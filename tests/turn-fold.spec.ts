@@ -256,6 +256,24 @@ describe('回答框只有一层', () => {
   })
 })
 
+describe('提示与可用高度', () => {
+  it('「已完成 · 用时」在整轮里找得到（宿主把它渲染成独立节点行）', () => {
+    const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
+    const body = source.slice(source.indexOf('captureProcessHint'), source.indexOf('captureProcessHint') + 1200)
+    expect(body).toContain("'[data-turn-process]'")
+    // 不能只在「工作步骤组」里找：那组可能是独立的一行
+    expect(body).not.toContain("matches('[data-step-process]')")
+    // 只取按钮里那段文字（后面跟着折叠箭头）
+    expect(body).toContain("querySelector('span')")
+  })
+  it('框的可用高度要扣掉框上方的东西（请求条、文案行），否则底部被输入框压住', () => {
+    const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
+    expect(source).toContain('aboveFrameHeight')
+    expect(source).toContain('requestBar')
+    expect(source).toContain('frameLabel')
+  })
+})
+
 describe('折叠条', () => {
   it('摘要条文本含轮次号、时刻与首句摘要', () => {
     expect(turnStripText(3, '17:31', '把工具栏收进更多')).toBe('第 3 轮 · 17:31 · 把工具栏收进更多')

@@ -353,12 +353,18 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
    * 输入框与轮首始终留在视野里。会话区本身没有布局（隐藏的标签）时返回 0，
    * 表示「先别限高」。
    */
-  const availableHeight = (container: Element): number => {
+  const availableHeight = (container: Element, record?: TurnRecord): number => {
     const viewport = typeof HTMLElement === 'undefined' ? 0 : (container as HTMLElement).clientHeight
     if (viewport === 0) return 0
     const composer = container.querySelector('[data-composer-seat]')
     const composerHeight = composer === null ? 0 : composer.getBoundingClientRect().height
-    return viewport - composerHeight - HEIGHT_MARGIN
+    // 框上方还有请求条与文案行——不扣掉，框底会伸到输入框下面。
+    let above = 0
+    if (record !== undefined) {
+      const framed = record.rows.find(row => row.hasAttribute(CAPPED_ATTR))
+      if (framed !== undefined) above = aboveFrameHeight(record, framed)
+    }
+    return viewport - composerHeight - HEIGHT_MARGIN - above
   }
 
   /**
@@ -376,6 +382,22 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     if (typeof document === 'undefined') return false
     if (document.querySelector('[data-chat-running]') !== null) return true
     return document.querySelector('[data-answer-status="running"]') !== null
+  }
+
+  /**
+   * 框上方占了多少高度：请求条、文案行，以及本轮里排在框前面的行。
+   *
+   * 可用高度要把它们扣掉，否则框的底边会伸到输入框下面（底部被压住）。
+   */
+  const aboveFrameHeight = (record: TurnRecord, framed: HTMLElement): number => {
+    let total = (record.requestBar?.offsetHeight ?? 0) + (record.frameLabel?.offsetHeight ?? 0)
+    for (const row of record.rows) {
+      if (row === framed) continue
+      // 只算排在框前面的行（文档顺序）。
+      if ((row.compareDocumentPosition(framed) & Node.DOCUMENT_POSITION_FOLLOWING) === 0) continue
+      total += row.getBoundingClientRect().height
+    }
+    return total
   }
 
   const applyCaps = (record: TurnRecord, available: number): void => {
@@ -445,10 +467,15 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
    */
   const captureProcessHint = (record: TurnRecord): string | undefined => {
     for (const row of record.rows) {
-      if (!row.matches('[data-step-process]')) continue
-      const button = row.querySelector('[data-turn-process]')
+      // 宿主把过程组头渲染成独立的节点行（它自己带 data-turn-process），
+      // 也可能嵌在组里——两种都找。
+      const button = row.matches('[data-turn-process]')
+        ? row
+        : row.querySelector('[data-turn-process]')
       if (button === null) continue
-      const text = (button.textContent ?? '').replace(/\s+/g, ' ').trim()
+      // 按钮里第一个 span 才是「已完成 · 用时 3.2s」那段文字（后面是折叠箭头）。
+      const label = button.querySelector('span')
+      const text = ((label?.textContent ?? button.textContent) ?? '').replace(/\s+/g, ' ').trim()
       button.setAttribute('data-chat-power-hint', '')
       return text === '' ? undefined : text
     }
@@ -707,7 +734,7 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
         if (record.collapsed) setCollapsed(record, false)
         ensureRequestBar(record)
         collapseThinking(record)
-        applyCaps(record, availableHeight(container))
+        applyCaps(record, availableHeight(container, record))
         applyProcessHint(record, captureProcessHint(record))
         ensureFrameLabel(record)
         continue
@@ -722,7 +749,7 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
         record.requestBar?.removeAttribute(REQUEST_HIDDEN_ATTR)
         ensureRequestBar(record)
         collapseThinking(record)
-        applyCaps(record, availableHeight(container))
+        applyCaps(record, availableHeight(container, record))
       }
       ensureFrameLabel(record)
     }
