@@ -47,7 +47,7 @@ export type ChatPowerLocaleKey =
   | 'selection.removeItem'
   | 'selection.multiAdded' | 'selection.editTitle' | 'selection.multiEditTitle'
   | 'selection.collectedCount'
-  | 'turnFold.label' | 'turnFold.labelWithSummary' | 'turnFold.collapse'
+  | 'turnFold.label' | 'turnFold.labelWithSummary'
   | 'turnFold.collapseAria' | 'turnFold.expandAria'
   | 'tools.chat' | 'tools.files' | 'tools.browser' | 'tools.terminal'
   | 'tools.openLocalFile' | 'tools.more' | 'tools.linkOpenDefault'
@@ -139,7 +139,6 @@ export const zh: Record<ChatPowerLocaleKey, string> = {
   'selection.collectedCount': '已收集 {count} 段',
   'turnFold.label': '第 {turn} 轮 · {clock}',
   'turnFold.labelWithSummary': '第 {turn} 轮 · {clock} · {summary}',
-  'turnFold.collapse': '收起',
   'turnFold.collapseAria': '收起这一轮',
   'turnFold.expandAria': '展开这一轮',
   'tools.chat': '会话',
@@ -239,7 +238,6 @@ export const en: Record<ChatPowerLocaleKey, string> = {
   'selection.collectedCount': '{count} collected',
   'turnFold.label': 'Turn {turn} · {clock}',
   'turnFold.labelWithSummary': 'Turn {turn} · {clock} · {summary}',
-  'turnFold.collapse': 'Collapse',
   'turnFold.collapseAria': 'Collapse this turn',
   'turnFold.expandAria': 'Expand this turn',
   'tools.chat': 'Chat',

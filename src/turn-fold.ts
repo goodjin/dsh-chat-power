@@ -9,7 +9,7 @@
  * 三条用户诉求与本模块的分工：
  * - 「思考块默认折叠、过程中展示、结束后自动折叠」由**宿主设置**实现
  *   （工作步骤收起时机＝回答结束后；收起后显示的回复＝仅最终回答），本模块不碰；
- * - 「当前轮不超过一屏」由 {@link distributeHeightCap} 分摊行高上限实现；
+ * - 「当前轮不超过一屏」由 {@link allocateRowHeights} 按比例分摊行高上限实现；
  * - 「新请求后历史轮折叠成小块、可展开可再收起」由折叠状态机 + 摘要条实现。
  *
  * 宿主重渲染可能把插件插入的摘要条冲掉，观察器负责补回；会话切换时整套状态重置，
@@ -89,34 +89,32 @@ export function formatClock(timestamp: number): string {
 /** 可用高度的下限：再窄也要给内容留一点可视高度。 */
 export const MIN_AVAILABLE_HEIGHT = 240
 
+/** 单行限高后的最小可读高度：再挤也不能把一块内容压成一条缝。 */
+export const MIN_ROW_HEIGHT = 180
+
 /**
- * 限高分摊：把“超出可用高度”的部分优先压到最高的行上。
+ * 行高分摊（按比例）：把可用高度按各行的内容高度比例分下去。
  *
- * 不给宿主行包容器（那要移动宿主节点），改为逐行限高：最高的行先让出空间，
- * 必要时次高的行也让。返回每行的上限（等于原高度表示不限）。
+ * 与「只压最高的一行」不同——那会把结果卡片压成几十像素的一条缝。这里按比例
+ * 分摊，每行再保留下限（{@link MIN_ROW_HEIGHT} 与可用高度的三成取大），
+ * 所以长块拿到的是它应得的那一份，而不是被牺牲掉。
  *
- * @param heights - 各行当前高度。
- * @param available - 可用高度（视口高减去输入框与余量）。
- * @returns 与 heights 等长的上限数组。
+ * @param heights - 各行的内容高度。
+ * @param available - 可用高度（会话区可视高度减去输入框与余量）。
+ * @returns 与 heights 等长的上限数组；未超出的行保持原值。
  */
-export function distributeHeightCap(heights: readonly number[], available: number): number[] {
-  // 上限始终是有限值：未让出空间的行保持原高度（等于不限），合计可直接比较。
-  const caps = heights.slice()
+export function allocateRowHeights(heights: readonly number[], available: number): number[] {
   const floor = Math.max(MIN_AVAILABLE_HEIGHT, Math.floor(available))
-  let total = heights.reduce((sum, height) => sum + height, 0)
-  if (total <= floor) return caps
-  let overflow = total - floor
-  // 从高到矮依次让出空间；每行至少留 MIN_AVAILABLE_HEIGHT/4 的可视高度。
-  const order = heights.map((height, index) => ({ height, index })).sort((a, b) => b.height - a.height)
-  const perRowFloor = Math.max(1, Math.floor(MIN_AVAILABLE_HEIGHT / 4))
-  for (const { height, index } of order) {
-    if (overflow <= 0) break
-    const give = Math.min(height - perRowFloor, overflow)
-    if (give <= 0) continue
-    caps[index] = height - give
-    overflow -= give
-  }
-  return caps
+  const total = heights.reduce((sum, height) => sum + height, 0)
+  if (total <= floor) return heights.slice()
+  const scale = floor / total
+  const readableFloor = Math.max(MIN_ROW_HEIGHT, Math.floor(floor * 0.28))
+  return heights.map(height => {
+    if (height <= 0) return height
+    const proportional = height * scale
+    const readable = Math.min(height, readableFloor)
+    return Math.min(height, Math.max(Math.floor(proportional), readable))
+  })
 }
 
 /**
@@ -246,43 +244,42 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     strip.dataset['signature'] = signature
     while (strip.firstChild !== null) strip.removeChild(strip.firstChild)
     const label = document.createElement('span')
-    label.className = css.stripLabel ?? '' 
+    label.className = css.stripLabel ?? ''
     label.textContent = turnStripText(record.number, formatClock(record.firstSeenAt), record.summary, t)
-    strip.appendChild(label)
-    if (record.collapsed) {
-      strip.setAttribute('data-state', 'collapsed')
-      strip.setAttribute('role', 'button')
-      strip.setAttribute('tabindex', '0')
-      strip.setAttribute('aria-label', `${label.textContent}（${t('turnFold.expandAria')}）`)
-      const expand = (): void => { setCollapsed(record, false); renderStrip(strip, record) }
-      strip.addEventListener('click', expand)
-      strip.addEventListener('keydown', (event: KeyboardEvent) => {
-        if (event.key !== 'Enter' && event.key !== ' ') return
-        event.preventDefault()
-        expand()
-      })
-      return
-    }
-    strip.setAttribute('data-state', 'expanded')
-    strip.removeAttribute('role')
-    strip.removeAttribute('tabindex')
-    const toggle = document.createElement('button')
-    toggle.type = 'button'
-    toggle.className = css.stripToggle ?? '' 
-    toggle.textContent = t('turnFold.collapse')
-    toggle.setAttribute('aria-label', t('turnFold.collapseAria'))
-    toggle.addEventListener('click', () => { setCollapsed(record, true); renderStrip(strip, record) })
-    strip.appendChild(toggle)
+    const chevron = document.createElement('span')
+    chevron.className = css.stripChevron ?? ''
+    chevron.setAttribute('aria-hidden', 'true')
+    chevron.textContent = record.collapsed ? '▸' : '▾'
+    strip.append(chevron, label)
+    strip.setAttribute('data-state', record.collapsed ? 'collapsed' : 'expanded')
+    strip.setAttribute('role', 'button')
+    strip.setAttribute('tabindex', '0')
+    strip.setAttribute('aria-expanded', record.collapsed ? 'false' : 'true')
+    strip.setAttribute('aria-label', record.collapsed
+      ? `${label.textContent}（${t('turnFold.expandAria')}）`
+      : `${label.textContent}（${t('turnFold.collapseAria')}）`)
   }
 
-  const ensureStrip = (record: TurnRecord, firstRow: HTMLElement): void => {    const parent = firstRow.parentElement
+  const ensureStrip = (record: TurnRecord, firstRow: HTMLElement): void => {
+    const parent = firstRow.parentElement
     if (parent === null) return
     let strip = record.strip
     if (strip === undefined || !strip.isConnected || strip.parentElement !== parent) {
       strip = document.createElement('div')
-      strip.className = css.strip ?? '' 
+      strip.className = css.strip ?? ''
       strip.setAttribute(STRIP_ATTR, '')
       strip.setAttribute('data-chat-power-turn', String(record.number))
+      // 整条横条就是开关：点击即折叠/展开（键盘 Enter / 空格同样可用）。
+      strip.addEventListener('click', () => {
+        setCollapsed(record, !record.collapsed)
+        renderStrip(strip!, record)
+      })
+      strip.addEventListener('keydown', (event: KeyboardEvent) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return
+        event.preventDefault()
+        setCollapsed(record, !record.collapsed)
+        renderStrip(strip!, record)
+      })
       parent.insertBefore(strip, firstRow)
       record.strip = strip
     }
@@ -303,7 +300,8 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
   }
 
   /**
-   * 给这一轮的行分摊高度上限：超出的部分压到最高的行上，该行内部滚动。
+   * 给这一轮的行分摊高度上限：超出的部分按比例分下去，该行内部滚动。
+   * 高度取**内容高度**（scrollHeight）——用盒子高度会把已被限高的行越量越小。
    * 内容增长时若该行原本贴着底部，就继续贴底（用户手动上滚后不再抢滚动）。
    */
   const applyCaps = (record: TurnRecord, available: number): void => {
@@ -311,8 +309,11 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
       clearCaps(record)
       return
     }
-    const heights = record.rows.map(row => row.getBoundingClientRect().height)
-    const caps = distributeHeightCap(heights, available)
+    const heights = record.rows.map(row => {
+      const content = row.scrollHeight
+      return content > 0 ? content : row.getBoundingClientRect().height
+    })
+    const caps = allocateRowHeights(heights, available)
     record.rows.forEach((row, index) => {
       const height = heights[index] ?? 0
       const cap = caps[index] ?? height

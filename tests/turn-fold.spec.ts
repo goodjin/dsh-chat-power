@@ -9,7 +9,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import {
-  distributeHeightCap,
+  allocateRowHeights,
   formatClock,
   groupTurnsByNumber,
   summarizeTurn,
@@ -67,26 +67,26 @@ describe('时刻格式化', () => {
   })
 })
 
-describe('限高分摊', () => {
-  it('合计不超过可用高度', () => {
-    const caps = distributeHeightCap([400, 300, 200], 600)
+describe('行高分摊（按比例，不压扁长块）', () => {
+  it('总高不超可用高度时不压任何行', () => {
+    expect(allocateRowHeights([30, 100], 600)).toEqual([30, 100])
+  })
+  it('超出时按比例分摊，最高的行不会被压成一条缝', () => {
+    const caps = allocateRowHeights([40, 800, 900], 600)
+    expect(caps[1]!).toBeGreaterThanOrEqual(200)
+    expect(caps[2]!).toBeGreaterThanOrEqual(200)
+    // 短行不受影响
+    expect(caps[0]).toBe(40)
+  })
+  it('没有行触底时合计不超过可用高度', () => {
+    const caps = allocateRowHeights([500, 500], 600)
+    expect(caps[0]).toBe(300)
+    expect(caps[1]).toBe(300)
     expect(caps.reduce((sum, cap) => sum + cap, 0)).toBeLessThanOrEqual(600)
   })
-
-  it('总高不超可用高度时原样返回（不压行）', () => {
-    expect(distributeHeightCap([100, 120], 600)).toEqual([100, 120])
-  })
-
-  it('超出时优先压最高的行，单行不会被压成 0', () => {
-    const caps = distributeHeightCap([900, 100], 300)
-    expect(caps[1]).toBe(100)
-    expect(caps[0]!).toBeGreaterThan(0)
-    expect(caps.reduce((sum, cap) => sum + cap, 0)).toBeLessThanOrEqual(300)
-  })
-
-  it('可用高度有下限，不会把内容压没', () => {
-    const caps = distributeHeightCap([900, 900], 40)
-    expect(Math.min(...caps)).toBeGreaterThan(0)
+  it('空间极紧时每行仍保留可读高度', () => {
+    const caps = allocateRowHeights([900, 900], 300)
+    expect(Math.min(...caps)).toBeGreaterThanOrEqual(160)
   })
 })
 
@@ -137,5 +137,20 @@ describe('折叠条', () => {
     const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8')
     expect(readme).toContain('工作步骤收起时机')
     expect(readme).toContain('收起后显示的回复')
+  })
+
+  it('摘要条整条可点（点击即折叠/展开），不再有独立按钮', () => {
+    const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
+    const css = readFileSync(new URL('../src/turn-fold.module.css', import.meta.url), 'utf8')
+    expect(source).not.toContain('stripToggle')
+    expect(css).not.toContain('stripToggle')
+    // 折叠与展开都走同一条横条
+    expect(source).toContain('data-state')
+  })
+
+  it('限高按内容高度计算，避免越滚越小', () => {
+    const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
+    expect(source).toContain('scrollHeight')
+    expect(source).toContain('allocateRowHeights')
   })
 })
