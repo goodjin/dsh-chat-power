@@ -9,13 +9,32 @@
   display: none !important;
 }
 
-/* 被限高的行：内容超出时行内滚动（上限由插件写入的 CSS 变量给出），
-   并且至少占满一屏——这样上方的历史摘要条被顶到屏幕外，屏里只剩当前轮。 */
+/* 输出框：内容超出时向上裁掉（不出现滚动条，历史直接消失，输出贴底继续）。
+   框至少占满一屏——这样上方的历史摘要条被顶到屏幕外，屏里只剩当前轮。 */
 [data-chat-power-capped] {
   min-height: var(--chat-power-floor, none);
   max-height: var(--chat-power-cap, none);
-  overflow-y: auto;
+  overflow-y: hidden;
   overscroll-behavior: contain;
+  border: 1px solid var(--dsw-alias-border-l2, rgba(127, 127, 127, 0.2));
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-1, transparent);
+}
+
+/* 输出框左上角的文案：思考 / 工具调用 / 回答。 */
+.frameLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 4px;
+  padding: 0 2px;
+  color: var(--dsw-alias-label-secondary, inherit);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.frameLabel[data-kind='answer'] {
+  color: var(--dsw-alias-label-primary, inherit);
 }
 
 /* 我们收起的思考/工具行：结果出来后让位给结果块（组头保留，可点开）。 */

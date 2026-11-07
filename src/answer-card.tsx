@@ -42,6 +42,8 @@ export function AnswerCard(props: {
   readonly sessionId: string | undefined
   readonly readers: MarkdownTurnReaders | undefined
   readonly t: (key: string) => string
+  /** 宿主给答案步的状态：running=还在流式输出，settled=已完成。 */
+  readonly status?: string
 }): ReactNode {
   const [copied, setCopied] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -57,6 +59,8 @@ export function AnswerCard(props: {
   const text = answerText(props.blocks)
   const canEdit = props.sessionId !== undefined && props.readers !== undefined
   const t = props.t
+  // 还在流式输出时先不给编辑/复制按钮——回答完成了才出现。
+  const settled = props.status !== 'running'
 
   // 发送控制器挂一次；props 经 ref 取最新值，避免闭包捕获旧会话号。
   const controller = useMemo(() => createSendController({
@@ -135,7 +139,7 @@ export function AnswerCard(props: {
           <div className={styles.answerCardHeader}>
             <span className={styles.answerCardTitle}>{t('answerCard.title')}</span>
             <div className={styles.answerHeaderActions}>
-              {canEdit && (
+              {canEdit && settled && (
                 <Tooltip portal label={t('answerCard.edit')} side="bottom" delayMs={500}>
                   <button
                     type="button"
@@ -149,19 +153,21 @@ export function AnswerCard(props: {
                   </button>
                 </Tooltip>
               )}
-              <button
-                type="button"
-                className={uiButtonClass}
-                data-action="copy-answer"
-                data-copied={copied || undefined}
-                aria-label={copied ? t('answerCard.copied') : t('answerCard.copy')}
-                title={copied ? t('answerCard.copied') : t('answerCard.copy')}
-                onClick={run}
-              >
-                {copied
-                  ? <IconCheckOutlineRegular size={16} className={styles.copiedIcon} />
-                  : <IconCopyOutlineRegular size={16} className={styles.answerCardIcon} />}
-              </button>
+              {settled && (
+                <button
+                  type="button"
+                  className={uiButtonClass}
+                  data-action="copy-answer"
+                  data-copied={copied || undefined}
+                  aria-label={copied ? t('answerCard.copied') : t('answerCard.copy')}
+                  title={copied ? t('answerCard.copied') : t('answerCard.copy')}
+                  onClick={run}
+                >
+                  {copied
+                    ? <IconCheckOutlineRegular size={16} className={styles.copiedIcon} />
+                    : <IconCopyOutlineRegular size={16} className={styles.answerCardIcon} />}
+                </button>
+              )}
             </div>
           </div>
           <div className={styles.answerCardBody} data-answer-body="">{props.children}</div>

@@ -140,6 +140,29 @@ export function scrollTopForTurnTop(rowTop: number, containerTop: number, scroll
   return Math.max(0, Math.round(rowTop - containerTop + scrollTop))
 }
 
+/** 输出框里当前展示的内容类型（框左上角的文案）。 */
+export type FrameKind = 'thinking' | 'tools' | 'answer'
+
+/**
+ * 判定输出框当前展示的是什么内容。
+ *
+ * 宿主把思考、工具调用、回答分别渲染成不同的行：思考行带 `data-chat-group-part`，
+ * 工具调用行的 flow kind 是 `tool-call`，回答行里有我们自己的答案卡。
+ *
+ * @param content - 这一框里出现过的内容标记。
+ * @returns 内容类型；有回答就是回答，其次工具调用，最后思考。
+ */
+export function frameKindOf(content: {
+  readonly hasAnswer: boolean
+  readonly hasToolCalls: boolean
+  readonly hasReasoning: boolean
+}): FrameKind {
+  if (content.hasAnswer) return 'answer'
+  if (content.hasToolCalls) return 'tools'
+  if (content.hasReasoning) return 'thinking'
+  return 'answer'
+}
+
 /**
  * 摘要条文本：轮次号 · 时刻 · 首句摘要（没有摘要时省掉末段）。
  * @param number - 轮次号。
@@ -162,6 +185,9 @@ export function turnStripText(
 /** 插件给被限高的行加的标记（CSS 据此开启内部滚动）。 */
 export const CAPPED_ATTR = 'data-chat-power-capped'
 
+/** 插件插在输出框左上角的文案（思考 / 工具调用 / 回答）。 */
+export const FRAME_LABEL_ATTR = 'data-chat-power-frame-label'
+
 /** 限高时给会话区留的余量（输入框上沿到视口顶的呼吸位）。 */
 const HEIGHT_MARGIN = 24
 
@@ -177,6 +203,7 @@ interface TurnRecord {
   collapsed: boolean
   strip?: HTMLElement
   requestBar?: HTMLElement
+  frameLabel?: HTMLElement
   requestCollapsed: boolean
   requestSummary: string
 }
@@ -362,17 +389,61 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
         row.style.removeProperty('--chat-power-floor')
         return
       }
-      // 结果块那一行至少占满一屏：这样会话区不会把历史摘要条又拉回屏内。
+      // 输出框：至少占满一屏，超出的部分向上裁掉（不出现滚动条，历史直接消失）。
       row.style.setProperty('--chat-power-floor', `${Math.floor(available)}px`)
       row.setAttribute(CAPPED_ATTR, '')
       if (cap >= height) {
         row.style.removeProperty('--chat-power-cap')
         return
       }
+      // 贴着底部才跟着长；用户手动上滚过就不再抢滚动。
       const atBottom = row.scrollTop + row.clientHeight >= row.scrollHeight - 4
       row.style.setProperty('--chat-power-cap', `${Math.floor(cap)}px`)
       if (atBottom) row.scrollTop = row.scrollHeight
     })
+  }
+
+  /**
+   * 输出框左上角的文案：按框里当前是什么内容显示 思考 / 工具调用 / 回答。
+   *
+   * 宿主把思考、工具调用、回答渲染成不同的行：思考行带 `data-chat-group-part`，
+   * 工具调用行的 flow kind 是 `tool-call`，回答行里有我们自己的答案卡。
+   */
+  const frameLabelOf = (row: HTMLElement): FrameKind => frameKindOf({
+    hasAnswer: row.querySelector('[data-answer-body]') !== null,
+    hasToolCalls: row.querySelector('[data-chat-flow-kind="tool-call"]') !== null
+      || row.querySelector('[data-chat-flow-kind="tool-calls"]') !== null,
+    hasReasoning: row.querySelector('[data-chat-group-part="reasoning"]') !== null,
+  })
+
+  /** 在输出框上方插入（或更新）左上角文案；框不在了就撤掉。 */
+  const ensureFrameLabel = (record: TurnRecord): void => {
+    const framed = record.rows.find(row => row.hasAttribute(CAPPED_ATTR))
+    if (framed === undefined) {
+      record.frameLabel?.remove()
+      record.frameLabel = undefined
+      return
+    }
+    const parent = framed.parentElement
+    if (parent === null) {
+      record.frameLabel?.remove()
+      record.frameLabel = undefined
+      return
+    }
+    let label = record.frameLabel
+    if (label === undefined || !label.isConnected || label.parentElement !== parent) {
+      label = document.createElement('div')
+      label.className = css.frameLabel ?? ''
+      label.setAttribute(FRAME_LABEL_ATTR, '')
+      parent.insertBefore(label, framed)
+      record.frameLabel = label
+    }
+    const kind = frameLabelOf(framed)
+    const text = kind === 'thinking'
+      ? t('turnFold.frameThinking')
+      : kind === 'tools' ? t('turnFold.frameTools') : t('turnFold.frameAnswer')
+    if (label.textContent !== text) label.textContent = text
+    label.setAttribute('data-kind', kind)
   }
 
   /** 收起折叠态的行不需要限高（它们不可见），清掉之前的限高痕迹。 */
@@ -571,6 +642,7 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
         ensureRequestBar(record)
         collapseThinking(record)
         applyCaps(record, availableHeight(container))
+        ensureFrameLabel(record)
         continue
       }
       ensureStrip(record, firstRow)
@@ -585,6 +657,7 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
         collapseThinking(record)
         applyCaps(record, availableHeight(container))
       }
+      ensureFrameLabel(record)
     }
     if (pendingAlign) {
       pendingAlign = false

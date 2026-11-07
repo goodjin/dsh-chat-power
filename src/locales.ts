@@ -50,6 +50,7 @@ export type ChatPowerLocaleKey =
   | 'selection.collectedCount'
   | 'turnFold.label' | 'turnFold.labelWithSummary' | 'turnFold.requestLabel'
   | 'turnFold.requestExpand' | 'turnFold.requestCollapse'
+  | 'turnFold.frameThinking' | 'turnFold.frameTools' | 'turnFold.frameAnswer'
   | 'turnFold.collapseAria' | 'turnFold.expandAria'
   | 'tools.chat' | 'tools.files' | 'tools.browser' | 'tools.terminal'
   | 'tools.openLocalFile' | 'tools.more' | 'tools.linkOpenDefault'
@@ -142,6 +143,9 @@ export const zh: Record<ChatPowerLocaleKey, string> = {
   'selection.multiEditTitle': '编辑多选内容',
   'selection.collectedCount': '已收集 {count} 段',
   'turnFold.label': '第 {turn} 轮 · {clock}',
+  'turnFold.frameThinking': '思考',
+  'turnFold.frameTools': '工具调用',
+  'turnFold.frameAnswer': '回答',
   'turnFold.requestLabel': '你的请求 · {summary}',
   'turnFold.requestExpand': '展开请求',
   'turnFold.requestCollapse': '收起请求',
@@ -246,6 +250,9 @@ export const en: Record<ChatPowerLocaleKey, string> = {
   'selection.multiEditTitle': 'Edit multi-selected text',
   'selection.collectedCount': '{count} collected',
   'turnFold.label': 'Turn {turn} · {clock}',
+  'turnFold.frameThinking': 'Thinking',
+  'turnFold.frameTools': 'Tool calls',
+  'turnFold.frameAnswer': 'Answer',
   'turnFold.requestLabel': 'Your request · {summary}',
   'turnFold.requestExpand': 'Expand request',
   'turnFold.requestCollapse': 'Collapse request',

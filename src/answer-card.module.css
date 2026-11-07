@@ -20,6 +20,11 @@
   gap: 8px;
   padding: 4px 4px 4px 12px;
   border-block-end: 1px solid var(--dsw-alias-settings-card-stroke, rgba(127, 127, 127, 0.2));
+  /* 正文被裁掉时（超出一屏），头部与右侧的编辑/复制按钮仍留在框顶。 */
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--dsw-alias-settings-card-fill, transparent);
 }
 .answerCardTitle {
   font-size: 12px;

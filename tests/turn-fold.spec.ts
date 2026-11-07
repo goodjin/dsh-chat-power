@@ -11,6 +11,7 @@ import { readFileSync } from 'node:fs'
 import {
   capTallestRow,
   formatClock,
+  frameKindOf,
   groupTurnsByNumber,
   scrollTopForTurnTop,
   summarizeTurn,
@@ -151,6 +152,35 @@ describe('请求条的形态', () => {
   })
 })
 
+describe('输出外框', () => {
+  it('框内不出现滚动条：超出的一屏向上裁掉（历史消失，输出继续贴底）', () => {
+    const css = readFileSync(new URL('../src/turn-fold.module.css', import.meta.url), 'utf8')
+    const capped = css.slice(css.indexOf('[data-chat-power-capped]'), css.indexOf('[data-chat-power-capped]') + 300)
+    expect(capped).toMatch(/overflow-y:\s*hidden/)
+    expect(capped).not.toMatch(/overflow-y:\s*auto/)
+  })
+  it('框上左侧按内容显示 思考 / 工具调用 / 回答', () => {
+    expect(frameKindOf({ hasAnswer: false, hasToolCalls: false, hasReasoning: true })).toBe('thinking')
+    expect(frameKindOf({ hasAnswer: false, hasToolCalls: true, hasReasoning: true })).toBe('tools')
+    expect(frameKindOf({ hasAnswer: true, hasToolCalls: true, hasReasoning: true })).toBe('answer')
+    expect(frameKindOf({ hasAnswer: false, hasToolCalls: false, hasReasoning: false })).toBe('answer')
+  })
+  it('DOM 层认得出三种内容（宿主的行标记）', () => {
+    const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
+    expect(source).toContain('data-chat-group-part')
+    expect(source).toContain('tool-call')
+    expect(source).toContain('data-answer-body')
+    expect(source).toContain('data-chat-power-frame-label')
+  })
+  it('回答完成后才出现编辑/复制按钮（宿主给 running/settled）', () => {
+    const card = readFileSync(new URL('../src/answer-card.tsx', import.meta.url), 'utf8')
+    expect(card).toContain("status")
+    expect(card).toContain('running')
+    const wrapper = readFileSync(new URL('../src/conversation-surfaces.tsx', import.meta.url), 'utf8')
+    expect(wrapper).toContain('status')
+  })
+})
+
 describe('折叠条', () => {
   it('摘要条文本含轮次号、时刻与首句摘要', () => {
     expect(turnStripText(3, '17:31', '把工具栏收进更多')).toBe('第 3 轮 · 17:31 · 把工具栏收进更多')
@@ -169,7 +199,7 @@ describe('折叠条', () => {
     expect(source).not.toContain('innerHTML')
   })
 
-  it('限高：按行分摊上限，超出的行内部滚动并保持贴底', () => {
+  it('限高：可用高度扣掉输入框，上限以 CSS 变量给出，内容贴底跟随', () => {
     const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
     const css = readFileSync(new URL('../src/turn-fold.module.css', import.meta.url), 'utf8')
     // 可用高度要扣掉输入框；上限以 CSS 变量给出，样式在 CSS 模块里。
@@ -178,7 +208,8 @@ describe('折叠条', () => {
     expect(source).toContain('data-chat-power-capped')
     expect(source).toContain('scrollHeight')
     expect(css).toContain('max-height')
-    expect(css).toContain('overflow-y: auto')
+    // 框内不出滚动条：超出的一屏向上裁掉。
+    expect(css).toContain('overflow-y: hidden')
   })
 
   it('容器晚挂载也要能起来：轮询重试并跟随容器更换', () => {

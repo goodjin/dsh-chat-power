@@ -152,6 +152,7 @@ function makeAssistantStepWrapper(
       sessionId: currentSessionIdFromDom(),
       readers: host.readers,
       t: host.dshT,
+      status: props.node?.data?.status as string | undefined,
       children: native,
     })
   }
