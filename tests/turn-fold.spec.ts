@@ -7,11 +7,13 @@
  */
 
 import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
 import {
   distributeHeightCap,
   formatClock,
   groupTurnsByNumber,
   summarizeTurn,
+  turnStripText,
 } from '../src/turn-fold.ts'
 
 /** 最小行面：只要轮次号与文本，便于构造假行。 */
@@ -85,5 +87,24 @@ describe('限高分摊', () => {
   it('可用高度有下限，不会把内容压没', () => {
     const caps = distributeHeightCap([900, 900], 40)
     expect(Math.min(...caps)).toBeGreaterThan(0)
+  })
+})
+
+describe('折叠条', () => {
+  it('摘要条文本含轮次号、时刻与首句摘要', () => {
+    expect(turnStripText(3, '17:31', '把工具栏收进更多')).toBe('第 3 轮 · 17:31 · 把工具栏收进更多')
+  })
+
+  it('没有摘要时只留轮次号与时刻', () => {
+    expect(turnStripText(3, '17:31', '')).toBe('第 3 轮 · 17:31')
+  })
+
+  it('折叠只加属性、插自有元素，不改写宿主行的内容', () => {
+    const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
+    expect(source).toContain('data-chat-turn')
+    expect(source).toContain('data-chat-power-collapsed')
+    expect(source).toContain('data-chat-power-turn-strip')
+    expect(source).not.toContain('replaceChildren')
+    expect(source).not.toContain('innerHTML')
   })
 })

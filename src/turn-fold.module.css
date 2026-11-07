@@ -1,0 +1,70 @@
+/* 轮次折叠与当前轮限高的样式。
+ *
+ * 折叠中的轮次：整轮的行隐藏（行高归零，宿主的滚动落地计算随之跳过）。
+ * 摘要条：折叠态是一行可点的摘要，展开态是同一行右侧的「收起」药丸。
+ * 颜色走宿主语义 token，深浅主题随之切换。 */
+
+/* 折叠中的轮次行：隐藏。 */
+[data-chat-power-collapsed] {
+  display: none !important;
+}
+
+/* 摘要条 / 展开态药丸。 */
+.strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+  padding: 6px 12px;
+  border: 1px solid var(--dsw-alias-border-l1, rgba(127, 127, 127, 0.15));
+  border-radius: 6px;
+  background: var(--dsw-alias-bg-hover, rgba(127, 127, 127, 0.06));
+  color: var(--dsw-alias-label-secondary, inherit);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.strip[data-state='collapsed'] {
+  cursor: pointer;
+}
+
+.strip[data-state='collapsed']:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(127, 127, 127, 0.1));
+}
+
+.strip:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary, var(--dsw-alias-brand-primary, currentColor));
+  outline-offset: 1px;
+}
+
+.stripLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 展开态右侧的「收起」药丸。 */
+.stripToggle {
+  flex: none;
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid var(--dsw-alias-border-l4, rgba(127, 127, 127, 0.25));
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  line-height: 18px;
+  cursor: pointer;
+}
+
+.stripToggle:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(127, 127, 127, 0.12));
+}
+
+.stripToggle:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary, var(--dsw-alias-brand-primary, currentColor));
+  outline-offset: 1px;
+}

@@ -15,6 +15,9 @@
  * 宿主重渲染可能把插件插入的摘要条冲掉，观察器负责补回；会话切换时整套状态重置，
  * 不把上一会话的折叠状态带到新会话。
  */
+import { fallbackT } from './locales.ts'
+import type { RuntimeT } from './locales.ts'
+import css from './turn-fold.module.css'
 
 /** 行元素的最小面：轮次号与文本（便于在无 DOM 环境里测试）。 */
 export interface TurnRowLike {
@@ -90,7 +93,7 @@ export const MIN_AVAILABLE_HEIGHT = 240
  * 限高分摊：把“超出可用高度”的部分优先压到最高的行上。
  *
  * 不给宿主行包容器（那要移动宿主节点），改为逐行限高：最高的行先让出空间，
- * 必要时次高的行也让。返回每行的上限（`Infinity` 表示不限）。
+ * 必要时次高的行也让。返回每行的上限（等于原高度表示不限）。
  *
  * @param heights - 各行当前高度。
  * @param available - 可用高度（视口高减去输入框与余量）。
@@ -114,4 +117,231 @@ export function distributeHeightCap(heights: readonly number[], available: numbe
     overflow -= give
   }
   return caps
+}
+
+/**
+ * 摘要条文本：轮次号 · 时刻 · 首句摘要（没有摘要时省掉末段）。
+ * @param number - 轮次号。
+ * @param clock - 时刻（HH:MM）。
+ * @param summary - 首句摘要。
+ * @param format - 词典函数；缺省用本地词典（中文）。
+ * @returns 摘要条文本。
+ */
+export function turnStripText(
+  number: number,
+  clock: string,
+  summary: string,
+  format?: (key: string, params?: Record<string, string | number>) => string,
+): string {
+  const t = format ?? fallbackT
+  const key = summary === '' ? 'turnFold.label' : 'turnFold.labelWithSummary'
+  return t(key, { turn: number, clock, summary })
+}
+
+/** 一轮的状态：行、首见时刻、摘要、是否折叠、摘要条元素。 */
+interface TurnRecord {
+  number: number
+  rows: HTMLElement[]
+  firstSeenAt: number
+  summary: string
+  collapsed: boolean
+  strip?: HTMLElement
+}
+
+/** 折叠控制器的可注入面（便于测试与宿主差异适配）。 */
+export interface TurnFoldOptions {
+  /** 聊天滚动容器；缺省按 `[data-conversation-scroll]` 查。 */
+  root?: () => Element | null
+  /** 文案词典。 */
+  t?: RuntimeT
+  /** 注入 DOM 观察。 */
+  observe?: (target: Element, callback: () => void) => () => void
+  /** 注入时钟。 */
+  now?: () => number
+}
+
+/**
+ * 启动轮次折叠：新一轮出现时把历史轮折叠成摘要条，当前轮保持展开。
+ *
+ * 只做两件事：给宿主行加/去折叠属性、在该轮第一行前插入插件自己的摘要条。
+ * 不移动宿主节点、不改写宿主内容；宿主重渲染冲掉摘要条时由观察器补回。
+ *
+ * @param options - 可注入的依赖与文案。
+ * @returns 停止函数（移除摘要条、清掉折叠属性）。
+ */
+export function startTurnFold(options: TurnFoldOptions = {}): () => void {
+  const t = options.t ?? fallbackT
+  const now = options.now ?? (() => Date.now())
+  const observe = options.observe ?? ((target: Element, callback: () => void) => {
+    const observer = new MutationObserver(() => { callback() })
+    observer.observe(target, { childList: true, subtree: true, attributes: true, attributeFilter: [TURN_ATTR] })
+    return () => observer.disconnect()
+  })
+
+  let stopped = false
+  let sessionKey: string | undefined
+  let currentTurn = 0
+  let records = new Map<number, TurnRecord>()
+  let stopObserving: (() => void) | undefined
+
+  const scroller = (): Element | null => {
+    if (options.root !== undefined) return options.root()
+    if (typeof document === 'undefined') return null
+    return document.querySelector('[data-conversation-scroll]')
+  }
+
+  /** 取滚动容器里的聊天行：只取最外层带轮次号的元素（跳过嵌套的同名标记）。 */
+  const rowsOf = (container: Element): HTMLElement[] => {
+    const rows: HTMLElement[] = []
+    const found = container.querySelectorAll<HTMLElement>(`[${TURN_ATTR}]`)
+    for (const row of Array.from(found)) {
+      if (row.closest(`[${TURN_ATTR}]`) !== row) continue
+      rows.push(row)
+    }
+    return rows
+  }
+
+  const sessionOf = (container: Element): string | undefined =>
+    container.closest('[data-conversation-session]')?.getAttribute('data-conversation-session') ?? undefined
+
+  const resetSession = (key: string | undefined): void => {
+    for (const record of records.values()) {
+      record.strip?.remove()
+      for (const row of record.rows) row.removeAttribute(COLLAPSED_ATTR)
+    }
+    records = new Map()
+    currentTurn = 0
+    sessionKey = key
+  }
+
+  const setCollapsed = (record: TurnRecord, collapsed: boolean): void => {
+    record.collapsed = collapsed
+    for (const row of record.rows) {
+      if (collapsed) row.setAttribute(COLLAPSED_ATTR, '')
+      else row.removeAttribute(COLLAPSED_ATTR)
+    }
+  }
+
+  /** 摘要条的稳定签名：内容没变就不重画，避免观察器自激。 */
+  const signatureOf = (record: TurnRecord): string =>
+    `${record.number}|${record.collapsed ? 'c' : 'e'}|${record.firstSeenAt}|${record.summary}`
+
+  const renderStrip = (strip: HTMLElement, record: TurnRecord): void => {
+    const signature = signatureOf(record)
+    if (strip.dataset['signature'] === signature) return
+    strip.dataset['signature'] = signature
+    while (strip.firstChild !== null) strip.removeChild(strip.firstChild)
+    const label = document.createElement('span')
+    label.className = css.stripLabel ?? '' 
+    label.textContent = turnStripText(record.number, formatClock(record.firstSeenAt), record.summary, t)
+    strip.appendChild(label)
+    if (record.collapsed) {
+      strip.setAttribute('data-state', 'collapsed')
+      strip.setAttribute('role', 'button')
+      strip.setAttribute('tabindex', '0')
+      strip.setAttribute('aria-label', `${label.textContent}（${t('turnFold.expandAria')}）`)
+      const expand = (): void => { setCollapsed(record, false); renderStrip(strip, record) }
+      strip.addEventListener('click', expand)
+      strip.addEventListener('keydown', (event: KeyboardEvent) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return
+        event.preventDefault()
+        expand()
+      })
+      return
+    }
+    strip.setAttribute('data-state', 'expanded')
+    strip.removeAttribute('role')
+    strip.removeAttribute('tabindex')
+    const toggle = document.createElement('button')
+    toggle.type = 'button'
+    toggle.className = css.stripToggle ?? '' 
+    toggle.textContent = t('turnFold.collapse')
+    toggle.setAttribute('aria-label', t('turnFold.collapseAria'))
+    toggle.addEventListener('click', () => { setCollapsed(record, true); renderStrip(strip, record) })
+    strip.appendChild(toggle)
+  }
+
+  const ensureStrip = (record: TurnRecord, firstRow: HTMLElement): void => {
+    const parent = firstRow.parentElement
+    if (parent === null) return
+    let strip = record.strip
+    if (strip === undefined || !strip.isConnected || strip.parentElement !== parent) {
+      strip = document.createElement('div')
+      strip.className = css.strip ?? '' 
+      strip.setAttribute(STRIP_ATTR, '')
+      strip.setAttribute('data-chat-power-turn', String(record.number))
+      parent.insertBefore(strip, firstRow)
+      record.strip = strip
+    }
+    renderStrip(strip, record)
+  }
+
+  const sync = (): void => {
+    if (stopped) return
+    const container = scroller()
+    if (container === null) return
+    const key = sessionOf(container)
+    if (key !== sessionKey) resetSession(key)
+    const rows = rowsOf(container)
+    if (rows.length === 0) return
+    const groups = groupTurnsByNumber(rows)
+    if (groups.length === 0) return
+    for (const group of groups) {
+      const existing = records.get(group.number)
+      if (existing === undefined) {
+        records.set(group.number, {
+          number: group.number,
+          rows: group.rows as HTMLElement[],
+          firstSeenAt: now(),
+          summary: summarizeTurn(group.rows),
+          collapsed: false,
+        })
+        continue
+      }
+      existing.rows = group.rows as HTMLElement[]
+      if (existing.summary === '') existing.summary = summarizeTurn(group.rows)
+    }
+    for (const number of [...records.keys()]) {
+      if (!groups.some(group => group.number === number)) records.delete(number)
+    }
+    const maxTurn = groups.reduce((max, group) => Math.max(max, group.number), 0)
+    if (maxTurn > currentTurn) {
+      currentTurn = maxTurn
+      // 新一轮开始：此前的轮次折叠成摘要条，只有当前轮留在主屏。
+      for (const record of records.values()) {
+        if (record.number < currentTurn) setCollapsed(record, true)
+      }
+    }
+    for (const record of records.values()) {
+      const firstRow = record.rows[0]
+      if (firstRow === undefined) continue
+      if (record.number === currentTurn) {
+        record.strip?.remove()
+        record.strip = undefined
+        if (record.collapsed) setCollapsed(record, false)
+        continue
+      }
+      ensureStrip(record, firstRow)
+      setCollapsed(record, record.collapsed)
+    }
+  }
+
+  const attach = (): void => {
+    const container = scroller()
+    if (container === null) return
+    stopObserving = observe(container, () => { sync() })
+    sync()
+  }
+  attach()
+
+  return () => {
+    stopped = true
+    stopObserving?.()
+    stopObserving = undefined
+    for (const record of records.values()) {
+      record.strip?.remove()
+      for (const row of record.rows) row.removeAttribute(COLLAPSED_ATTR)
+    }
+    records = new Map()
+  }
 }
