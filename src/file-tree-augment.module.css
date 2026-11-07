@@ -12,7 +12,7 @@
 /* 鼠标移过整行：变色 + 框线（用户点名的交互；键盘聚焦同待遇）。 */
 [data-chat-tools-session] li[data-files-entry="file"]:hover,
 [data-chat-tools-session] li[data-files-entry="file"]:focus-within {
-  background: var(--dsw-alias-bg-hover, rgba(127, 127, 127, 0.12));
+  background: var(--dsw-alias-interactive-bg-hover, rgba(127, 127, 127, 0.12));
   border-color: var(--dsw-alias-border-l1, rgba(127, 127, 127, 0.2));
 }
 
@@ -34,7 +34,7 @@
   display: inline-flex; align-items: center; justify-content: center;
   flex: none; width: 28px; height: 28px; padding: 0;
   border: 1px solid var(--dsw-alias-border-l2, rgba(127, 127, 127, 0.2)); border-radius: 6px;
-  background: var(--dsw-alias-bg-container, var(--ds-bg-container, #fff));
+  background: var(--dsw-alias-bg-layer-1, var(--ds-bg-container, #fff));
   color: var(--dsw-alias-label-secondary, inherit);
   cursor: pointer; opacity: 0; pointer-events: none;
 }
@@ -44,7 +44,7 @@
   opacity: 1; pointer-events: auto;
 }
 [data-chat-tools-session] li[data-files-entry="file"] > [data-chat-file-edit]:hover {
-  background: var(--dsw-alias-bg-hover, rgba(127, 127, 127, 0.12));
+  background: var(--dsw-alias-interactive-bg-hover, rgba(127, 127, 127, 0.12));
   color: var(--dsw-alias-label-primary, inherit);
 }
 

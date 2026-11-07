@@ -6,7 +6,7 @@
 
 /* 会话头部动作槽位的入口图标（打开本机文件、链接偏好「更多」）。 */
 .iconEntry { display:inline-flex; align-items:center; justify-content:center; flex:none; width:32px; height:28px; padding:0; border:none; border-radius:6px; background:transparent; color:var(--dsw-alias-label-secondary,inherit); cursor:pointer; }
-.iconEntry:hover { background:var(--dsw-alias-bg-hover,rgba(127,127,127,.12)); color:var(--dsw-alias-label-primary,inherit); }
+.iconEntry:hover { background:var(--dsw-alias-interactive-bg-hover,rgba(127,127,127,.12)); color:var(--dsw-alias-label-primary,inherit); }
 .iconEntry:focus-visible { outline:2px solid var(--dsw-alias-state-business-primary,var(--dsw-alias-brand-primary,currentColor)); outline-offset:1px; }
 
 /* 正文与工具行共用 12px 左缘（此前正文 24px / 工具栏 16px 边线不齐）。 */
@@ -22,15 +22,15 @@
 
 /* 一枚标签 = 一片框线：默认细框灰字，悬停变色。 */
 [data-chat-tools-tab] { display:inline-flex; align-items:center; gap:4px; max-width:180px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; padding:3px 10px; border:1px solid var(--dsw-alias-border-l2,rgba(127,127,127,.2)); border-radius:6px; background:transparent; color:var(--dsw-alias-label-secondary,inherit); font:inherit; font-size:12px; cursor:pointer; }
-[data-chat-tools-tab]:hover { background:var(--dsw-alias-bg-hover,rgba(127,127,127,.12)); color:var(--dsw-alias-label-primary,inherit); }
+[data-chat-tools-tab]:hover { background:var(--dsw-alias-interactive-bg-hover,rgba(127,127,127,.12)); color:var(--dsw-alias-label-primary,inherit); }
 [data-chat-tools-tab]:focus-visible { outline:2px solid var(--dsw-alias-state-business-primary,var(--dsw-alias-brand-primary,currentColor)); outline-offset:1px; }
 
 /* 当前标签：框线加实、底色加重，一行里只突出这一个。 */
-[data-chat-tools-tab][data-chat-tools-tab-active] { background:var(--dsw-alias-bg-hover,rgba(127,127,127,.16)); border-color:var(--dsw-alias-border-l3,var(--dsw-alias-state-business-primary,rgba(127,127,127,.4))); color:var(--dsw-alias-label-primary,inherit); }
+[data-chat-tools-tab][data-chat-tools-tab-active] { background:var(--dsw-alias-interactive-bg-hover,rgba(127,127,127,.16)); border-color:var(--dsw-alias-border-l3,var(--dsw-alias-state-business-primary,rgba(127,127,127,.4))); color:var(--dsw-alias-label-primary,inherit); }
 
 /* 关闭钮：24px 见方热区，单独一枚小钮贴在标签右侧。 */
 [data-chat-tools-tab-close] { display:inline-flex; align-items:center; justify-content:center; flex:none; width:24px; height:24px; padding:0; border:none; border-radius:6px; background:transparent; color:var(--dsw-alias-label-secondary,inherit); font:inherit; font-size:12px; cursor:pointer; }
-[data-chat-tools-tab-close]:hover { background:var(--dsw-alias-bg-hover,rgba(127,127,127,.12)); color:var(--dsw-alias-label-primary,inherit); }
+[data-chat-tools-tab-close]:hover { background:var(--dsw-alias-interactive-bg-hover,rgba(127,127,127,.12)); color:var(--dsw-alias-label-primary,inherit); }
 
 /* 工具标签激活时：把宿主自己的标签（对话 / 轨迹）压暗，一行只突出一个。 */
 [data-conversation-tabs][data-chat-tools-live] button[role=tab]:not([data-chat-tools-tab]) { opacity:.55; }
@@ -38,4 +38,4 @@
 /* 自建行：宿主标签行缺席时顶上，高度与宿主标签行一致。 */
 [data-chat-tools-row] { display:flex; align-items:center; gap:2px; flex:none; min-height:36px; padding:2px 12px; overflow:hidden; }
 [data-chat-tools-row] [data-chat-tools-chat-button] { display:inline-flex; align-items:center; padding:3px 10px; border:1px solid transparent; border-radius:6px; background:transparent; color:var(--dsw-alias-label-secondary,inherit); font:inherit; font-size:12px; cursor:pointer; }
-[data-chat-tools-row] [data-chat-tools-chat-button][aria-selected=true] { border-color:var(--dsw-alias-border-l2,rgba(127,127,127,.2)); background:var(--dsw-alias-bg-hover,rgba(127,127,127,.16)); color:var(--dsw-alias-label-primary,inherit); }
+[data-chat-tools-row] [data-chat-tools-chat-button][aria-selected=true] { border-color:var(--dsw-alias-border-l2,rgba(127,127,127,.2)); background:var(--dsw-alias-interactive-bg-hover,rgba(127,127,127,.16)); color:var(--dsw-alias-label-primary,inherit); }

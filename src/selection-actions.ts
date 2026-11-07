@@ -228,30 +228,30 @@ const PANEL_CSS = [
   // 超过 40vh 限高、面板内部滚动——不再无限覆盖正文。
   '.dshca-panel{position:fixed;z-index:90;display:flex;flex-direction:column;gap:4px;box-sizing:border-box;',
   'max-height:min(40vh,320px);overflow-y:auto;padding:6px;border-radius:10px;',
-  'background:var(--dsw-alias-bg-container,rgb(255 255 255 / 96%));',
+  'background:var(--dsw-alias-bg-overlay,rgb(255 255 255 / 96%));',
   'border:1px solid var(--dsw-alias-border-l2,rgba(127,127,127,.2));box-shadow:0 4px 16px rgb(0 0 0 / 16%)}',
   // 面板里的一条收藏：32px 行高，预览 + 24px 移除热区。
   '.dshca-bar{display:flex;align-items:center;gap:8px;flex:none;height:32px;padding:0 10px;border-radius:8px;',
-  'background:var(--dsw-alias-bg-hover,rgba(127,127,127,.08))}',
+  'background:var(--dsw-alias-interactive-bg-hover,rgba(127,127,127,.08))}',
   '.dshca-bar-dot{width:8px;height:8px;border-radius:50%;flex:none;',
   'background:var(--dsw-alias-state-business-primary,rgb(59 130 246))}',
   '.dshca-bar-text{text-overflow:ellipsis;white-space:nowrap;color:var(--dsw-alias-label-primary,inherit);',
   'flex:1;min-width:0;font-size:12px;line-height:20px;overflow:hidden}',
   '.dshca-bar-remove{display:inline-flex;align-items:center;justify-content:center;color:var(--dsw-alias-label-secondary,inherit);cursor:pointer;background:0 0;border:none;',
   'border-radius:6px;flex:none;width:24px;height:24px;font-size:14px;line-height:1}',
-  '.dshca-bar-remove:hover{background:var(--dsw-alias-bg-hover,rgba(127,127,127,.16));color:var(--dsw-alias-label-primary,inherit)}',
+  '.dshca-bar-remove:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(127,127,127,.16));color:var(--dsw-alias-label-primary,inherit)}',
   // 面板脚注：收集计数 + 「编辑 (n)」入口。
   '.dshca-panel-foot{display:flex;align-items:center;gap:8px;flex:none;height:28px;padding:0 6px;',
   'font-size:12px;color:var(--dsw-alias-label-secondary,inherit)}',
   '.dshca-bar-edit{margin-left:auto;border:1px solid var(--dsw-alias-border-l4,rgba(127,127,127,.25));',
   'border-radius:6px;background:transparent;color:var(--dsw-alias-label-primary,inherit);',
   'font:inherit;font-size:12px;line-height:18px;padding:2px 10px;cursor:pointer;white-space:nowrap}',
-  '.dshca-bar-edit:hover{background:var(--dsw-alias-bg-hover,rgba(127,127,127,.12))}',
+  '.dshca-bar-edit:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(127,127,127,.12))}',
   '.dshca-bar-edit:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary,var(--dsw-alias-brand-primary,currentColor));outline-offset:1px}',
   // 轻提示（toast）：中性深底浮层，只用于「没有找到输入框」等短反馈。
   '.dshca-toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);z-index:70;',
-  'padding:6px 14px;border-radius:8px;background:var(--dsw-alias-tooltip-background,rgb(48 48 54 / 94%));',
-  'color:var(--dsw-alias-label-on-accent,#fff);font-size:12px;pointer-events:none}',
+  'padding:6px 14px;border-radius:8px;background:var(--dsw-alias-toast-bg,rgb(48 48 54 / 94%));',
+  'color:var(--dsw-alias-toast-label,#fff);font-size:12px;pointer-events:none}',
 ].join('')
 
 /**

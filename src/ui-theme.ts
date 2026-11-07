@@ -46,7 +46,7 @@ export const statusNoticeClass = 'dshcp-status'
 
 export const UI_THEME_CSS = `
 .${uiButtonClass}{display:inline-flex;align-items:center;justify-content:center;flex:none;width:32px;height:32px;padding:0;border:none;border-radius:6px;background:transparent;color:var(--dsw-alias-label-secondary,inherit);cursor:pointer}
-.${uiButtonClass}:hover{background:var(--dsw-alias-bg-hover,rgba(127,127,127,.12));color:var(--dsw-alias-label-primary,inherit)}
+.${uiButtonClass}:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(127,127,127,.12));color:var(--dsw-alias-label-primary,inherit)}
 .${uiButtonClass}:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary,var(--dsw-alias-brand-primary,currentColor));outline-offset:1px}
 .${uiButtonClass}:disabled{cursor:default;opacity:.5}
 .${uiButtonSmallClass}{width:28px;height:28px}
@@ -63,7 +63,7 @@ export const UI_THEME_CSS = `
 .${btnClass}:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(127,127,127,.12))}
 .${btnClass}:disabled{cursor:default;opacity:.5}
 .${btnQuietClass}{border-color:transparent;padding-inline:8px;color:var(--dsw-alias-label-secondary,inherit)}
-.${sendClass}{display:inline-grid;place-items:center;flex:none;width:34px;height:34px;padding:0;border:none;border-radius:999px;background:var(--dsw-alias-button-info-fill,var(--dsw-alias-brand-primary,rgba(127,127,127,.3)));color:var(--dsw-alias-label-on-accent,#fff);cursor:pointer;transition:background-color 100ms}
+.${sendClass}{display:inline-grid;place-items:center;flex:none;width:34px;height:34px;padding:0;border:none;border-radius:999px;background:var(--dsw-alias-button-info-fill,var(--dsw-alias-brand-primary,rgba(127,127,127,.3)));color:var(--dsw-alias-label-primary-foreground,#fff);cursor:pointer;transition:background-color 100ms}
 .${sendClass}:hover{background:var(--dsw-alias-button-info-hover,var(--dsw-alias-brand-primary,rgba(127,127,127,.45)))}
 .${sendClass}:disabled{cursor:default;opacity:.6}
 .${statusNoticeClass}{margin:4px 12px 0;font-size:12px;line-height:16px;color:var(--dsw-alias-label-secondary,inherit)}

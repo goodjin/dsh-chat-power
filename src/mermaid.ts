@@ -109,7 +109,7 @@ const STYLE_CSS = `
   cursor: pointer;
 }
 [${PREVIEW_ATTR}] [${TOGGLE_ATTR}]:hover {
-  background: var(--dsw-alias-bg-hover, rgba(127, 127, 127, 0.12));
+  background: var(--dsw-alias-interactive-bg-hover, rgba(127, 127, 127, 0.12));
 }
 [${PREVIEW_ATTR}] [data-th-mermaid-error] {
   display: flex;
@@ -137,7 +137,7 @@ const STYLE_CSS = `
   cursor: pointer;
 }
 [${PREVIEW_ATTR}] [data-th-mermaid-retry]:hover {
-  background: var(--dsw-alias-bg-hover, rgba(127, 127, 127, 0.12));
+  background: var(--dsw-alias-interactive-bg-hover, rgba(127, 127, 127, 0.12));
 }
 [${PREVIEW_ATTR}] [${CANVAS_ATTR}] {
   display: none;
