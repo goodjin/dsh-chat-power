@@ -9,6 +9,13 @@
   display: none !important;
 }
 
+/* 被限高的行：内容超出时行内滚动（上限由插件写入的 CSS 变量给出）。 */
+[data-chat-power-capped] {
+  max-height: var(--chat-power-cap, none);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 /* 摘要条 / 展开态药丸。 */
 .strip {
   display: flex;

@@ -107,4 +107,16 @@ describe('折叠条', () => {
     expect(source).not.toContain('replaceChildren')
     expect(source).not.toContain('innerHTML')
   })
+
+  it('限高：按行分摊上限，超出的行内部滚动并保持贴底', () => {
+    const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
+    const css = readFileSync(new URL('../src/turn-fold.module.css', import.meta.url), 'utf8')
+    // 可用高度要扣掉输入框；上限以 CSS 变量给出，样式在 CSS 模块里。
+    expect(source).toContain('data-composer-seat')
+    expect(source).toContain('--chat-power-cap')
+    expect(source).toContain('data-chat-power-capped')
+    expect(source).toContain('scrollHeight')
+    expect(css).toContain('max-height')
+    expect(css).toContain('overflow-y: auto')
+  })
 })

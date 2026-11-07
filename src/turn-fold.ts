@@ -138,6 +138,12 @@ export function turnStripText(
   return t(key, { turn: number, clock, summary })
 }
 
+/** 插件给被限高的行加的标记（CSS 据此开启内部滚动）。 */
+export const CAPPED_ATTR = 'data-chat-power-capped'
+
+/** 限高时给会话区留的余量（输入框上沿到视口顶的呼吸位）。 */
+const HEIGHT_MARGIN = 24
+
 /** 一轮的状态：行、首见时刻、摘要、是否折叠、摘要条元素。 */
 interface TurnRecord {
   number: number
@@ -183,6 +189,8 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
   let currentTurn = 0
   let records = new Map<number, TurnRecord>()
   let stopObserving: (() => void) | undefined
+  let composerObserver: ResizeObserver | undefined
+  const onViewportChange = (): void => { sync() }
 
   const scroller = (): Element | null => {
     if (options.root !== undefined) return options.root()
@@ -261,8 +269,7 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     strip.appendChild(toggle)
   }
 
-  const ensureStrip = (record: TurnRecord, firstRow: HTMLElement): void => {
-    const parent = firstRow.parentElement
+  const ensureStrip = (record: TurnRecord, firstRow: HTMLElement): void => {    const parent = firstRow.parentElement
     if (parent === null) return
     let strip = record.strip
     if (strip === undefined || !strip.isConnected || strip.parentElement !== parent) {
@@ -274,6 +281,47 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
       record.strip = strip
     }
     renderStrip(strip, record)
+  }
+
+  /**
+   * 可用高度：视口高减去输入框高度与余量——当前轮的内容不超过这一块，
+   * 输入框与轮首始终留在视野里。
+   */
+  const availableHeight = (container: Element): number => {
+    const composer = container.querySelector('[data-composer-seat]')
+    const composerHeight = composer === null ? 0 : composer.getBoundingClientRect().height
+    const viewport = typeof window === 'undefined' ? 0 : window.innerHeight
+    return viewport - composerHeight - HEIGHT_MARGIN
+  }
+
+  /**
+   * 给这一轮的行分摊高度上限：超出的部分压到最高的行上，该行内部滚动。
+   * 内容增长时若该行原本贴着底部，就继续贴底（用户手动上滚后不再抢滚动）。
+   */
+  const applyCaps = (record: TurnRecord, available: number): void => {
+    const heights = record.rows.map(row => row.getBoundingClientRect().height)
+    const caps = distributeHeightCap(heights, available)
+    record.rows.forEach((row, index) => {
+      const height = heights[index] ?? 0
+      const cap = caps[index] ?? height
+      if (cap >= height) {
+        row.removeAttribute(CAPPED_ATTR)
+        row.style.removeProperty('--chat-power-cap')
+        return
+      }
+      const atBottom = row.scrollTop + row.clientHeight >= row.scrollHeight - 4
+      row.style.setProperty('--chat-power-cap', `${Math.floor(cap)}px`)
+      row.setAttribute(CAPPED_ATTR, '')
+      if (atBottom) row.scrollTop = row.scrollHeight
+    })
+  }
+
+  /** 收起折叠态的行不需要限高（它们不可见），清掉之前的限高痕迹。 */
+  const clearCaps = (record: TurnRecord): void => {
+    for (const row of record.rows) {
+      row.removeAttribute(CAPPED_ATTR)
+      row.style.removeProperty('--chat-power-cap')
+    }
   }
 
   const sync = (): void => {
@@ -319,10 +367,13 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
         record.strip?.remove()
         record.strip = undefined
         if (record.collapsed) setCollapsed(record, false)
+        applyCaps(record, availableHeight(container))
         continue
       }
       ensureStrip(record, firstRow)
       setCollapsed(record, record.collapsed)
+      if (record.collapsed) clearCaps(record)
+      else applyCaps(record, availableHeight(container))
     }
   }
 
@@ -330,6 +381,13 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     const container = scroller()
     if (container === null) return
     stopObserving = observe(container, () => { sync() })
+    // 窗口与输入框高度变化都会改变可用高度，重新分摊上限。
+    if (typeof window !== 'undefined') window.addEventListener('resize', onViewportChange)
+    const composer = container.querySelector('[data-composer-seat]')
+    if (composer !== null && typeof ResizeObserver !== 'undefined') {
+      composerObserver = new ResizeObserver(() => { sync() })
+      composerObserver.observe(composer)
+    }
     sync()
   }
   attach()
@@ -338,9 +396,16 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     stopped = true
     stopObserving?.()
     stopObserving = undefined
+    composerObserver?.disconnect()
+    composerObserver = undefined
+    if (typeof window !== 'undefined') window.removeEventListener('resize', onViewportChange)
     for (const record of records.values()) {
       record.strip?.remove()
-      for (const row of record.rows) row.removeAttribute(COLLAPSED_ATTR)
+      for (const row of record.rows) {
+        row.removeAttribute(COLLAPSED_ATTR)
+        row.removeAttribute(CAPPED_ATTR)
+        row.style.removeProperty('--chat-power-cap')
+      }
     }
     records = new Map()
   }
