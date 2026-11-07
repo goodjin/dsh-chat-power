@@ -195,7 +195,8 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
   let composerObserver: ResizeObserver | undefined
   let observedContainer: Element | undefined
   let retryTimer: number | undefined
-  const onViewportChange = (): void => { sync() }
+  let syncScheduled = false
+  const onViewportChange = (): void => { scheduleSync() }
 
   const scroller = (): Element | null => {
     if (options.root !== undefined) return options.root()
@@ -289,13 +290,15 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
   }
 
   /**
-   * 可用高度：视口高减去输入框高度与余量——当前轮的内容不超过这一块，
-   * 输入框与轮首始终留在视野里。
+   * 可用高度：会话区可视高度减去输入框高度与余量——当前轮的内容不超过这一块，
+   * 输入框与轮首始终留在视野里。会话区本身没有布局（隐藏的标签）时返回 0，
+   * 表示「先别限高」。
    */
   const availableHeight = (container: Element): number => {
+    const viewport = typeof HTMLElement === 'undefined' ? 0 : (container as HTMLElement).clientHeight
+    if (viewport === 0) return 0
     const composer = container.querySelector('[data-composer-seat]')
     const composerHeight = composer === null ? 0 : composer.getBoundingClientRect().height
-    const viewport = typeof window === 'undefined' ? 0 : window.innerHeight
     return viewport - composerHeight - HEIGHT_MARGIN
   }
 
@@ -304,6 +307,10 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
    * 内容增长时若该行原本贴着底部，就继续贴底（用户手动上滚后不再抢滚动）。
    */
   const applyCaps = (record: TurnRecord, available: number): void => {
+    if (available <= 0) {
+      clearCaps(record)
+      return
+    }
     const heights = record.rows.map(row => row.getBoundingClientRect().height)
     const caps = distributeHeightCap(heights, available)
     record.rows.forEach((row, index) => {
@@ -327,6 +334,18 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
       row.removeAttribute(CAPPED_ATTR)
       row.style.removeProperty('--chat-power-cap')
     }
+  }
+
+  /**
+   * 流式输出时每帧都有 DOM 变动；测量与写样式合并到下一帧执行，
+   * 避免在每次变动里都做布局读取（那会让长回复越输出越卡）。
+   */
+  const scheduleSync = (): void => {
+    if (stopped || syncScheduled) return
+    syncScheduled = true
+    const run = (): void => { syncScheduled = false; sync() }
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(run)
+    else setTimeout(run, 16)
   }
 
   const sync = (): void => {
@@ -386,12 +405,12 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
   const attachTo = (container: Element): void => {
     stopObserving?.()
     observedContainer = container
-    stopObserving = observe(container, () => { sync() })
+    stopObserving = observe(container, () => { scheduleSync() })
     const composer = container.querySelector('[data-composer-seat]')
     composerObserver?.disconnect()
     composerObserver = undefined
     if (composer !== null && typeof ResizeObserver !== 'undefined') {
-      composerObserver = new ResizeObserver(() => { sync() })
+      composerObserver = new ResizeObserver(() => { scheduleSync() })
       composerObserver.observe(composer)
     }
   }
