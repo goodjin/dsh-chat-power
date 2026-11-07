@@ -12,6 +12,37 @@
   padding: 0 2px;
 }
 
+/* 改动文件列表的折叠条：整条可点，展开/收起文件卡。 */
+.groupToggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 6px;
+  border: 1px solid var(--dsw-alias-border-l1, rgba(127, 127, 127, 0.15));
+  border-radius: 6px;
+  background: var(--dsw-alias-bg-hover, rgba(127, 127, 127, 0.06));
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.groupToggle:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(127, 127, 127, 0.1));
+}
+
+.groupToggle:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary, var(--dsw-alias-brand-primary, currentColor));
+  outline-offset: 1px;
+}
+
+.groupChevron {
+  flex: none;
+  color: var(--dsw-alias-label-tertiary, inherit);
+  font-size: 11px;
+}
+
 .groupTitle {
   font-size: 12px;
   font-weight: 600;

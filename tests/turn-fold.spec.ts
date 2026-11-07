@@ -9,7 +9,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import {
-  allocateRowHeights,
+  capTallestRow,
   formatClock,
   groupTurnsByNumber,
   summarizeTurn,
@@ -67,26 +67,31 @@ describe('时刻格式化', () => {
   })
 })
 
-describe('行高分摊（按比例，不压扁长块）', () => {
-  it('总高不超可用高度时不压任何行', () => {
-    expect(allocateRowHeights([30, 100], 600)).toEqual([30, 100])
-  })
-  it('超出时按比例分摊，最高的行不会被压成一条缝', () => {
-    const caps = allocateRowHeights([40, 800, 900], 600)
-    expect(caps[1]!).toBeGreaterThanOrEqual(200)
-    expect(caps[2]!).toBeGreaterThanOrEqual(200)
-    // 短行不受影响
+describe('结果块占满整屏', () => {
+  it('最高的一行拿整屏高度，其余行保持原样（不再按比例互挤）', () => {
+    const caps = capTallestRow([40, 800, 900], 600)
+    expect(caps[2]).toBe(600)
+    expect(caps[1]).toBe(800)
     expect(caps[0]).toBe(40)
   })
-  it('没有行触底时合计不超过可用高度', () => {
-    const caps = allocateRowHeights([500, 500], 600)
-    expect(caps[0]).toBe(300)
-    expect(caps[1]).toBe(300)
-    expect(caps.reduce((sum, cap) => sum + cap, 0)).toBeLessThanOrEqual(600)
+  it('可用高度为 0（会话区没布局）时不压任何行', () => {
+    expect(capTallestRow([400, 900], 0)).toEqual([400, 900])
   })
-  it('空间极紧时每行仍保留可读高度', () => {
-    const caps = allocateRowHeights([900, 900], 300)
-    expect(Math.min(...caps)).toBeGreaterThanOrEqual(160)
+  it('没有行时返回空数组', () => {
+    expect(capTallestRow([], 600)).toEqual([])
+  })
+})
+
+describe('思考块一律收起', () => {
+  it('按宿主自己的组标记收起思考块，不改宿主状态', () => {
+    const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
+    expect(source).toContain('data-step-process')
+    expect(source).toContain('data-answer-body')
+    expect(source).toContain('data-chat-power-group-hidden')
+  })
+  it('样式只隐藏思考行，组头保留（用户还能点开看）', () => {
+    const css = readFileSync(new URL('../src/turn-fold.module.css', import.meta.url), 'utf8')
+    expect(css).toContain('data-chat-power-group-hidden')
   })
 })
 
@@ -151,6 +156,13 @@ describe('折叠条', () => {
   it('限高按内容高度计算，避免越滚越小', () => {
     const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
     expect(source).toContain('scrollHeight')
-    expect(source).toContain('allocateRowHeights')
+    expect(source).toContain('capTallestRow')
+  })
+
+  it('改动文件列表默认折成一块，可点开与收起', () => {
+    const source = readFileSync(new URL('../src/markdown-turn.tsx', import.meta.url), 'utf8')
+    expect(source).toContain('filesOpen')
+    expect(source).toContain('markdownTurn.filesToggle')
+    expect(source).toContain('markdownTurn.filesCollapse')
   })
 })

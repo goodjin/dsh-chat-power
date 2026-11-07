@@ -663,6 +663,8 @@ export function MarkdownTurnTail({ sessionId, turn, t, readers, onNotify }: Mark
   const rootRef = useRef<HTMLDivElement>(null)
   const [extra, setExtra] = useState<SummaryExtra>([])
   const [listOpen, setListOpen] = useState(false)
+  // 改动文件列表默认折成一个小块（只有标题条），点一下展开/收起。
+  const [filesOpen, setFilesOpen] = useState(false)
   useEffect(() => () => { releaseHeldFileTop(rootRef.current) }, [])
   useEffect(() => {
     if (id === undefined || changesSeq === undefined) {
@@ -698,14 +700,31 @@ export function MarkdownTurnTail({ sessionId, turn, t, readers, onNotify }: Mark
     holdFileTop(rootRef.current, rootRef.current)
     setListOpen(value => !value)
   }
+  const toggleFiles = (): void => {
+    holdFileTop(rootRef.current, rootRef.current)
+    setFilesOpen(value => !value)
+  }
   return <div ref={rootRef} className={css.root} data-markdown-turn="" {...(folded ? { 'data-markdown-folded': '' } : {})}>
+    {/* 改动文件列表默认折成一个小块（标题条），点一下展开/收起。 */}
     <div className={css.groupHead} data-files-group="">
-      <span className={css.groupTitle}>{translate('markdownTurn.filesGroup', { count: String(paths.length) })}</span>
+      <button
+        type="button"
+        className={css.groupToggle}
+        data-files-toggle=""
+        aria-expanded={filesOpen}
+        aria-label={translate(filesOpen ? 'markdownTurn.filesCollapse' : 'markdownTurn.filesToggle')}
+        onClick={toggleFiles}
+      >
+        <span className={css.groupTitle}>{translate('markdownTurn.filesGroup', { count: String(paths.length) })}</span>
+        <span className={css.groupChevron} aria-hidden="true">{filesOpen ? '▾' : '▸'}</span>
+      </button>
     </div>
-    {shown.map(path => <MarkdownDocument key={path} sessionId={id} path={path} readers={readers} t={translate} {...(onNotify === undefined ? {} : { onNotify })} />)}
-    {paths.length > FOLDED_FILE_COUNT && <div className={css.edge}>
-      <ExpandButton open={listOpen} label={listLabel} caption={listCount} onClick={toggleList} kind="more" />
-    </div>}
+    {filesOpen && <>
+      {shown.map(path => <MarkdownDocument key={path} sessionId={id} path={path} readers={readers} t={translate} {...(onNotify === undefined ? {} : { onNotify })} />)}
+      {paths.length > FOLDED_FILE_COUNT && <div className={css.edge}>
+        <ExpandButton open={listOpen} label={listLabel} caption={listCount} onClick={toggleList} kind="more" />
+      </div>}
+    </>}
   </div>
 }
 

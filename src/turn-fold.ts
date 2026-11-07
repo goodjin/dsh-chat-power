@@ -89,32 +89,31 @@ export function formatClock(timestamp: number): string {
 /** 可用高度的下限：再窄也要给内容留一点可视高度。 */
 export const MIN_AVAILABLE_HEIGHT = 240
 
-/** 单行限高后的最小可读高度：再挤也不能把一块内容压成一条缝。 */
-export const MIN_ROW_HEIGHT = 180
+/** 插件给「由我们收起的思考组」加的标记（CSS 据此只隐藏组体，组头保留）。 */
+export const GROUP_HIDDEN_ATTR = 'data-chat-power-group-hidden'
 
 /**
- * 行高分摊（按比例）：把可用高度按各行的内容高度比例分下去。
+ * 结果块限高：给**最高的那一行**整屏高度，其余行保持原样。
  *
- * 与「只压最高的一行」不同——那会把结果卡片压成几十像素的一条缝。这里按比例
- * 分摊，每行再保留下限（{@link MIN_ROW_HEIGHT} 与可用高度的三成取大），
- * 所以长块拿到的是它应得的那一份，而不是被牺牲掉。
+ * 早先的版本把超出高度按比例分给所有行，结果卡片被挤成一条缝；再早的版本只压
+ * 最高行但压得太狠（只留 60px）。现在的前提是：思考块已收起、改动文件列表已折成
+ * 小块，当前轮里最高的那个行就是结果块——给它整屏高度、内容在行内滚动即可。
  *
  * @param heights - 各行的内容高度。
  * @param available - 可用高度（会话区可视高度减去输入框与余量）。
- * @returns 与 heights 等长的上限数组；未超出的行保持原值。
+ * @returns 与 heights 等长的上限数组；其余行保持原值。
  */
-export function allocateRowHeights(heights: readonly number[], available: number): number[] {
-  const floor = Math.max(MIN_AVAILABLE_HEIGHT, Math.floor(available))
-  const total = heights.reduce((sum, height) => sum + height, 0)
-  if (total <= floor) return heights.slice()
-  const scale = floor / total
-  const readableFloor = Math.max(MIN_ROW_HEIGHT, Math.floor(floor * 0.28))
-  return heights.map(height => {
-    if (height <= 0) return height
-    const proportional = height * scale
-    const readable = Math.min(height, readableFloor)
-    return Math.min(height, Math.max(Math.floor(proportional), readable))
+export function capTallestRow(heights: readonly number[], available: number): number[] {
+  const caps = heights.slice()
+  if (available <= 0 || heights.length === 0) return caps
+  let tallest = -1
+  heights.forEach((height, index) => {
+    if (height <= 0) return
+    if (tallest === -1 || height > (heights[tallest] ?? 0)) tallest = index
   })
+  if (tallest === -1) return caps
+  caps[tallest] = Math.min(heights[tallest] ?? 0, available)
+  return caps
 }
 
 /**
@@ -313,7 +312,7 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
       const content = row.scrollHeight
       return content > 0 ? content : row.getBoundingClientRect().height
     })
-    const caps = allocateRowHeights(heights, available)
+    const caps = capTallestRow(heights, available)
     record.rows.forEach((row, index) => {
       const height = heights[index] ?? 0
       const cap = caps[index] ?? height
@@ -347,6 +346,59 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     const run = (): void => { syncScheduled = false; sync() }
     if (typeof requestAnimationFrame === 'function') requestAnimationFrame(run)
     else setTimeout(run, 16)
+  }
+
+  /**
+   * 思考块（宿主的过程组）：结果出来后一律收起——不管宿主是哪种展示模式。
+   *
+   * 宿主自己在标准/详细模式下会把整组藏起来；完全展开模式下它永远展开。
+   * 这里补上缺口：组里已经有结果时，把组内**除结果以外**的行（思考、工具调用）
+   * 收起来，只留结果那一行——于是结果块自然占满整屏，组头（时长/状态）留着，
+   * 用户点组头还能临时展开看。不改宿主的状态机，只加自己的标记。
+   */
+  const collapseThinking = (record: TurnRecord): void => {
+    // 结果块可能在组外（单独一行），也可能在组内（宿主把结果步并进过程组）。
+    const turnHasAnswer = record.rows.some(row => row.querySelector('[data-answer-body]') !== null)
+    for (const row of record.rows) {
+      if (!row.matches('[data-step-process]')) continue
+      const members = Array.from(row.querySelectorAll<HTMLElement>(`[${TURN_ATTR}]`)).filter(el => el !== row)
+      const insideAnswer = members.some(member => member.querySelector('[data-answer-body]') !== null)
+      // 还没出结果：思考照常展示，不动它。
+      if (!turnHasAnswer && !insideAnswer) continue
+      const state = managedGroups.get(row)
+      // 用户点开后保持展开，直到这一轮结束。
+      if (state !== undefined && !state.collapsed) continue
+      ensureGroupToggle(row)
+      const hidden: HTMLElement[] = []
+      for (const member of members) {
+        if (member.querySelector('[data-answer-body]') !== null) continue
+        member.setAttribute(GROUP_HIDDEN_ATTR, '')
+        hidden.push(member)
+      }
+      if (state === undefined) managedGroups.set(row, { collapsed: true, hidden })
+      else state.hidden = hidden
+    }
+  }
+
+  /** 我们收起过的思考组：collapsed=true 表示当前是我们收起来的（可点开）。 */
+  const managedGroups = new WeakMap<Element, { collapsed: boolean, hidden: HTMLElement[] }>()
+  const groupListeners = new WeakSet<Element>()
+
+  /** 组头点击：由我们收起的组，开合也由我们负责，不去抢宿主的状态机。 */
+  const ensureGroupToggle = (group: Element): void => {
+    if (groupListeners.has(group)) return
+    groupListeners.add(group)
+    group.addEventListener('click', (event: Event) => {
+      const state = managedGroups.get(group)
+      if (state === undefined) return
+      event.preventDefault()
+      event.stopPropagation()
+      state.collapsed = !state.collapsed
+      for (const member of state.hidden) {
+        if (state.collapsed) member.setAttribute(GROUP_HIDDEN_ATTR, '')
+        else member.removeAttribute(GROUP_HIDDEN_ATTR)
+      }
+    }, true)
   }
 
   const sync = (): void => {
@@ -392,13 +444,17 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
         record.strip?.remove()
         record.strip = undefined
         if (record.collapsed) setCollapsed(record, false)
+        collapseThinking(record)
         applyCaps(record, availableHeight(container))
         continue
       }
       ensureStrip(record, firstRow)
       setCollapsed(record, record.collapsed)
       if (record.collapsed) clearCaps(record)
-      else applyCaps(record, availableHeight(container))
+      else {
+        collapseThinking(record)
+        applyCaps(record, availableHeight(container))
+      }
     }
   }
 

@@ -164,7 +164,7 @@ export function AnswerCard(props: {
               </button>
             </div>
           </div>
-          <div className={styles.answerCardBody}>{props.children}</div>
+          <div className={styles.answerCardBody} data-answer-body="">{props.children}</div>
         </div>
       )}
       {toast !== null && <Toast
