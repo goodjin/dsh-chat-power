@@ -17,6 +17,7 @@ import { registerSessionIdBar } from './session-id-bar/index.js'
 import { startMermaidDiagrams } from './mermaid.ts'
 import { injectTablePadCss } from './table-pad.ts'
 import { injectUiThemeCss } from './ui-theme.ts'
+import { startTurnFold } from './turn-fold.ts'
 import { createMarkdownTurnReaders } from './markdown-turn-sources.ts'
 import { registerSelectionToolbar } from './selection-toolbar.tsx'
 import { startMultiSelectPanel } from './selection-actions.ts'
@@ -74,6 +75,15 @@ export function apply(ctx: PluginContext): void {
     injectUiThemeCss()
   } catch (error: unknown) {
     log.warn(`ui theme: inject failed — ${error instanceof Error ? error.message : String(error)}`)
+  }
+  try {
+    // 轮次折叠与当前轮限高：新一轮开始时历史轮折叠成摘要条，当前轮不超过一屏。
+    // 纯 DOM 增强（加属性、插自己的摘要条），失败只损失这个观感。
+    const disposeTurnFold = startTurnFold({ t: fallbackT })
+    ctx.effect(() => disposeTurnFold, 'dsh-chat-power: turn fold')
+    log.info('turn fold: started')
+  } catch (error: unknown) {
+    log.warn(`turn fold: start failed — ${error instanceof Error ? error.message : String(error)}`)
   }
   try {
     // 会话区工具（标签条、文件树控件、本机文件卡）。整块失败只损失工具区，

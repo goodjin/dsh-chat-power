@@ -119,4 +119,23 @@ describe('折叠条', () => {
     expect(css).toContain('max-height')
     expect(css).toContain('overflow-y: auto')
   })
+
+  it('容器晚挂载也要能起来：轮询重试并跟随容器更换', () => {
+    const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
+    expect(source).toContain('setInterval')
+    expect(source).toContain('observedContainer')
+  })
+
+  it('插件启动处调用轮次折叠，且包在 try/catch 里（失败不拖累启动）', () => {
+    const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
+    expect(source).toContain('startTurnFold')
+    expect(source).toMatch(/try \{[\s\S]{0,400}startTurnFold/)
+    expect(source).toMatch(/catch \(error[\s\S]{0,200}turn fold/)
+  })
+
+  it('README 写明思考块折叠走宿主设置的哪两项', () => {
+    const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8')
+    expect(readme).toContain('工作步骤收起时机')
+    expect(readme).toContain('收起后显示的回复')
+  })
 })

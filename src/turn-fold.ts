@@ -144,6 +144,9 @@ export const CAPPED_ATTR = 'data-chat-power-capped'
 /** 限高时给会话区留的余量（输入框上沿到视口顶的呼吸位）。 */
 const HEIGHT_MARGIN = 24
 
+/** 心跳间隔：聊天区晚挂载或被换掉时的重试节奏。 */
+const RETRY_INTERVAL_MS = 500
+
 /** 一轮的状态：行、首见时刻、摘要、是否折叠、摘要条元素。 */
 interface TurnRecord {
   number: number
@@ -190,6 +193,8 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
   let records = new Map<number, TurnRecord>()
   let stopObserving: (() => void) | undefined
   let composerObserver: ResizeObserver | undefined
+  let observedContainer: Element | undefined
+  let retryTimer: number | undefined
   const onViewportChange = (): void => { sync() }
 
   const scroller = (): Element | null => {
@@ -377,16 +382,37 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     }
   }
 
-  const attach = (): void => {
-    const container = scroller()
-    if (container === null) return
+  /** 把观察器挂到当前滚动容器；容器换了（切会话/重渲染）就重挂。 */
+  const attachTo = (container: Element): void => {
+    stopObserving?.()
+    observedContainer = container
     stopObserving = observe(container, () => { sync() })
-    // 窗口与输入框高度变化都会改变可用高度，重新分摊上限。
-    if (typeof window !== 'undefined') window.addEventListener('resize', onViewportChange)
     const composer = container.querySelector('[data-composer-seat]')
+    composerObserver?.disconnect()
+    composerObserver = undefined
     if (composer !== null && typeof ResizeObserver !== 'undefined') {
       composerObserver = new ResizeObserver(() => { sync() })
       composerObserver.observe(composer)
+    }
+  }
+
+  /**
+   * 心跳：聊天区可能晚于插件启动才挂载，或在切会话时被整个换掉。
+   * 这里定期看一眼容器——换了就重挂观察器，没换就不做事（不做无谓的测量）。
+   */
+  const tick = (): void => {
+    if (stopped) return
+    const container = scroller()
+    if (container === null) return
+    if (container !== observedContainer) attachTo(container)
+  }
+
+  const attach = (): void => {
+    const container = scroller()
+    if (container !== null) attachTo(container)
+    if (typeof window !== 'undefined') {
+      window.addEventListener('resize', onViewportChange)
+      retryTimer = window.setInterval(tick, RETRY_INTERVAL_MS)
     }
     sync()
   }
@@ -398,6 +424,8 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     stopObserving = undefined
     composerObserver?.disconnect()
     composerObserver = undefined
+    if (retryTimer !== undefined && typeof window !== 'undefined') window.clearInterval(retryTimer)
+    retryTimer = undefined
     if (typeof window !== 'undefined') window.removeEventListener('resize', onViewportChange)
     for (const record of records.values()) {
       record.strip?.remove()
