@@ -21,8 +21,17 @@
   background: var(--dsw-alias-bg-layer-1, transparent);
 }
 
-/* 输出框左上角的文案：思考 / 工具调用 / 回答。 */
+/* 回答完成（不再流式输出）后：框内可滚动，结果太长时出滚动条，
+   顶栏（文案与编辑/复制）吸顶不动。 */
+[data-chat-power-capped][data-chat-power-scroll='auto'] {
+  overflow-y: auto;
+}
+
+/* 输出框左上角的文案：思考 / 工具调用 / 回答。吸顶，框内滚动时留在顶部。 */
 .frameLabel {
+  position: sticky;
+  top: 0;
+  z-index: 2;
   display: flex;
   align-items: center;
   gap: 6px;

@@ -188,8 +188,8 @@ export const CAPPED_ATTR = 'data-chat-power-capped'
 /** 插件插在输出框左上角的文案（思考 / 工具调用 / 回答）。 */
 export const FRAME_LABEL_ATTR = 'data-chat-power-frame-label'
 
-/** 限高时给会话区留的余量（输入框上沿到视口顶的呼吸位）。 */
-const HEIGHT_MARGIN = 24
+/** 限高时给会话区留的余量（框底到输入框之间的间距）。 */
+const HEIGHT_MARGIN = 32
 
 /** 心跳间隔：聊天区晚挂载或被换掉时的重试节奏。 */
 const RETRY_INTERVAL_MS = 500
@@ -365,6 +365,18 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
    * 高度取**内容高度**（scrollHeight）——用盒子高度会把已被限高的行越量越小。
    * 内容增长时若该行原本贴着底部，就继续贴底（用户手动上滚后不再抢滚动）。
    */
+  /**
+   * 是否还在流式输出。
+   *
+   * 宿主在生成时挂 `[data-chat-running]` 标记；我们自己的答案卡也把宿主给的
+   * 状态透出来（`data-answer-status="running"`）。两者都说明这一轮还在写。
+   */
+  const isLiveOutput = (): boolean => {
+    if (typeof document === 'undefined') return false
+    if (document.querySelector('[data-chat-running]') !== null) return true
+    return document.querySelector('[data-answer-status="running"]') !== null
+  }
+
   const applyCaps = (record: TurnRecord, available: number): void => {
     if (available <= 0) {
       clearCaps(record)
@@ -392,6 +404,8 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
       // 输出框：至少占满一屏，超出的部分向上裁掉（不出现滚动条，历史直接消失）。
       row.style.setProperty('--chat-power-floor', `${Math.floor(available)}px`)
       row.setAttribute(CAPPED_ATTR, '')
+      // 还在流式输出：裁切、不出滚动条；回答完成：允许在框内滚动（出滚动条）。
+      row.setAttribute('data-chat-power-scroll', isLiveOutput() ? 'clip' : 'auto')
       if (cap >= height) {
         row.style.removeProperty('--chat-power-cap')
         return

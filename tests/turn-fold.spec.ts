@@ -181,6 +181,31 @@ describe('输出外框', () => {
   })
 })
 
+describe('输出框的固定顶栏与底部间距', () => {
+  it('顶栏固定：框上的文案与答案卡头都吸顶', () => {
+    const css = readFileSync(new URL('../src/turn-fold.module.css', import.meta.url), 'utf8')
+    const cardCss = readFileSync(new URL('../src/answer-card.module.css', import.meta.url), 'utf8')
+    expect(css).toMatch(/position:\s*sticky/)
+    expect(cardCss).toMatch(/position:\s*sticky/)
+  })
+  it('流式输出时裁切、回答完成后框内可滚动（出滚动条）', () => {
+    const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
+    const css = readFileSync(new URL('../src/turn-fold.module.css', import.meta.url), 'utf8')
+    expect(source).toContain('data-chat-power-scroll')
+    expect(source).toContain('data-answer-status')
+    expect(css).toContain("data-chat-power-scroll='auto'")
+    // 答案卡把宿主给的状态透出来，DOM 层据此判断是否还在流式输出
+    const card = readFileSync(new URL('../src/answer-card.tsx', import.meta.url), 'utf8')
+    expect(card).toContain('data-answer-status')
+  })
+  it('框底与输入框之间留出间距', () => {
+    const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
+    const margin = source.match(/HEIGHT_MARGIN\s*=\s*(\d+)/)
+    expect(margin).not.toBeNull()
+    expect(Number(margin?.[1] ?? 0)).toBeGreaterThanOrEqual(24)
+  })
+})
+
 describe('折叠条', () => {
   it('摘要条文本含轮次号、时刻与首句摘要', () => {
     expect(turnStripText(3, '17:31', '把工具栏收进更多')).toBe('第 3 轮 · 17:31 · 把工具栏收进更多')
