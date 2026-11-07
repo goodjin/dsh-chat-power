@@ -51,6 +51,26 @@
   display: none;
 }
 
+/* 框里不再套第二层边框：外框由 [data-chat-power-capped] 提供。 */
+[data-chat-power-capped] [data-answer-card] {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+/* 宿主的过程组头（「已完成 · 用时」）：收成提示，不再独占一行、也不再可展开。 */
+[data-chat-power-hint] {
+  display: none !important;
+}
+
+/* 提示文字进回答栏：标题之后、按钮之前。 */
+[data-answer-header][data-chat-power-hint-text]::before {
+  content: attr(data-chat-power-hint-text);
+  margin-right: 8px;
+  color: var(--dsw-alias-label-tertiary, inherit);
+  font-weight: 400;
+}
+
 /* 我们收起的思考/工具行：结果出来后让位给结果块（组头保留，可点开）。 */
 [data-chat-power-group-hidden] {
   display: none !important;

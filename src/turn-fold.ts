@@ -204,6 +204,7 @@ interface TurnRecord {
   strip?: HTMLElement
   requestBar?: HTMLElement
   frameLabel?: HTMLElement
+  processHint?: string
   requestCollapsed: boolean
   requestSummary: string
 }
@@ -432,6 +433,46 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     hasReasoning: row.querySelector('[data-chat-group-part="reasoning"]') !== null,
   })
 
+  /**
+   * 宿主的过程组头（「已完成 · 用时 3.2s」）。
+   *
+   * 它本来是独立一行、还能点开展开工作步骤。现在按要求把它收成一条提示：
+   * 文字搬进回答栏（答案卡的头那一行），原来的按钮藏起来——不再独占一行，
+   * 也不再提供展开。
+   *
+   * @param record - 当前轮。
+   * @returns 提示文字；没有过程组时是 undefined。
+   */
+  const captureProcessHint = (record: TurnRecord): string | undefined => {
+    for (const row of record.rows) {
+      if (!row.matches('[data-step-process]')) continue
+      const button = row.querySelector('[data-turn-process]')
+      if (button === null) continue
+      const text = (button.textContent ?? '').replace(/\s+/g, ' ').trim()
+      button.setAttribute('data-chat-power-hint', '')
+      return text === '' ? undefined : text
+    }
+    return undefined
+  }
+
+  /** 把提示文字放进回答栏（答案卡的头）；没有卡片时退回框顶那行文案。 */
+  const applyProcessHint = (record: TurnRecord, hint: string | undefined): void => {
+    let header: Element | undefined
+    for (const row of record.rows) {
+      const found = row.querySelector('[data-answer-header]')
+      if (found !== null) {
+        header = found
+        break
+      }
+    }
+    if (header !== undefined) {
+      if (hint === undefined) header.removeAttribute('data-chat-power-hint-text')
+      else header.setAttribute('data-chat-power-hint-text', hint)
+      return
+    }
+    record.processHint = hint
+  }
+
   /** 在输出框上方插入（或更新）左上角文案；框不在了就撤掉。 */
   const ensureFrameLabel = (record: TurnRecord): void => {
     const framed = record.rows.find(row => row.hasAttribute(CAPPED_ATTR))
@@ -461,9 +502,12 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
       record.frameLabel = label
     }
     const kind = frameLabelOf(framed)
-    const text = kind === 'thinking'
+    const kindText = kind === 'thinking'
       ? t('turnFold.frameThinking')
       : kind === 'tools' ? t('turnFold.frameTools') : t('turnFold.frameAnswer')
+    const text = record.processHint === undefined
+      ? kindText
+      : `${kindText} · ${record.processHint}`
     if (label.textContent !== text) label.textContent = text
     label.setAttribute('data-kind', kind)
   }
@@ -664,6 +708,7 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
         ensureRequestBar(record)
         collapseThinking(record)
         applyCaps(record, availableHeight(container))
+        applyProcessHint(record, captureProcessHint(record))
         ensureFrameLabel(record)
         continue
       }

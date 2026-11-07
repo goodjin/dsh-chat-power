@@ -238,6 +238,24 @@ describe('框顶栏只在本轮', () => {
   })
 })
 
+describe('回答框只有一层', () => {
+  it('框内不再套第二层边框（外框由插件的输出框提供）', () => {
+    const css = readFileSync(new URL('../src/turn-fold.module.css', import.meta.url), 'utf8')
+    expect(css).toContain('[data-chat-power-capped] [data-answer-card]')
+    const card = readFileSync(new URL('../src/answer-card.tsx', import.meta.url), 'utf8')
+    expect(card).toContain('data-answer-card')
+  })
+  it('「已完成 · 用时」搬进回答栏，只作提示、不再独占一行、也不可展开', () => {
+    const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
+    const css = readFileSync(new URL('../src/turn-fold.module.css', import.meta.url), 'utf8')
+    expect(source).toContain('data-chat-power-hint')
+    expect(source).toContain('data-chat-power-hint-text')
+    expect(css).toContain('[data-chat-power-hint]')
+    const card = readFileSync(new URL('../src/answer-card.tsx', import.meta.url), 'utf8')
+    expect(card).toContain('data-answer-header')
+  })
+})
+
 describe('折叠条', () => {
   it('摘要条文本含轮次号、时刻与首句摘要', () => {
     expect(turnStripText(3, '17:31', '把工具栏收进更多')).toBe('第 3 轮 · 17:31 · 把工具栏收进更多')
