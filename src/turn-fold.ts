@@ -101,45 +101,6 @@ export const REQUEST_HIDDEN_ATTR = 'data-chat-power-request-collapsed'
 /** 用户的请求行（首条用户消息、补发消息）。 */
 const USER_ROW_SELECTOR = '[data-chat-flow-kind="user"],[data-chat-flow-kind="steering"]'
 
-/**
- * 结果块限高：给**最高的那一行**整屏高度，其余行保持原样。
- *
- * 早先的版本把超出高度按比例分给所有行，结果卡片被挤成一条缝；再早的版本只压
- * 最高行但压得太狠（只留 60px）。现在的前提是：思考块已收起、改动文件列表已折成
- * 小块，当前轮里最高的那个行就是结果块——给它整屏高度、内容在行内滚动即可。
- *
- * @param heights - 各行的内容高度。
- * @param available - 可用高度（会话区可视高度减去输入框与余量）。
- * @returns 与 heights 等长的上限数组；其余行保持原值。
- */
-export function capTallestRow(heights: readonly number[], available: number): number[] {
-  const caps = heights.slice()
-  if (available <= 0 || heights.length === 0) return caps
-  let tallest = -1
-  heights.forEach((height, index) => {
-    if (height <= 0) return
-    if (tallest === -1 || height > (heights[tallest] ?? 0)) tallest = index
-  })
-  if (tallest === -1) return caps
-  caps[tallest] = Math.min(heights[tallest] ?? 0, available)
-  return caps
-}
-
-/**
- * 把某一轮的顶端对齐到滚动容器的顶端所需的 scrollTop。
- *
- * 历史轮次折成摘要条后仍排在流里，会和最后一轮挤在同一屏。滚到「当前轮从顶端
- * 开始」的位置，历史轮次就被顶到屏幕外——往上滚还能看回去。
- *
- * @param rowTop - 目标轮次顶端在视口里的位置。
- * @param containerTop - 滚动容器顶端在视口里的位置。
- * @param scrollTop - 容器当前的 scrollTop。
- * @returns 目标 scrollTop（不小于 0）。
- */
-export function scrollTopForTurnTop(rowTop: number, containerTop: number, scrollTop: number): number {
-  return Math.max(0, Math.round(rowTop - containerTop + scrollTop))
-}
-
 /** 输出框里当前展示的内容类型（框左上角的文案）。 */
 export type FrameKind = 'thinking' | 'tools' | 'answer'
 
@@ -161,6 +122,21 @@ export function frameKindOf(content: {
   if (content.hasToolCalls) return 'tools'
   if (content.hasReasoning) return 'thinking'
   return 'answer'
+}
+
+/**
+ * 把某一轮的顶端对齐到滚动容器的顶端所需的 scrollTop。
+ *
+ * 历史轮次折成摘要条后仍排在流里，会和最后一轮挤在同一屏。滚到「当前轮从顶端
+ * 开始」的位置，历史轮次就被顶到屏幕外——往上滚还能看回去。
+ *
+ * @param rowTop - 目标轮次顶端在视口里的位置。
+ * @param containerTop - 滚动容器顶端在视口里的位置。
+ * @param scrollTop - 容器当前的 scrollTop。
+ * @returns 目标 scrollTop（不小于 0）。
+ */
+export function scrollTopForTurnTop(rowTop: number, containerTop: number, scrollTop: number): number {
+  return Math.max(0, Math.round(rowTop - containerTop + scrollTop))
 }
 
 /**
@@ -189,7 +165,7 @@ export const CAPPED_ATTR = 'data-chat-power-capped'
 export const FRAME_LABEL_ATTR = 'data-chat-power-frame-label'
 
 /** 限高时给会话区留的余量（框底到输入框之间的间距）。 */
-const HEIGHT_MARGIN = 32
+const HEIGHT_MARGIN = 42
 
 /** 心跳间隔：聊天区晚挂载或被换掉时的重试节奏。 */
 const RETRY_INTERVAL_MS = 500
@@ -409,16 +385,20 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
       const content = row.scrollHeight
       return content > 0 ? content : row.getBoundingClientRect().height
     })
-    const caps = capTallestRow(heights, available)
     let tallest = -1
     heights.forEach((height, index) => {
       if (height <= 0) return
       if (tallest === -1 || height > (heights[tallest] ?? 0)) tallest = index
     })
+    // 选哪一行来套框：有答案卡时以答案那行为准（回答才是主角），
+    // 否则取最高的一行（思考 / 工具调用阶段）。
+    const answerIndex = record.rows.findIndex(row => row.querySelector('[data-answer-body]') !== null)
+    const framed = answerIndex >= 0 ? answerIndex : tallest
     record.rows.forEach((row, index) => {
       const height = heights[index] ?? 0
-      const cap = caps[index] ?? height
-      if (index !== tallest) {
+      // 上限：框内最多一屏（内容超出就裁掉，不出滚动条）。
+      const cap = index === framed ? Math.min(height, available) : height
+      if (index !== framed) {
         row.removeAttribute(CAPPED_ATTR)
         row.style.removeProperty('--chat-power-cap')
         row.style.removeProperty('--chat-power-floor')

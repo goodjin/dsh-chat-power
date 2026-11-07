@@ -9,7 +9,6 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import {
-  capTallestRow,
   formatClock,
   frameKindOf,
   groupTurnsByNumber,
@@ -66,21 +65,6 @@ describe('时刻格式化', () => {
   it('输出 HH:MM（本地时区、零填充）', () => {
     const at = new Date(2026, 10, 7, 9, 5).getTime()
     expect(formatClock(at)).toBe('09:05')
-  })
-})
-
-describe('结果块占满整屏', () => {
-  it('最高的一行拿整屏高度，其余行保持原样（不再按比例互挤）', () => {
-    const caps = capTallestRow([40, 800, 900], 600)
-    expect(caps[2]).toBe(600)
-    expect(caps[1]).toBe(800)
-    expect(caps[0]).toBe(40)
-  })
-  it('可用高度为 0（会话区没布局）时不压任何行', () => {
-    expect(capTallestRow([400, 900], 0)).toEqual([400, 900])
-  })
-  it('没有行时返回空数组', () => {
-    expect(capTallestRow([], 600)).toEqual([])
   })
 })
 
@@ -274,6 +258,19 @@ describe('提示与可用高度', () => {
   })
 })
 
+describe('框选哪一行', () => {
+  it('有答案卡时以答案那行为框（否则思考行更高会让框套错地方）', () => {
+    const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
+    const body = source.slice(source.indexOf('const applyCaps'), source.indexOf('const applyCaps') + 2000)
+    expect(body).toContain('data-answer-body')
+  })
+  it('框底与输入框的间距按要求加大 10px', () => {
+    const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
+    const margin = source.match(/HEIGHT_MARGIN\s*=\s*(\d+)/)
+    expect(Number(margin?.[1] ?? 0)).toBe(42)
+  })
+})
+
 describe('折叠条', () => {
   it('摘要条文本含轮次号、时刻与首句摘要', () => {
     expect(turnStripText(3, '17:31', '把工具栏收进更多')).toBe('第 3 轮 · 17:31 · 把工具栏收进更多')
@@ -336,7 +333,7 @@ describe('折叠条', () => {
   it('限高按内容高度计算，避免越滚越小', () => {
     const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
     expect(source).toContain('scrollHeight')
-    expect(source).toContain('capTallestRow')
+    expect(source).toContain('data-answer-body')
   })
 
   it('改动文件列表默认折成一块，可点开与收起', () => {
