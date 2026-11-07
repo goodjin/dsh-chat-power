@@ -95,6 +95,24 @@ describe('思考块一律收起', () => {
   })
 })
 
+describe('用户请求条', () => {
+  it('请求行折成一行会话条，可点开与收起', () => {
+    const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
+    expect(source).toContain('data-chat-power-request-bar')
+    expect(source).toContain('data-chat-power-request-collapsed')
+    expect(source).toContain('data-chat-flow-kind="user"')
+  })
+  it('样式里收起请求行、条本身只占一行', () => {
+    const css = readFileSync(new URL('../src/turn-fold.module.css', import.meta.url), 'utf8')
+    expect(css).toContain('data-chat-power-request-collapsed')
+    expect(css).toContain('data-chat-power-request-bar')
+  })
+  it('文案里有请求条', () => {
+    const locales = readFileSync(new URL('../src/locales.ts', import.meta.url), 'utf8')
+    expect(locales).toContain('turnFold.requestLabel')
+  })
+})
+
 describe('折叠条', () => {
   it('摘要条文本含轮次号、时刻与首句摘要', () => {
     expect(turnStripText(3, '17:31', '把工具栏收进更多')).toBe('第 3 轮 · 17:31 · 把工具栏收进更多')

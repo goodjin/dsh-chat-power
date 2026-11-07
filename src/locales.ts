@@ -48,7 +48,8 @@ export type ChatPowerLocaleKey =
   | 'selection.removeItem'
   | 'selection.multiAdded' | 'selection.editTitle' | 'selection.multiEditTitle'
   | 'selection.collectedCount'
-  | 'turnFold.label' | 'turnFold.labelWithSummary'
+  | 'turnFold.label' | 'turnFold.labelWithSummary' | 'turnFold.requestLabel'
+  | 'turnFold.requestExpand' | 'turnFold.requestCollapse'
   | 'turnFold.collapseAria' | 'turnFold.expandAria'
   | 'tools.chat' | 'tools.files' | 'tools.browser' | 'tools.terminal'
   | 'tools.openLocalFile' | 'tools.more' | 'tools.linkOpenDefault'
@@ -141,6 +142,9 @@ export const zh: Record<ChatPowerLocaleKey, string> = {
   'selection.multiEditTitle': '编辑多选内容',
   'selection.collectedCount': '已收集 {count} 段',
   'turnFold.label': '第 {turn} 轮 · {clock}',
+  'turnFold.requestLabel': '你的请求 · {summary}',
+  'turnFold.requestExpand': '展开请求',
+  'turnFold.requestCollapse': '收起请求',
   'turnFold.labelWithSummary': '第 {turn} 轮 · {clock} · {summary}',
   'turnFold.collapseAria': '收起这一轮',
   'turnFold.expandAria': '展开这一轮',
@@ -242,6 +246,9 @@ export const en: Record<ChatPowerLocaleKey, string> = {
   'selection.multiEditTitle': 'Edit multi-selected text',
   'selection.collectedCount': '{count} collected',
   'turnFold.label': 'Turn {turn} · {clock}',
+  'turnFold.requestLabel': 'Your request · {summary}',
+  'turnFold.requestExpand': 'Expand request',
+  'turnFold.requestCollapse': 'Collapse request',
   'turnFold.labelWithSummary': 'Turn {turn} · {clock} · {summary}',
   'turnFold.collapseAria': 'Collapse this turn',
   'turnFold.expandAria': 'Expand this turn',

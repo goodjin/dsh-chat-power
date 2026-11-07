@@ -21,6 +21,17 @@
   display: none !important;
 }
 
+/* 被收起的用户请求行（改由请求条代劳）。 */
+[data-chat-power-request-collapsed] {
+  display: none !important;
+}
+
+/* 请求条：只占一行，超出的摘要省略。 */
+[data-chat-power-request-bar] {
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
 /* 摘要条 / 展开态药丸。 */
 .strip {
   display: flex;

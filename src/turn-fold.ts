@@ -92,6 +92,15 @@ export const MIN_AVAILABLE_HEIGHT = 240
 /** 插件给「由我们收起的思考组」加的标记（CSS 据此只隐藏组体，组头保留）。 */
 export const GROUP_HIDDEN_ATTR = 'data-chat-power-group-hidden'
 
+/** 插件插入的「请求条」标记：用户请求折成一行，点一下展开。 */
+export const REQUEST_BAR_ATTR = 'data-chat-power-request-bar'
+
+/** 插件给「被收起的用户请求行」加的标记。 */
+export const REQUEST_HIDDEN_ATTR = 'data-chat-power-request-collapsed'
+
+/** 用户的请求行（首条用户消息、补发消息）。 */
+const USER_ROW_SELECTOR = '[data-chat-flow-kind="user"],[data-chat-flow-kind="steering"]'
+
 /**
  * 结果块限高：给**最高的那一行**整屏高度，其余行保持原样。
  *
@@ -152,6 +161,9 @@ interface TurnRecord {
   summary: string
   collapsed: boolean
   strip?: HTMLElement
+  requestBar?: HTMLElement
+  requestCollapsed: boolean
+  requestSummary: string
 }
 
 /** 折叠控制器的可注入面（便于测试与宿主差异适配）。 */
@@ -218,7 +230,11 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
   const resetSession = (key: string | undefined): void => {
     for (const record of records.values()) {
       record.strip?.remove()
-      for (const row of record.rows) row.removeAttribute(COLLAPSED_ATTR)
+      record.requestBar?.remove()
+      for (const row of record.rows) {
+        row.removeAttribute(COLLAPSED_ATTR)
+        row.removeAttribute(REQUEST_HIDDEN_ATTR)
+      }
     }
     records = new Map()
     currentTurn = 0
@@ -401,6 +417,60 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     }, true)
   }
 
+  /**
+   * 用户请求条：把这一轮的用户请求折成一行（标题条 + 首句摘要），点一下展开。
+   *
+   * 请求本身常常好几行，占掉本该给结果块的空间；折成一行后，当前轮里占地方的
+   * 就只剩结果块。展开时恢复原样，再点一下收起。
+   */
+  const ensureRequestBar = (record: TurnRecord): void => {
+    const userRow = record.rows.find(row => row.matches(USER_ROW_SELECTOR))
+    if (userRow === undefined) return
+    const parent = userRow.parentElement
+    if (parent === null) return
+    if (record.requestSummary === '') record.requestSummary = summarizeTurn([userRow])
+    let bar = record.requestBar
+    if (bar === undefined || !bar.isConnected || bar.parentElement !== parent) {
+      bar = document.createElement('div')
+      bar.className = css.strip ?? ''
+      bar.setAttribute(REQUEST_BAR_ATTR, '')
+      bar.addEventListener('click', () => {
+        record.requestCollapsed = !record.requestCollapsed
+        applyRequestBar(record)
+      })
+      parent.insertBefore(bar, userRow)
+      record.requestBar = bar
+    }
+    applyRequestBar(record)
+  }
+
+  /** 请求条与请求行的状态同步（收起 / 展开、文案、指示箭头）。 */
+  const applyRequestBar = (record: TurnRecord): void => {
+    const bar = record.requestBar
+    const userRow = record.rows.find(row => row.matches(USER_ROW_SELECTOR))
+    if (bar === undefined || userRow === undefined) return
+    if (record.requestCollapsed) userRow.setAttribute(REQUEST_HIDDEN_ATTR, '')
+    else userRow.removeAttribute(REQUEST_HIDDEN_ATTR)
+    const signature = `${record.requestCollapsed ? 'c' : 'e'}|${record.requestSummary}`
+    if (bar.dataset['signature'] === signature) return
+    bar.dataset['signature'] = signature
+    while (bar.firstChild !== null) bar.removeChild(bar.firstChild)
+    const chevron = document.createElement('span')
+    chevron.className = css.stripChevron ?? ''
+    chevron.setAttribute('aria-hidden', 'true')
+    chevron.textContent = record.requestCollapsed ? '▸' : '▾'
+    const label = document.createElement('span')
+    label.className = css.stripLabel ?? ''
+    label.textContent = t('turnFold.requestLabel', { summary: record.requestSummary })
+    bar.append(chevron, label)
+    bar.setAttribute('role', 'button')
+    bar.setAttribute('tabindex', '0')
+    bar.setAttribute('aria-expanded', record.requestCollapsed ? 'false' : 'true')
+    bar.setAttribute('aria-label', record.requestCollapsed
+      ? `${label.textContent}（${t('turnFold.requestExpand')}）`
+      : `${label.textContent}（${t('turnFold.requestCollapse')}）`)
+  }
+
   const sync = (): void => {
     if (stopped) return
     const container = scroller()
@@ -420,6 +490,8 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
           firstSeenAt: now(),
           summary: summarizeTurn(group.rows),
           collapsed: false,
+          requestCollapsed: true,
+          requestSummary: '',
         })
         continue
       }
@@ -444,14 +516,20 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
         record.strip?.remove()
         record.strip = undefined
         if (record.collapsed) setCollapsed(record, false)
+        ensureRequestBar(record)
         collapseThinking(record)
         applyCaps(record, availableHeight(container))
         continue
       }
       ensureStrip(record, firstRow)
       setCollapsed(record, record.collapsed)
-      if (record.collapsed) clearCaps(record)
-      else {
+      if (record.collapsed) {
+        clearCaps(record)
+        // 整轮折成摘要条时，请求条也一起藏起来。
+        record.requestBar?.setAttribute(REQUEST_HIDDEN_ATTR, '')
+      } else {
+        record.requestBar?.removeAttribute(REQUEST_HIDDEN_ATTR)
+        ensureRequestBar(record)
         collapseThinking(record)
         applyCaps(record, availableHeight(container))
       }
@@ -505,9 +583,11 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     if (typeof window !== 'undefined') window.removeEventListener('resize', onViewportChange)
     for (const record of records.values()) {
       record.strip?.remove()
+      record.requestBar?.remove()
       for (const row of record.rows) {
         row.removeAttribute(COLLAPSED_ATTR)
         row.removeAttribute(CAPPED_ATTR)
+        row.removeAttribute(REQUEST_HIDDEN_ATTR)
         row.style.removeProperty('--chat-power-cap')
       }
     }
