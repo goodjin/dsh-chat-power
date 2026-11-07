@@ -12,6 +12,7 @@ import {
   capTallestRow,
   formatClock,
   groupTurnsByNumber,
+  scrollTopForTurnTop,
   summarizeTurn,
   turnStripText,
 } from '../src/turn-fold.ts'
@@ -110,6 +111,26 @@ describe('用户请求条', () => {
   it('文案里有请求条', () => {
     const locales = readFileSync(new URL('../src/locales.ts', import.meta.url), 'utf8')
     expect(locales).toContain('turnFold.requestLabel')
+  })
+})
+
+describe('历史轮次顶到屏幕外', () => {
+  it('新的一轮出现时把当前轮顶到容器顶部，历史轮被顶出屏幕', () => {
+    const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
+    expect(source).toContain('scrollTopForTurnTop')
+    expect(source).toContain('scrollTop')
+  })
+  it('换算：轮次顶端对齐容器顶端', () => {
+    // 轮次顶端在容器顶端下方 300px，容器已滚 200px → 需要滚到 500
+    expect(scrollTopForTurnTop(500, 200, 200)).toBe(500)
+    // 已经在目标位置上方则不再往回滚
+    expect(scrollTopForTurnTop(100, 200, 40)).toBe(0)
+  })
+  it('结果块那行至少占满一屏（否则历史条会被拉回屏内）', () => {
+    const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
+    const css = readFileSync(new URL('../src/turn-fold.module.css', import.meta.url), 'utf8')
+    expect(source).toContain('--chat-power-floor')
+    expect(css).toContain('min-height')
   })
 })
 

@@ -126,6 +126,21 @@ export function capTallestRow(heights: readonly number[], available: number): nu
 }
 
 /**
+ * 把某一轮的顶端对齐到滚动容器的顶端所需的 scrollTop。
+ *
+ * 历史轮次折成摘要条后仍排在流里，会和最后一轮挤在同一屏。滚到「当前轮从顶端
+ * 开始」的位置，历史轮次就被顶到屏幕外——往上滚还能看回去。
+ *
+ * @param rowTop - 目标轮次顶端在视口里的位置。
+ * @param containerTop - 滚动容器顶端在视口里的位置。
+ * @param scrollTop - 容器当前的 scrollTop。
+ * @returns 目标 scrollTop（不小于 0）。
+ */
+export function scrollTopForTurnTop(rowTop: number, containerTop: number, scrollTop: number): number {
+  return Math.max(0, Math.round(rowTop - containerTop + scrollTop))
+}
+
+/**
  * 摘要条文本：轮次号 · 时刻 · 首句摘要（没有摘要时省掉末段）。
  * @param number - 轮次号。
  * @param clock - 时刻（HH:MM）。
@@ -199,6 +214,8 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
   let stopped = false
   let sessionKey: string | undefined
   let currentTurn = 0
+  /** 待把当前轮顶到容器顶端（新一轮出现、或刚打开会话）。 */
+  let pendingAlign = false
   let records = new Map<number, TurnRecord>()
   let stopObserving: (() => void) | undefined
   let composerObserver: ResizeObserver | undefined
@@ -238,6 +255,8 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     }
     records = new Map()
     currentTurn = 0
+    // 刚打开一个会话：历史轮次同样顶到屏幕外，屏幕里只留最后一轮。
+    pendingAlign = true
     sessionKey = key
   }
 
@@ -329,17 +348,29 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
       return content > 0 ? content : row.getBoundingClientRect().height
     })
     const caps = capTallestRow(heights, available)
+    let tallest = -1
+    heights.forEach((height, index) => {
+      if (height <= 0) return
+      if (tallest === -1 || height > (heights[tallest] ?? 0)) tallest = index
+    })
     record.rows.forEach((row, index) => {
       const height = heights[index] ?? 0
       const cap = caps[index] ?? height
-      if (cap >= height) {
+      if (index !== tallest) {
         row.removeAttribute(CAPPED_ATTR)
+        row.style.removeProperty('--chat-power-cap')
+        row.style.removeProperty('--chat-power-floor')
+        return
+      }
+      // 结果块那一行至少占满一屏：这样会话区不会把历史摘要条又拉回屏内。
+      row.style.setProperty('--chat-power-floor', `${Math.floor(available)}px`)
+      row.setAttribute(CAPPED_ATTR, '')
+      if (cap >= height) {
         row.style.removeProperty('--chat-power-cap')
         return
       }
       const atBottom = row.scrollTop + row.clientHeight >= row.scrollHeight - 4
       row.style.setProperty('--chat-power-cap', `${Math.floor(cap)}px`)
-      row.setAttribute(CAPPED_ATTR, '')
       if (atBottom) row.scrollTop = row.scrollHeight
     })
   }
@@ -349,6 +380,7 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     for (const row of record.rows) {
       row.removeAttribute(CAPPED_ATTR)
       row.style.removeProperty('--chat-power-cap')
+      row.style.removeProperty('--chat-power-floor')
     }
   }
 
@@ -471,6 +503,24 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
       : `${label.textContent}（${t('turnFold.requestCollapse')}）`)
   }
 
+  /**
+   * 把当前轮顶到滚动容器顶端：历史轮次的摘要条被顶到屏幕外，屏幕里只剩当前轮。
+   * 只在「新的一轮出现」和「刚打开会话」时做一次，用户自己往回滚不会被拽回去。
+   */
+  const alignCurrentTurnToTop = (record: TurnRecord, container: Element): void => {
+    const scrollable = container as HTMLElement
+    if (typeof scrollable.scrollTop !== 'number') return
+    const anchor = record.requestBar ?? record.rows[0]
+    if (anchor === undefined) return
+    const target = scrollTopForTurnTop(
+      anchor.getBoundingClientRect().top,
+      container.getBoundingClientRect().top,
+      scrollable.scrollTop,
+    )
+    if (Math.abs(target - scrollable.scrollTop) < 2) return
+    scrollable.scrollTop = target
+  }
+
   const sync = (): void => {
     if (stopped) return
     const container = scroller()
@@ -508,6 +558,8 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
       for (const record of records.values()) {
         if (record.number < currentTurn) setCollapsed(record, true)
       }
+      // 历史轮次被顶到屏幕外，屏幕里只剩当前轮。
+      pendingAlign = true
     }
     for (const record of records.values()) {
       const firstRow = record.rows[0]
@@ -532,6 +584,21 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
         ensureRequestBar(record)
         collapseThinking(record)
         applyCaps(record, availableHeight(container))
+      }
+    }
+    if (pendingAlign) {
+      pendingAlign = false
+      const record = records.get(currentTurn)
+      if (record !== undefined) {
+        alignCurrentTurnToTop(record, container)
+        // 宿主可能在我们之后又滚了一次（它要贴住最新内容），下一帧再对一次位。
+        if (typeof requestAnimationFrame === 'function') {
+          requestAnimationFrame(() => {
+            if (stopped) return
+            const current = records.get(currentTurn)
+            if (current !== undefined) alignCurrentTurnToTop(current, container)
+          })
+        }
       }
     }
   }

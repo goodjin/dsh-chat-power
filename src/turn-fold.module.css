@@ -9,8 +9,10 @@
   display: none !important;
 }
 
-/* 被限高的行：内容超出时行内滚动（上限由插件写入的 CSS 变量给出）。 */
+/* 被限高的行：内容超出时行内滚动（上限由插件写入的 CSS 变量给出），
+   并且至少占满一屏——这样上方的历史摘要条被顶到屏幕外，屏里只剩当前轮。 */
 [data-chat-power-capped] {
+  min-height: var(--chat-power-floor, none);
   max-height: var(--chat-power-cap, none);
   overflow-y: auto;
   overscroll-behavior: contain;
