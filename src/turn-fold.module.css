@@ -63,6 +63,11 @@
   display: none !important;
 }
 
+/* 组头让位给思考行的头：藏起组头后，「思考」+ 图标就是框顶那一行（官方样式）。 */
+[data-chat-power-group-head-hidden] {
+  display: none !important;
+}
+
 /* 提示文字进回答栏：标题之后、按钮之前。 */
 [data-answer-header][data-chat-power-hint-text]::before {
   content: attr(data-chat-power-hint-text);

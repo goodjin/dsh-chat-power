@@ -271,6 +271,21 @@ describe('框选哪一行', () => {
   })
 })
 
+describe('思考逐行展开', () => {
+  it('流式中的思考要展开成全文（宿主默认只给一行摘要）', () => {
+    const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
+    expect(source).toContain('data-variant="think"')
+    expect(source).toContain("getAttribute('data-state')")
+    expect(source).toContain('data-expanded')
+  })
+  it('「思考」+ 图标用官方那行（组头让位给思考行的头）', () => {
+    const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
+    expect(source).toContain('data-chat-power-group-head-hidden')
+    const css = readFileSync(new URL('../src/turn-fold.module.css', import.meta.url), 'utf8')
+    expect(css).toContain('data-chat-power-group-head-hidden')
+  })
+})
+
 describe('折叠条', () => {
   it('摘要条文本含轮次号、时刻与首句摘要', () => {
     expect(turnStripText(3, '17:31', '把工具栏收进更多')).toBe('第 3 轮 · 17:31 · 把工具栏收进更多')

@@ -376,6 +376,41 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     return total
   }
 
+  /**
+   * 思考逐行展开。
+   *
+   * 宿主在思考流式期间只渲染**一行摘要**（`data-preview`），完整正文要它自己
+   * 展开才有（`data-expanded`）。这里在它还在跑的时候点开它的头——用的是宿主
+   * 自己的展开动作，正文因此按行流出来；等思考结束、答案出来，思考块照旧收起。
+   */
+  const expandRunningThinking = (record: TurnRecord): void => {
+    for (const row of record.rows) {
+      const thinkRows = row.querySelectorAll<HTMLElement>('[data-variant="think"]')
+      for (const think of Array.from(thinkRows)) {
+        if (think.getAttribute('data-state') !== 'running') continue
+        if (think.hasAttribute('data-expanded')) continue
+        const toggle = think.querySelector('button')
+        if (toggle === null) continue
+        toggle.click()
+      }
+    }
+  }
+
+  /**
+   * 「思考」那一行（官方的标题 + 图标）要待在框的最上面：把过程组自己的组头
+   * 让开——组头藏起来后，思考行的头就成了框顶那一行，样式仍是官方的。
+   */
+  const yieldGroupHeadToThinking = (record: TurnRecord): void => {
+    for (const row of record.rows) {
+      if (!row.matches('[data-step-process]')) continue
+      const hasThinking = row.querySelector('[data-variant="think"]') !== null
+      const head = row.firstElementChild
+      if (head === null) continue
+      if (hasThinking) head.setAttribute('data-chat-power-group-head-hidden', '')
+      else head.removeAttribute('data-chat-power-group-head-hidden')
+    }
+  }
+
   const applyCaps = (record: TurnRecord, available: number): void => {
     if (available <= 0) {
       clearCaps(record)
@@ -488,6 +523,7 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     const needLabel = framed !== undefined
       && record.number === currentTurn
       && framed.querySelector('[data-answer-body]') === null
+      && framed.querySelector('[data-variant="think"]') === null
     if (!needLabel) {
       record.frameLabel?.remove()
       record.frameLabel = undefined
@@ -714,6 +750,8 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
         if (record.collapsed) setCollapsed(record, false)
         ensureRequestBar(record)
         collapseThinking(record)
+        expandRunningThinking(record)
+        yieldGroupHeadToThinking(record)
         applyCaps(record, availableHeight(container, record))
         applyProcessHint(record, captureProcessHint(record))
         ensureFrameLabel(record)
