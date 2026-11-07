@@ -206,6 +206,38 @@ describe('输出框的固定顶栏与底部间距', () => {
   })
 })
 
+describe('底部文件区块合并', () => {
+  it('已编辑文件与本轮文件合成一块，默认收起', () => {
+    const css = readFileSync(new URL('../src/markdown-turn.module.css', import.meta.url), 'utf8')
+    // 宿主的「已编辑文件」卡片在收起时只留标题行（增删行数与悬停预览仍在标题上）
+    expect(css).toContain('data-changed-files')
+    expect(css).toContain('aria-expanded')
+    // 本轮文件列表沿用宿主卡片的边框，视觉上是一块
+    expect(css).toContain('data-files-group')
+  })
+  it('本轮文件的折叠钮带标记，供样式联动', () => {
+    const source = readFileSync(new URL('../src/markdown-turn.tsx', import.meta.url), 'utf8')
+    expect(source).toContain('data-files-toggle')
+    expect(source).toContain('aria-expanded')
+  })
+})
+
+describe('框顶栏只在本轮', () => {
+  it('历史轮次不再显示吸顶的「回答」标题', () => {
+    const css = readFileSync(new URL('../src/turn-fold.module.css', import.meta.url), 'utf8')
+    expect(css).toContain('data-chat-power-frame')
+    expect(css).toContain('data-answer-title')
+  })
+  it('答案卡标题带标记，便于按框的状态显隐', () => {
+    const source = readFileSync(new URL('../src/answer-card.tsx', import.meta.url), 'utf8')
+    expect(source).toContain('data-answer-title')
+  })
+  it('DOM 层标出哪个框是当前轮', () => {
+    const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
+    expect(source).toContain('data-chat-power-frame')
+  })
+})
+
 describe('折叠条', () => {
   it('摘要条文本含轮次号、时刻与首句摘要', () => {
     expect(turnStripText(3, '17:31', '把工具栏收进更多')).toBe('第 3 轮 · 17:31 · 把工具栏收进更多')

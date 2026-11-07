@@ -43,6 +43,33 @@
   font-size: 11px;
 }
 
+/* 底部「已编辑文件」（宿主卡片）与「本轮文件」合成一块：
+   收起时只留宿主那张标题行（增删行数与悬停预览仍在上面），点一下两边的内容一起出来。 */
+body:has([data-files-toggle][aria-expanded='false']) [data-changed-files] > *:not(:first-child) {
+  display: none;
+}
+
+/* 宿主卡片在场时，本轮文件这一行沿用它的边框与圆角，视觉上是一整块。 */
+body:has([data-changed-files]) [data-files-group] {
+  margin-top: -1px;
+}
+
+/* 反过来（宿主卡片在本轮文件之后）也合成一块。 */
+body:has([data-files-group] + [data-changed-files]) [data-changed-files] {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+body:has([data-changed-files]) [data-files-group] .groupToggle {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  background: transparent;
+}
+
+body:has([data-changed-files]) [data-files-group] .groupToggle:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(127, 127, 127, 0.1));
+}
+
 .groupTitle {
   font-size: 12px;
   font-weight: 600;

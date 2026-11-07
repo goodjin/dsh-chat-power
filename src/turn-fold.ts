@@ -404,6 +404,8 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
       // 输出框：至少占满一屏，超出的部分向上裁掉（不出现滚动条，历史直接消失）。
       row.style.setProperty('--chat-power-floor', `${Math.floor(available)}px`)
       row.setAttribute(CAPPED_ATTR, '')
+      // 标出这是不是当前轮的框：历史轮不再显示吸顶的「回答」标题。
+      row.setAttribute('data-chat-power-frame', record.number === currentTurn ? 'current' : 'history')
       // 还在流式输出：裁切、不出滚动条；回答完成：允许在框内滚动（出滚动条）。
       row.setAttribute('data-chat-power-scroll', isLiveOutput() ? 'clip' : 'auto')
       if (cap >= height) {
@@ -433,11 +435,17 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
   /** 在输出框上方插入（或更新）左上角文案；框不在了就撤掉。 */
   const ensureFrameLabel = (record: TurnRecord): void => {
     const framed = record.rows.find(row => row.hasAttribute(CAPPED_ATTR))
-    if (framed === undefined) {
+    // 只有当前轮的框才另加一行文案：历史轮不再出现吸顶的「回答」；
+    // 框里已经有答案卡时也不加——卡片自己的头就是那一行（左边标题、右边按钮）。
+    const needLabel = framed !== undefined
+      && record.number === currentTurn
+      && framed.querySelector('[data-answer-body]') === null
+    if (!needLabel) {
       record.frameLabel?.remove()
       record.frameLabel = undefined
       return
     }
+    if (framed === undefined) return
     const parent = framed.parentElement
     if (parent === null) {
       record.frameLabel?.remove()

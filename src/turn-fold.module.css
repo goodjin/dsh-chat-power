@@ -46,6 +46,11 @@
   color: var(--dsw-alias-label-primary, inherit);
 }
 
+/* 历史轮的框不再显示吸顶的「回答」标题（当前轮的框才有）。 */
+[data-chat-power-frame='history'] [data-answer-title] {
+  display: none;
+}
+
 /* 我们收起的思考/工具行：结果出来后让位给结果块（组头保留，可点开）。 */
 [data-chat-power-group-hidden] {
   display: none !important;

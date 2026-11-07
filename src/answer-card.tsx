@@ -137,7 +137,7 @@ export function AnswerCard(props: {
       ) : (
         <div className={styles.answerCard} data-answer-status={props.status ?? 'settled'}>
           <div className={styles.answerCardHeader}>
-            <span className={styles.answerCardTitle}>{t('answerCard.title')}</span>
+            <span className={styles.answerCardTitle} data-answer-title="">{t('answerCard.title')}</span>
             <div className={styles.answerHeaderActions}>
               {canEdit && settled && (
                 <Tooltip portal label={t('answerCard.edit')} side="bottom" delayMs={500}>
