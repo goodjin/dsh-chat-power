@@ -134,6 +134,23 @@ describe('历史轮次顶到屏幕外', () => {
   })
 })
 
+describe('请求条的形态', () => {
+  it('当前轮的请求条靠右显示，不用整轮折叠的横条样式', () => {
+    const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
+    expect(source).toContain('css.requestBar')
+    expect(source).not.toContain('bar.className = css.strip')
+  })
+  it('样式上：请求条靠右、宽度自适应；整轮折叠条仍是整行', () => {
+    const css = readFileSync(new URL('../src/turn-fold.module.css', import.meta.url), 'utf8')
+    const requestBar = css.slice(css.indexOf('.requestBar'), css.indexOf('.requestBar') + 600)
+    expect(requestBar).toMatch(/margin-left:\s*auto/)
+    expect(requestBar).toMatch(/width:\s*fit-content/)
+    // 整轮折叠条仍占满一行
+    const strip = css.slice(css.indexOf('.strip {'), css.indexOf('.strip {') + 400)
+    expect(strip).not.toMatch(/margin-left:\s*auto/)
+  })
+})
+
 describe('折叠条', () => {
   it('摘要条文本含轮次号、时刻与首句摘要', () => {
     expect(turnStripText(3, '17:31', '把工具栏收进更多')).toBe('第 3 轮 · 17:31 · 把工具栏收进更多')

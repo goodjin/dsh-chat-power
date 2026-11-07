@@ -34,6 +34,34 @@
   white-space: nowrap;
 }
 
+/* 当前轮的用户请求条：靠右的一小块（跟用户消息同侧），
+   不是整轮折叠用的那种整行横条。 */
+.requestBar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  max-width: min(70%, 640px);
+  margin-left: auto;
+  padding: 4px 10px;
+  border: 1px solid var(--dsw-alias-border-l2, rgba(127, 127, 127, 0.2));
+  border-radius: 999px;
+  background: var(--dsw-alias-bg-layer-1, transparent);
+  color: var(--dsw-alias-label-secondary, inherit);
+  font-size: 12px;
+  line-height: 18px;
+  cursor: pointer;
+}
+
+.requestBar:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(127, 127, 127, 0.1));
+}
+
+.requestBar:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary, var(--dsw-alias-brand-primary, currentColor));
+  outline-offset: 1px;
+}
+
 /* 摘要条 / 展开态药丸。 */
 .strip {
   display: flex;

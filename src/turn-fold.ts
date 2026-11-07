@@ -464,7 +464,7 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     let bar = record.requestBar
     if (bar === undefined || !bar.isConnected || bar.parentElement !== parent) {
       bar = document.createElement('div')
-      bar.className = css.strip ?? ''
+      bar.className = css.requestBar ?? ''
       bar.setAttribute(REQUEST_BAR_ATTR, '')
       bar.addEventListener('click', () => {
         record.requestCollapsed = !record.requestCollapsed
