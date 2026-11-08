@@ -62,6 +62,8 @@ export interface ToolsRowHandlers {
   subscribe(listener: () => void): () => void
   /** 文案由调用方注入，模块不写死语言。 */
   labels: { chat: string; kinds: Record<ToolRowKind, string> }
+  /** 每个入口的图标（SVG 源码）；没有就不画图标。 */
+  icons?: Partial<Record<ToolRowKind, string>>
 }
 
 /** 行补挂与点击路由要用的最小元素面（真实 DOM 满足它，测试里的假元素也满足）。 */
@@ -81,6 +83,8 @@ export interface RowElementLike {
   /** 真实 DOM 有 children；测试假件可缺省（护栏签名比对退化到总是重画）。 */
   readonly children?: { readonly length: number }
   ownerDocument?: RowDocumentLike
+  /** 图标用 SVG 源码填进去（真实 DOM 有；测试假件可缺省）。 */
+  innerHTML?: string
 }
 
 /** 建元素与查页面要用的最小 document 面。 */
@@ -194,6 +198,15 @@ export function syncSessionToolsRow(root: RowElementLike, doc: RowDocumentLike, 
     button.setAttribute(TAB_KIND_ATTR, kind)
     button.setAttribute('aria-selected', kindTab !== undefined && isActive(snapshot, kindTab) ? 'true' : 'false')
     button.setAttribute('title', handlers.labels.kinds[kind])
+    // 入口带图标：先图标后文字（图标是纯装饰，文字才是名字）。
+    const icon = handlers.icons?.[kind]
+    if (icon !== undefined && icon !== '') {
+      const mark = doc.createElement('span')
+      mark.setAttribute('aria-hidden', 'true')
+      mark.setAttribute('data-chat-tools-icon', '')
+      mark.innerHTML = icon
+      button.append(mark)
+    }
     button.append(doc.createTextNode(handlers.labels.kinds[kind]))
     render(button)
   }

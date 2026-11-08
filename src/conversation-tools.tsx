@@ -6,6 +6,7 @@ import { createToolsAdapter, toolSlot } from './tools-adapter.tsx'
 import { attachToolsRow } from './tools-tabs.ts'
 import { attachFilesTreeAugment, hasHistoryForPhase, type AugmentHandlers } from './file-tree-augment.tsx'
 import { LazyFileTree } from './file-tree-lazy.tsx'
+import { ToolEntries } from './tools-entries.tsx'
 import { checkedFiles, toolsNotice } from './checked-files.ts'
 import { createReferenceApplier } from './composer-references.ts'
 import { readEntireWorkspaceText } from './workspace-text.ts'
@@ -22,6 +23,13 @@ const BODY = toolSlot('sidebar.right.pane.tab')
 
 /** 草稿文本按「会话 + contentId」保管：关闭标签不删，重开同内容自动找回。 */
 const docKey = (sessionId: string, contentId: string): string => `${sessionId}:${contentId}`
+
+/** 工具入口的图标：文件夹、地球、终端。 */
+const TOOL_ENTRY_ICONS = {
+  files: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2 4.2c0-.66.54-1.2 1.2-1.2h2.4l1.5 1.8h5.7c.66 0 1.2.54 1.2 1.2v6c0 .66-.54 1.2-1.2 1.2H3.2c-.66 0-1.2-.54-1.2-1.2V4.2Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>',
+  browser: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="5.6" stroke="currentColor" stroke-width="1.3"/><path d="M2.6 8h10.8M8 2.4c1.5 1.6 2.2 3.5 2.2 5.6S9.5 12 8 13.6C6.5 12 5.8 10.1 5.8 8S6.5 4 8 2.4Z" stroke="currentColor" stroke-width="1.3"/></svg>',
+  terminal: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="2.4" y="3" width="11.2" height="10" rx="1.6" stroke="currentColor" stroke-width="1.3"/><path d="M5 6.6 7.2 8.4 5 10.2M8.8 10.6h2.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+}
 
 export function registerConversationTools(ctx: any) {
   if (typeof ctx.inject !== 'function') return
@@ -98,6 +106,15 @@ export function registerConversationTools(ctx: any) {
     return <section className={css.tools} data-chat-tools="" aria-label="会话工具">
       {(notice !== '') && <p role="alert" className={statusNoticeClass} data-variant="error">{notice}</p>}
       <div className={css.content} data-chat-tools-bodies="" data-chat-tools-session={id}>
+        {s.hasHistory === false && (
+          <ToolEntries
+            entries={[
+              { kind: 'files', label: fallbackT('tools.files'), icon: TOOL_ENTRY_ICONS.files },
+              { kind: 'browser', label: fallbackT('tools.browser'), icon: TOOL_ENTRY_ICONS.browser },
+              { kind: 'terminal', label: fallbackT('tools.terminal'), icon: TOOL_ENTRY_ICONS.terminal },
+            ]}
+            onOpen={kind => { openKind(id, kind) }} />
+        )}
         {s.tabs.map(tab => {
           if (tab.kind === 'chat') return null
           const visible = tab.id === s.active
@@ -344,6 +361,7 @@ export function registerConversationTools(ctx: any) {
         terminal: fallbackT('tools.terminal'),
       },
     },
+    icons: TOOL_ENTRY_ICONS,
   }), 'chat-power: tools tab row')
   function DocumentActions({ sessionId, absolutePath }: { sessionId: string; absolutePath: string }) {
     const [status, setStatus] = useState('')

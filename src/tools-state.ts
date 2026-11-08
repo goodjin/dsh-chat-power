@@ -18,7 +18,12 @@ export interface ToolTab {
   controller: AbortController
   commands: { refresh?: () => void }
 }
-export interface ToolsSnapshot { active?: string; tabs: readonly ToolTab[] }
+export interface ToolsSnapshot {
+  active?: string
+  tabs: readonly ToolTab[]
+  /** 这个会话有没有历史：没有历史（新会话）时在会话区展示工具入口。 */
+  hasHistory?: boolean
+}
 
 /** Stable id of the per-session conversation tab; one session owns exactly one. */
 export const CHAT_TAB_ID = 'chat-power-chat-tab'
@@ -43,12 +48,16 @@ export class ToolsState {
     if (!s.tabs.some(t => t.id === tabId)) return
     this.put(id, { ...s, tabs: s.tabs.map(t => t.id === tabId ? { ...t, draft } : t) })
   }
-  /** First-time shape of a session: history shows the chat, a blank one shows files. No-op once seeded. */
+  /**
+   * 会话第一次成形时的样子。
+   *
+   * 有历史：直接是聊天。**没有历史（新会话）**：也是聊天，但会话区同时摆出
+   * 工具入口（工作区文件 / 浏览器 / 终端）——照搬右侧栏打开时的样子，
+   * 让新会话一进来就能看见这几个栏目。
+   */
   seed(id: string, hasHistory: boolean) {
     if (this.sessions.has(id)) return
-    if (hasHistory) { this.put(id, { active: CHAT_TAB_ID, tabs: [chatTab()] }); return }
-    const files: ToolTab = { id: `chat-tools-${crypto.randomUUID()}`, kind: 'files', title: '工作区文件', contentId: 'sidebar://files', controller: new AbortController(), commands: {} }
-    this.put(id, { active: files.id, tabs: [files] })
+    this.put(id, { active: CHAT_TAB_ID, tabs: [chatTab()], hasHistory })
   }
   /** Append the conversation tab when missing (first send); never changes the active tab. */
   private ensureChat(id: string) {
