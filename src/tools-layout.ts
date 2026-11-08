@@ -45,14 +45,16 @@ export interface ToolMessageHider {
   restore(): void
 }
 export function createToolMessageHider(): ToolMessageHider {
-  const hidden: Array<[HTMLElement, string]> = []
+  const original = new Map<HTMLElement, string>()
   const hide = (node: HTMLElement): void => {
-    hidden.push([node, node.style.display])
+    // 只首次记原值：同节点在宿主 scroll 内移动会重新 added、再次 hide，重复记录会把
+    // 原值覆盖成 none，restore 又写 none，节点就永远隐藏（2026-11-08 reviewer 发现）。
+    if (!original.has(node)) original.set(node, node.style.display)
     node.style.display = 'none'
   }
   const restore = (): void => {
-    for (const [node, display] of hidden) node.style.display = display
-    hidden.length = 0
+    for (const [node, display] of original) node.style.display = display
+    original.clear()
   }
   return { hide, restore }
 }

@@ -112,4 +112,20 @@ describe('createToolMessageHider（激活 → 插入新视图 → 退出）', ()
     initial.remove()
     added.remove()
   })
+
+  it('同一节点 hide 两次后 restore 仍保持原 display（含初始 inline 值）', () => {
+    // 同节点在宿主 scroll 内移动会重新 added、再次 hide；非幂等的话第二次 hide 记成
+    // [原值, none]，restore 最后又写 none，节点永远隐藏（2026-11-08 reviewer 发现）。
+    const node = document.createElement('div')
+    node.style.display = 'inline'
+    document.body.append(node)
+    const hider = createToolMessageHider()
+    hider.hide(node)
+    expect(node.style.display).toBe('none')
+    hider.hide(node) // 同节点再次 hide
+    expect(node.style.display).toBe('none')
+    hider.restore()
+    expect(node.style.display).toBe('inline') // 恢复原值，不是 none
+    node.remove()
+  })
 })

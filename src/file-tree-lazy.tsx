@@ -8,7 +8,7 @@
  * 每层最多显示 {@link FILE_PAGE_SIZE} 条，剩下的用「加载更多」继续显示。
  * 文件大小随目录列表一起回来（`list` 的结果带 `size`），不再逐个 stat。
  */
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { Fragment, useCallback, useEffect, useState, type ReactNode } from 'react'
 import styles from './file-tree-lazy.module.css'
 
 /** 每层最多显示多少条（超出部分用「加载更多」继续）。 */
@@ -241,7 +241,7 @@ export function LazyFileTree(props: {
           const entryPath = path === '' ? entry.name : `${path}/${entry.name}`
           const isDirectory = entry.type === 'directory'
           const open = expanded[entryPath] === true
-          return <>
+          return <Fragment key={entryPath}>
             <li
               key={entryPath}
               className={styles.item}
@@ -264,7 +264,7 @@ export function LazyFileTree(props: {
               </button>
             </li>
             {isDirectory && open && renderLevel(entryPath, depth + 1)}
-          </>
+          </Fragment>
         })}
       </ul>
       {rest > 0 && (
