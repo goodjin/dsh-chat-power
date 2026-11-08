@@ -23,8 +23,10 @@ describe('工作区文件树（懒加载）', () => {
     expect(listing.truncated).toBe(true)
   })
 
-  it('调用失败时给空列表（不抛）', () => {
-    expect(parseListing({ ok: false, error: { message: 'nope' } })).toEqual({ entries: [], truncated: false })
+  it('调用失败信封给出错误提示（不抛、不退化成空目录）', () => {
+    expect(parseListing({ ok: false, error: { message: 'nope' } })).toEqual({ entries: [], truncated: false, error: 'nope' })
+  })
+  it('形状不对（非信封）给空列表、无错误', () => {
     expect(parseListing(undefined)).toEqual({ entries: [], truncated: false })
   })
 

@@ -4,6 +4,7 @@ import { IconChevronDownOutlineRegular, IconFolderOpenOutlineRegular, IconRightU
 import { toolsState } from './tools-state.ts'
 import { createToolsAdapter, toolSlot } from './tools-adapter.tsx'
 import { attachToolsRow } from './tools-tabs.ts'
+import { isToolMessageNode, mountToolBody, toolHiddenNodes } from './tools-layout.ts'
 import { attachFilesTreeAugment, hasHistoryForPhase, type AugmentHandlers } from './file-tree-augment.tsx'
 import { LazyFileTree } from './file-tree-lazy.tsx'
 import { checkedFiles, toolsNotice } from './checked-files.ts'
@@ -150,7 +151,7 @@ export function registerConversationTools(ctx: any) {
     const s = useSyncExternalStore(toolsState.subscribe, () => toolsState.get(id ?? ''), () => toolsState.get(id ?? ''))
     const activeTab = s.tabs.find(t => t.id === s.active)
     const toolActive = activeTab !== undefined && activeTab.kind !== 'chat'
-    const [mounts, setMounts] = useState<{ button: HTMLElement | null; body: HTMLElement } | null>(null)
+    const [mounts, setMounts] = useState<{ button: HTMLElement | null; body: HTMLElement; content: Element | null } | null>(null)
     const [reference, setReference] = useState<any>(null)
     useEffect(() => {
       if (!id) { setReference(null); return }
@@ -166,14 +167,17 @@ export function registerConversationTools(ctx: any) {
         const leading = document.querySelector<HTMLElement>('[data-conversation-header-leading]')
         let root = leading?.closest('header')?.parentElement
         while (root && !root.querySelector('[data-conversation-content]')) root = root.parentElement
-        if (!leading || !root || attached === root) return
+        if (!leading || !root || (attached === root && body !== null && body.isConnected)) return
         body?.remove()
         attached = root
+        const content = root.querySelector('[data-conversation-content]')
         body = document.createElement('div'); body.className = css.chat ?? ''
         body.dataset.chatToolsMount = ''
-        const content = root.querySelector('[data-conversation-content]')
-        if (content) root.insertBefore(body, content); else root.append(body)
-        setMounts({ button: null as unknown as HTMLElement, body })
+        // 正文挂进会话内容的滚动层（宿主视图之后、composer 之前）：激活工具标签时
+        // 顺序固定为「标签行在上、正文居中、composer 在下」。此前挂在 content 之前、
+        // 激活时 content 塌缩，标签行被挤到正文下方、输入框之上（2026-11-08 空白现场）。
+        if (content) mountToolBody(content, body); else root.append(body)
+        setMounts({ button: null as unknown as HTMLElement, body, content })
       }
       attach()
       // attach 自己的 remove/insert 也是 childList 变异：回调末尾吞掉本次造成的
@@ -190,8 +194,8 @@ export function registerConversationTools(ctx: any) {
     // active=旧会话→会话标签），并侦测发送（聊天流新增用户消息→切到会话标签）。
     useEffect(() => {
       if (!id || !mounts) return
-      const root = mounts.body.parentElement
-      if (!root) return
+      const content = mounts.content
+      if (!content) return
       let observer: MutationObserver | undefined
       let fallback: ReturnType<typeof setTimeout> | undefined
       const teardown = (): void => {
@@ -199,53 +203,53 @@ export function registerConversationTools(ctx: any) {
         if (fallback !== undefined) { clearTimeout(fallback); fallback = undefined }
       }
       const decide = (): void => {
-        const content = root.querySelector('[data-conversation-content]')
-        const decision = hasHistoryForPhase(content?.getAttribute('data-content-phase'))
+        const decision = hasHistoryForPhase(content.getAttribute('data-content-phase'))
         if (decision !== undefined) { toolsState.seed(id, decision); teardown(); return }
-        if (observer === undefined && content !== null) {
+        if (observer === undefined) {
           observer = new MutationObserver(decide)
           observer.observe(content, { attributes: true, attributeFilter: ['data-content-phase'] })
         }
       }
       // 兜底：相位迟迟不定（宿主变化）就按聊天流里已有的用户消息判定。
       fallback = setTimeout(() => {
-        toolsState.seed(id, root.querySelectorAll(USER_NODE_SELECTOR).length > 0)
+        toolsState.seed(id, content.querySelectorAll(USER_NODE_SELECTOR).length > 0)
         teardown()
       }, 5000)
       decide()
       const stopWatch = startSendWatch({
-        root: () => root.querySelector('[data-conversation-scroll]'),
+        root: () => content.querySelector('[data-conversation-scroll]'),
         isUserTurn: node => node.matches?.(USER_NODE_SELECTOR) === true || node.querySelector?.(USER_NODE_SELECTOR) !== null,
         onSend: () => { toolsState.activateChat(id); checkedFiles.clear(id) },
       })
       return () => { teardown(); stopWatch() }
     }, [id, mounts])
     // 布局切换：工具标签激活时收起聊天消息（composer 留在下方），工具条带撑满；
-    // 会话标签激活时恢复宿主布局，条带缩回工具行 + 标签行的高度。
+    // 会话标签激活时恢复宿主布局。正文已挂在滚动层里，content 保持宿主 flex:1
+    // 不动——塌缩它才会把标签行挤到正文下方。
     useLayoutEffect(() => {
       if (!mounts) return
       const body = mounts.body
       body.hidden = !id
-      const root = body.parentElement
-      const content = root?.querySelector<HTMLElement>('[data-conversation-content]') ?? null
+      const content = mounts.content
       const scroll = content?.querySelector<HTMLElement>('[data-conversation-scroll]') ?? null
-      const isMessage = (node: Element): boolean => node.getAttribute('data-composer-seat') === null
       const hide = (node: HTMLElement): void => { node.style.display = 'none' }
-      const messages = scroll === null ? [] : [...scroll.children].filter((node): node is HTMLElement =>
-        node instanceof HTMLElement && isMessage(node))
+      // 工具标签激活才收起宿主视图（对话/轨迹）；回到对话 / 轨迹即恢复——content 保持
+      // 宿主 flex:1 不塌缩，正文（flex:1）自然落在标签行与 composer 之间。
+      const messages = scroll === null
+        ? []
+        : toolHiddenNodes(scroll, body, toolActive).filter((node): node is HTMLElement =>
+            node instanceof HTMLElement)
       const previous = messages.map(node => [node, node.style.display] as const)
-      const previousFlex = content === null ? null : content.style.flex
       let guard: MutationObserver | undefined
       if (toolActive && id) {
         for (const node of messages) hide(node)
-        if (content !== null) content.style.flex = '0 0 auto'
         body.dataset.chatStripLive = ''
-        // 兜底：工具标签激活期间宿主补渲染的新消息节点也要收起。
+        // 兜底：工具标签激活期间宿主补渲染的新视图节点也要收起。
         if (scroll !== null && typeof MutationObserver !== 'undefined') {
           guard = new MutationObserver(records => {
             for (const record of records) {
               for (const node of record.addedNodes) {
-                if (node instanceof HTMLElement && isMessage(node)) hide(node)
+                if (node instanceof HTMLElement && isToolMessageNode(node, body)) hide(node)
               }
             }
           })
@@ -257,10 +261,6 @@ export function registerConversationTools(ctx: any) {
       return () => {
         guard?.disconnect()
         for (const [node, display] of previous) node.style.display = display
-        if (content !== null) {
-          if (previousFlex === '') content.style.removeProperty('flex')
-          else if (previousFlex !== null) content.style.flex = previousFlex
-        }
       }
     }, [mounts, toolActive, id])
     if (!mounts) return null
