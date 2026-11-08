@@ -273,11 +273,10 @@ describe('框选哪一行', () => {
 })
 
 describe('思考逐行展开', () => {
-  it('流式中的思考要展开成全文（宿主默认只给一行摘要）', () => {
-    const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
-    expect(source).toContain('data-variant="think"')
-    expect(source).toContain("getAttribute('data-state')")
-    expect(source).toContain('data-expanded')
+  it('流式中的思考由我们的帧展开成全文（宿主默认只给一行摘要）', () => {
+    const frame = readFileSync(new URL('../src/think-frame.tsx', import.meta.url), 'utf8')
+    expect(frame).toContain('MarkdownText')
+    expect(frame).toContain('streaming={props.running}')
   })
   it('「思考」+ 图标用官方那行（组头让位给思考行的头）', () => {
     const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
@@ -288,9 +287,11 @@ describe('思考逐行展开', () => {
 })
 
 describe('思考与框的关系', () => {
-  it('展开思考要点宿主真正的展开控件（data-disclosure-row）', () => {
+  it('DOM 层不再替宿主点控件（帧由我们渲染，DOM 层只管布局）', () => {
     const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
-    expect(source).toContain('data-disclosure-row')
+    expect(source).not.toContain('data-disclosure-row')
+    expect(source).not.toContain('.click()')
+    expect(source).not.toContain('expandRunningThinking')
   })
   it('框顶那行文案放进框里（不再漂在框外）', () => {
     const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
