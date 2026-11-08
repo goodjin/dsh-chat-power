@@ -7,6 +7,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
 import {
   GROUP_ATTR,
   LIVE_ATTR,
@@ -282,5 +283,19 @@ describe('handleToolsRowClick（点击路由）', () => {
     expect(handled).toBe(false)
     expect(stopped.stopped).toBe(false)
     expect(actions).toEqual(['chat:s1'])
+  })
+})
+
+describe('工具标签行的按钮样式', () => {
+  it('会话标签也带图标', () => {
+    const source = readFileSync(new URL('../src/tools-tabs.ts', import.meta.url), 'utf8')
+    expect(source).toContain('handlers.icons?.chat')
+    const tools = readFileSync(new URL('../src/conversation-tools.tsx', import.meta.url), 'utf8')
+    expect(tools).toContain('chat:')
+  })
+  it('四个标签统一成按钮样式，选中的变色', () => {
+    const css = readFileSync(new URL('../src/conversation-tools.module.css', import.meta.url), 'utf8')
+    expect(css).toContain('[data-chat-tools-chat-button]')
+    expect(css).toContain("[data-chat-tools-tab][aria-selected=true]")
   })
 })

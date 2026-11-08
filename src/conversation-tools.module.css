@@ -39,3 +39,43 @@
 [data-chat-tools-row] { display:flex; align-items:center; gap:2px; flex:none; min-height:36px; padding:2px 12px; overflow:hidden; }
 [data-chat-tools-row] [data-chat-tools-chat-button] { display:inline-flex; align-items:center; padding:3px 10px; border:1px solid transparent; border-radius:6px; background:transparent; color:var(--dsw-alias-label-secondary,inherit); font:inherit; font-size:12px; cursor:pointer; }
 [data-chat-tools-row] [data-chat-tools-chat-button][aria-selected=true] { border-color:var(--dsw-alias-border-l2,rgba(127,127,127,.2)); background:var(--dsw-alias-interactive-bg-hover,rgba(127,127,127,.16)); color:var(--dsw-alias-label-primary,inherit); }
+
+/* 工具标签行：会话 / 工作区文件 / 浏览器 / 终端 —— 统一成按钮样式，
+   选中的那个用底色与文字颜色区分。 */
+[data-chat-tools-chat-button],
+[data-chat-tools-tab] {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--dsw-radius-md, 8px);
+  background: transparent;
+  color: var(--dsw-alias-label-secondary, inherit);
+  font: inherit;
+  font-size: 13px;
+  line-height: 20px;
+  cursor: pointer;
+}
+
+[data-chat-tools-chat-button]:hover,
+[data-chat-tools-tab]:hover {
+  background: var(--dsw-alias-interactive-bg-hover, transparent);
+}
+
+/* 选中的标签：变色表示当前在看哪一个。 */
+[data-chat-tools-chat-button][aria-selected=true],
+[data-chat-tools-tab][aria-selected=true],
+[data-chat-tools-tab][data-chat-tools-tab-active] {
+  background: var(--dsw-alias-interactive-bg-active, transparent);
+  border-color: var(--dsw-alias-border-l2, transparent);
+  color: var(--dsw-alias-label-primary, inherit);
+  font-weight: 600;
+}
+
+[data-chat-tools-chat-button] [data-chat-tools-icon],
+[data-chat-tools-tab] [data-chat-tools-icon] {
+  display: inline-flex;
+  align-items: center;
+  color: currentColor;
+}

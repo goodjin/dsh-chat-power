@@ -25,6 +25,7 @@ const docKey = (sessionId: string, contentId: string): string => `${sessionId}:$
 
 /** 工具入口的图标：文件夹、地球、终端。 */
 const TOOL_ENTRY_ICONS = {
+  chat: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2.6 4.2c0-.66.54-1.2 1.2-1.2h8.4c.66 0 1.2.54 1.2 1.2v5.2c0 .66-.54 1.2-1.2 1.2H6.6L3.6 13.2c-.3.2-.7 0-.7-.4v-2.2c-.19-.12-.3-.31-.3-.52V4.2Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>',
   files: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2 4.2c0-.66.54-1.2 1.2-1.2h2.4l1.5 1.8h5.7c.66 0 1.2.54 1.2 1.2v6c0 .66-.54 1.2-1.2 1.2H3.2c-.66 0-1.2-.54-1.2-1.2V4.2Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>',
   browser: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="5.6" stroke="currentColor" stroke-width="1.3"/><path d="M2.6 8h10.8M8 2.4c1.5 1.6 2.2 3.5 2.2 5.6S9.5 12 8 13.6C6.5 12 5.8 10.1 5.8 8S6.5 4 8 2.4Z" stroke="currentColor" stroke-width="1.3"/></svg>',
   terminal: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="2.4" y="3" width="11.2" height="10" rx="1.6" stroke="currentColor" stroke-width="1.3"/><path d="M5 6.6 7.2 8.4 5 10.2M8.8 10.6h2.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',

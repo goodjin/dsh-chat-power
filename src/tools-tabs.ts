@@ -63,7 +63,7 @@ export interface ToolsRowHandlers {
   /** 文案由调用方注入，模块不写死语言。 */
   labels: { chat: string; kinds: Record<ToolRowKind, string> }
   /** 每个入口的图标（SVG 源码）；没有就不画图标。 */
-  icons?: Partial<Record<ToolRowKind, string>>
+  icons?: Partial<Record<ToolRowKind, string>> & { chat?: string }
 }
 
 /** 行补挂与点击路由要用的最小元素面（真实 DOM 满足它，测试里的假元素也满足）。 */
@@ -148,6 +148,14 @@ export function syncSessionToolsRow(root: RowElementLike, doc: RowDocumentLike, 
       chat.setAttribute('role', 'tab')
       chat.setAttribute('data-chat-tools-chat-button', '')
       chat.setAttribute('aria-selected', 'true')
+      const chatIcon = handlers.icons?.chat
+      if (chatIcon !== undefined && chatIcon !== '') {
+        const mark = doc.createElement('span')
+        mark.setAttribute('aria-hidden', 'true')
+        mark.setAttribute('data-chat-tools-icon', '')
+        mark.innerHTML = chatIcon
+        chat.append(mark)
+      }
       chat.append(doc.createTextNode(handlers.labels.chat))
       owned.append(chat)
       const group = doc.createElement('div')
