@@ -336,11 +336,15 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     const composerHeight = composer === null ? 0 : composer.getBoundingClientRect().height
     // 框上方还有请求条与文案行——不扣掉，框底会伸到输入框下面。
     let above = 0
+    let below = 0
     if (record !== undefined) {
       const framed = record.rows.find(row => row.hasAttribute(CAPPED_ATTR))
-      if (framed !== undefined) above = aboveFrameHeight(record, framed)
+      if (framed !== undefined) {
+        above = aboveFrameHeight(record, framed)
+        below = belowFrameHeight(record, framed)
+      }
     }
-    return viewport - composerHeight - HEIGHT_MARGIN - above
+    return viewport - composerHeight - HEIGHT_MARGIN - above - below
   }
 
   /**
@@ -366,11 +370,28 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
    * 可用高度要把它们扣掉，否则框的底边会伸到输入框下面（底部被压住）。
    */
   const aboveFrameHeight = (record: TurnRecord, framed: HTMLElement): number => {
-    let total = (record.requestBar?.offsetHeight ?? 0) + (record.frameLabel?.offsetHeight ?? 0)
+    let total = record.requestBar?.offsetHeight ?? 0
     for (const row of record.rows) {
       if (row === framed) continue
       // 只算排在框前面的行（文档顺序）。
       if ((row.compareDocumentPosition(framed) & Node.DOCUMENT_POSITION_FOLLOWING) === 0) continue
+      total += row.getBoundingClientRect().height
+    }
+    return total
+  }
+
+  /**
+   * 框**下面**占了多少高度：底部的文件块、点赞那一排等。
+   *
+   * 它们排在框后面，要一起放进一屏里，所以限高时得让出它们的位置——
+   * 否则框的底边会被它们顶到输入框下面。
+   */
+  const belowFrameHeight = (record: TurnRecord, framed: HTMLElement): number => {
+    let total = 0
+    for (const row of record.rows) {
+      if (row === framed) continue
+      // 只算排在框后面的行（文档顺序）。
+      if ((row.compareDocumentPosition(framed) & Node.DOCUMENT_POSITION_PRECEDING) === 0) continue
       total += row.getBoundingClientRect().height
     }
     return total
@@ -409,6 +430,22 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
       const badge = box.querySelector('[data-chat-power-state]')
       if (badge === null) continue
       if (badge.textContent !== text) badge.textContent = text
+    }
+  }
+
+  /**
+   * 认出宿主那排点赞/点踩按钮，交给样式摆到回答框的标题栏里。
+   *
+   * 宿主把它们画在答案下面；我们只做标记（按 `aria-pressed` 认，不看文案），
+   * 位置交给 CSS。
+   */
+  const markFeedbackRow = (record: TurnRecord): void => {
+    for (const row of record.rows) {
+      const like = row.querySelector('button[aria-pressed]')
+      if (like === null) continue
+      const holder = like.parentElement
+      if (holder === null) continue
+      holder.setAttribute('data-chat-power-feedback', '')
     }
   }
 
@@ -524,41 +561,7 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
   }
 
   /** 在输出框上方插入（或更新）左上角文案；框不在了就撤掉。 */
-  const ensureFrameLabel = (record: TurnRecord): void => {
-    const framed = record.rows.find(row => row.hasAttribute(CAPPED_ATTR))
-    // 只有当前轮的框才另加一行文案：历史轮不再出现吸顶的「回答」；
-    // 框里已经有答案卡时也不加——卡片自己的头就是那一行（左边标题、右边按钮）。
-    const needLabel = framed !== undefined
-      && record.number === currentTurn
-      && framed.querySelector('[data-answer-body]') === null
-      && framed.querySelector('[data-variant="think"]') === null
-      && framed.querySelector('[data-chat-power-think-frame]') === null
-      && framed.querySelector('[data-chat-power-tools-frame]') === null
-    if (!needLabel) {
-      record.frameLabel?.remove()
-      record.frameLabel = undefined
-      return
-    }
-    if (framed === undefined) return
-    let label = record.frameLabel
-    if (label === undefined || !label.isConnected || label.parentElement !== framed) {
-      label = document.createElement('div')
-      label.className = css.frameLabel ?? ''
-      label.setAttribute(FRAME_LABEL_ATTR, '')
-      // 放进框里（框的第一行）：吸顶，不会漂到框外跟别的字叠在一起。
-      framed.insertBefore(label, framed.firstChild)
-      record.frameLabel = label
-    }
-    const kind = frameLabelOf(framed)
-    const kindText = kind === 'thinking'
-      ? t('turnFold.frameThinking')
-      : kind === 'tools' ? t('turnFold.frameTools') : t('turnFold.frameAnswer')
-    const text = record.processHint === undefined
-      ? kindText
-      : `${kindText} · ${record.processHint}`
-    if (label.textContent !== text) label.textContent = text
-    label.setAttribute('data-kind', kind)
-  }
+
 
   /** 收起折叠态的行不需要限高（它们不可见），清掉之前的限高痕迹。 */
   const clearCaps = (record: TurnRecord): void => {
@@ -771,7 +774,7 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
         yieldGroupHeadToThinking(record)
         applyCaps(record, availableHeight(container, record))
         applyProcessHint(record, captureProcessHint(record))
-        ensureFrameLabel(record)
+        markFeedbackRow(record)
         markFrameState(record)
         continue
       }
@@ -787,7 +790,6 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
         collapseThinking(record)
         applyCaps(record, availableHeight(container, record))
       }
-      ensureFrameLabel(record)
     }
     if (pendingAlign) {
       pendingAlign = false

@@ -105,8 +105,8 @@ describe('工具调用帧', () => {
     expect(frame).toContain('data-chat-power-frame-box')
     expect(frame).toContain('data-chat-power-tools-frame')
   })
-  it('框里有工具调用帧时，DOM 层不再另加一行文案', () => {
+  it('DOM 层不再另加文案行（各帧自带标题行）', () => {
     const dom = source('../src/turn-fold.ts')
-    expect(dom).toContain('data-chat-power-tools-frame')
+    expect(dom).not.toContain('ensureFrameLabel')
   })
 })

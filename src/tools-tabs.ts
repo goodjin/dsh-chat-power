@@ -168,21 +168,7 @@ export function syncSessionToolsRow(root: RowElementLike, doc: RowDocumentLike, 
       owned = doc.createElement('div')
       owned.setAttribute(ROW_ATTR, '')
       owned.setAttribute('role', 'tablist')
-      const chat = doc.createElement('button')
-      chat.setAttribute('type', 'button')
-      chat.setAttribute('role', 'tab')
-      chat.setAttribute('data-chat-tools-chat-button', '')
-      chat.setAttribute('aria-selected', 'true')
-      const chatIcon = handlers.icons?.chat
-      if (chatIcon !== undefined && chatIcon !== '') {
-        const mark = doc.createElement('span')
-        mark.setAttribute('aria-hidden', 'true')
-        mark.setAttribute('data-chat-tools-icon', '')
-        mark.innerHTML = chatIcon
-        chat.append(mark)
-      }
-      chat.append(doc.createTextNode(handlers.labels.chat))
-      owned.append(chat)
+      // 「会话」按钮不画：宿主那一行自带「对话 / 轨迹」。
       const group = doc.createElement('div')
       group.setAttribute(GROUP_ATTR, '')
       owned.append(group)

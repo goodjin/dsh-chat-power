@@ -180,13 +180,12 @@ describe('syncSessionToolsRow（同步）', () => {
     expect(group!.querySelectorAll(`[${TAB_CLOSE_ATTR}]`)).toHaveLength(1)
   })
 
-  it('宿主行缺席：自建行带自己的「对话」标签，工具激活时对话不高亮', () => {
+  it('宿主行缺席：自建行不再画「会话」标签（宿主那一行自带「对话」）', () => {
     const root = content('s1', false)
     const h = handlers(() => snapshotOf([{ id: 't1', kind: 'files', title: '工作区文件' }], 't1'))
     const row = syncSessionToolsRow(root, fakeDoc(), h.value, {})
     expect(row!.hasAttribute(ROW_ATTR)).toBe(true)
-    const chat = row!.querySelector('[data-chat-tools-chat-button]')
-    expect(chat!.getAttribute('aria-selected')).toBe('false')
+    expect(row!.querySelector('[data-chat-tools-chat-button]')).toBeNull()
     expect(row!.getAttribute(LIVE_ATTR)).toBe('')
   })
 
@@ -195,7 +194,6 @@ describe('syncSessionToolsRow（同步）', () => {
     const h = handlers(() => snapshotOf([{ id: 't1', kind: 'local', title: 'a.md' }], undefined))
     const row = syncSessionToolsRow(root, fakeDoc(), h.value, {})
     expect(row!.hasAttribute(LIVE_ATTR)).toBe(false)
-    expect(row!.querySelector('[data-chat-tools-chat-button]')!.getAttribute('aria-selected')).toBe('true')
   })
 
   it('同步是全量重画：两次同步不叠出两份标签', () => {
@@ -307,11 +305,9 @@ describe('handleToolsRowClick（点击路由）', () => {
 })
 
 describe('工具标签行的按钮样式', () => {
-  it('会话标签也带图标', () => {
+  it('我们不再自己画「会话」标签', () => {
     const source = readFileSync(new URL('../src/tools-tabs.ts', import.meta.url), 'utf8')
-    expect(source).toContain('handlers.icons?.chat')
-    const tools = readFileSync(new URL('../src/conversation-tools.tsx', import.meta.url), 'utf8')
-    expect(tools).toContain('chat:')
+    expect(source).not.toContain("setAttribute('data-chat-tools-chat-button'")
   })
   it('四个标签统一成按钮样式，选中的变色', () => {
     const css = readFileSync(new URL('../src/conversation-tools.module.css', import.meta.url), 'utf8')

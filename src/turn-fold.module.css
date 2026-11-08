@@ -173,3 +173,26 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* 点赞/点踩那排按钮：宿主画在答案下面。
+   贴到框顶跟着标题栏走；若它本来就在答案卡里，就摆进标题栏右侧（编辑/复制前面）。 */
+[data-chat-power-feedback] {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 12px 2px;
+  background: var(--dsw-alias-bg-layer-1, transparent);
+}
+
+[data-answer-card] [data-chat-power-feedback] {
+  position: absolute;
+  top: 0;
+  right: 92px;
+  height: 30px;
+  padding: 0;
+  background: transparent;
+  z-index: 2;
+}

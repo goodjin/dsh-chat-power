@@ -300,10 +300,10 @@ describe('思考与框的关系', () => {
     expect(source).not.toContain('.click()')
     expect(source).not.toContain('expandRunningThinking')
   })
-  it('框顶那行文案放进框里（不再漂在框外）', () => {
+  it('不再注入框顶文案行（各帧自带标题行）', () => {
     const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
-    const body = source.slice(source.indexOf('const ensureFrameLabel'), source.indexOf('const ensureFrameLabel') + 1600)
-    expect(body).toContain('framed.insertBefore')
+    expect(source).not.toContain('ensureFrameLabel')
+    expect(source).not.toContain('framed.insertBefore')
   })
   it('结果出来后，思考块（不管它在哪一行）都收起', () => {
     const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
@@ -382,5 +382,22 @@ describe('折叠条', () => {
     expect(source).toContain('filesOpen')
     expect(source).toContain('markdownTurn.filesToggle')
     expect(source).toContain('markdownTurn.filesCollapse')
+  })
+})
+
+describe('会话区排布', () => {
+  it('不再往框里注入「思考/回答」那行文案（会闪，且各帧自带标题行）', () => {
+    const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
+    expect(source).not.toContain('ensureFrameLabel')
+  })
+  it('限高时把框下面那截（文件块、点赞行）的高度也算进来', () => {
+    const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
+    expect(source).toContain('belowFrameHeight')
+  })
+  it('点赞行被认出来并摆进标题栏', () => {
+    const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
+    expect(source).toContain('data-chat-power-feedback')
+    const css = readFileSync(new URL('../src/turn-fold.module.css', import.meta.url), 'utf8')
+    expect(css).toContain('[data-chat-power-feedback]')
   })
 })

@@ -6,6 +6,8 @@
    这里只留排布。 */
 .answerCard {
   margin-block: 6px;
+  /* 点赞那排按钮要摆进标题栏右侧，得有定位参照。 */
+  position: relative;
   /* Clip vertical overflow so long content keeps the rounded corners, but let a
      wide markdown table's own horizontal scroll wrapper reach the card edge —
      `overflow: hidden` here would clip it and hide the table's scrollbar. */
