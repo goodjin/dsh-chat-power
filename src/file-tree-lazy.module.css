@@ -1,0 +1,73 @@
+/* 懒加载工作区文件树：一次只画当前目录的一层，条目多了用「加载更多」继续。 */
+
+.tree {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 12px;
+  min-width: 0;
+  font-size: 13px;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 12px;
+}
+
+.item {
+  margin: 0;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 3px 6px;
+  border: none;
+  border-radius: var(--dsw-radius-sm, 4px);
+  background: transparent;
+  color: var(--dsw-alias-label-primary, inherit);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.row:hover {
+  background: var(--dsw-alias-interactive-bg-hover, transparent);
+}
+
+.name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.size {
+  flex: none;
+  color: var(--dsw-alias-label-tertiary, inherit);
+  font-size: 11px;
+}
+
+/* 「加载更多」 */
+.more {
+  align-self: flex-start;
+  margin-left: 12px;
+  padding: 2px 8px;
+  border: 1px solid var(--dsw-alias-border-l2, transparent);
+  border-radius: var(--dsw-radius-sm, 4px);
+  background: transparent;
+  color: var(--dsw-alias-label-secondary, inherit);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.hint {
+  padding: 4px 12px;
+  color: var(--dsw-alias-label-tertiary, inherit);
+  font-size: 12px;
+}

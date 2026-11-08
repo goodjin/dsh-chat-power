@@ -57,7 +57,7 @@ export type ChatPowerLocaleKey =
   | 'turnFold.collapseAria' | 'turnFold.expandAria'
   | 'tools.chat' | 'tools.files' | 'tools.browser' | 'tools.terminal'
   | 'tools.openLocalFile' | 'tools.more' | 'tools.linkOpenDefault'
-  | 'fileTree.reference' | 'fileTree.editCopy'
+  | 'fileTree.reference' | 'fileTree.editCopy' | 'fileTree.loadMore'
 
 export const zh: Record<ChatPowerLocaleKey, string> = {
   'mermaid.label': 'Mermaid',
@@ -171,6 +171,7 @@ export const zh: Record<ChatPowerLocaleKey, string> = {
   'tools.more': '更多',
   'tools.linkOpenDefault': '网页链接打开方式',
   'fileTree.reference': '引用 {path}',
+  'fileTree.loadMore': '加载更多（还有 {count} 条）',
   'fileTree.editCopy': '编辑副本 {path}',
 }
 
@@ -286,6 +287,7 @@ export const en: Record<ChatPowerLocaleKey, string> = {
   'tools.more': 'More',
   'tools.linkOpenDefault': 'Default link opening',
   'fileTree.reference': 'Reference {path}',
+  'fileTree.loadMore': 'Load more ({count} left)',
   'fileTree.editCopy': 'Edit copy of {path}',
 }
 

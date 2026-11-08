@@ -5,6 +5,7 @@ import { toolsState } from './tools-state.ts'
 import { createToolsAdapter, toolSlot } from './tools-adapter.tsx'
 import { attachToolsRow } from './tools-tabs.ts'
 import { attachFilesTreeAugment, hasHistoryForPhase, type AugmentHandlers } from './file-tree-augment.tsx'
+import { LazyFileTree } from './file-tree-lazy.tsx'
 import { checkedFiles, toolsNotice } from './checked-files.ts'
 import { createReferenceApplier } from './composer-references.ts'
 import { readEntireWorkspaceText } from './workspace-text.ts'
@@ -118,7 +119,16 @@ export function registerConversationTools(ctx: any) {
                     : undefined}
                   // 卡内「退出编辑」直接丢弃草稿：暂存文本移除，重开重新读文件。
                   onClose={() => closeDocument(id, tab.id)} />
-              : definition && props.renderSlot(BODY, {}, { entryKey: definition.id, hookContext: () => info })}
+              : tab.kind === 'files'
+                // 工作区文件：自己画一棵懒加载树——只列当前目录的直接子项，
+                // 点开文件夹才加载下一层，每层最多显示一百条（其余用「加载更多」）。
+                // 宿主那棵树一次画完整目录，工作区一大就卡住。
+                ? <LazyFileTree
+                    sessionId={id}
+                    remote={() => ctx.get('remote')}
+                    t={fallbackT}
+                    onOpenFile={path => { openWorkspaceEditor(id, path) }} />
+                : definition && props.renderSlot(BODY, {}, { entryKey: definition.id, hookContext: () => info })}
           </div>
         })}
       </div>
