@@ -57,7 +57,7 @@ export type ChatPowerLocaleKey =
   | 'turnFold.collapseAria' | 'turnFold.expandAria'
   | 'tools.chat' | 'tools.files' | 'tools.browser' | 'tools.terminal'
   | 'tools.openLocalFile' | 'tools.more' | 'tools.linkOpenDefault'
-  | 'fileTree.reference' | 'fileTree.editCopy' | 'fileTree.loadMore'
+  | 'fileTree.reference' | 'fileTree.editCopy' | 'fileTree.loadMore' | 'fileTree.empty'
 
 export const zh: Record<ChatPowerLocaleKey, string> = {
   'mermaid.label': 'Mermaid',
@@ -173,6 +173,7 @@ export const zh: Record<ChatPowerLocaleKey, string> = {
   'fileTree.reference': '引用 {path}',
   'fileTree.loadMore': '加载更多（还有 {count} 条）',
   'fileTree.editCopy': '编辑副本 {path}',
+  'fileTree.empty': '此目录为空',
 }
 
 export const en: Record<ChatPowerLocaleKey, string> = {
@@ -289,6 +290,7 @@ export const en: Record<ChatPowerLocaleKey, string> = {
   'fileTree.reference': 'Reference {path}',
   'fileTree.loadMore': 'Load more ({count} left)',
   'fileTree.editCopy': 'Edit copy of {path}',
+  'fileTree.empty': 'This directory is empty',
 }
 
 /** `{name}` 形式的参数插值；模板里没有对应参数时原样保留占位符。 */

@@ -40,6 +40,7 @@ interface FakeEl {
   querySelector(selector: string): FakeEl | null
   querySelectorAll(selector: string): FakeEl[]
   closest(selector: string): FakeEl | null
+  readonly parentElement: FakeEl | null
 }
 
 function el(tag: string, attrs: Record<string, string> = {}): FakeEl {
@@ -80,6 +81,7 @@ function el(tag: string, attrs: Record<string, string> = {}): FakeEl {
       }
       return walk(node)
     },
+    get parentElement() { return node.parent },
     querySelectorAll(selector) {
       const attribute = /\[([^\]=]+)\]/.exec(selector)?.[1]
       const found: FakeEl[] = []
@@ -281,6 +283,26 @@ describe('handleToolsRowClick（点击路由）', () => {
     expect(handled).toBe(false)
     expect(stopped.stopped).toBe(false)
     expect(actions).toEqual(['chat:s1'])
+  })
+
+  it('工具激活时点 header 里的宿主视图标签（对话/轨迹/提示词，在 header、与 content 是兄弟）→ 回对话并放行', () => {
+    // 真实结构：宿主视图标签行在 header 里，content 是 header 的兄弟、不在其中。
+    // 早先 `closest('[data-conversation-content]')` 对 header 里的点击返回 null，
+    // 于是 sessionId 取不到、直接 return，点对话/轨迹/提示词都不 activateChat。
+    const root = el('div')
+    const header = el('header')
+    const tabs = el('div', { 'data-conversation-tabs': '' })
+    const hostTab = el('button', { role: 'tab' })
+    tabs.append(hostTab)
+    header.append(tabs)
+    root.append(header)
+    root.append(el('div', { 'data-conversation-content': '', 'data-conversation-session': 's1' }))
+    const h = handlers(() => snapshotOf([{ id: 't1', kind: 'files', title: '工作区文件' }], 't1'))
+    const stopped = { stopped: false }
+    const handled = handleToolsRowClick({ target: hostTab, preventDefault: () => {}, stopPropagation: () => { stopped.stopped = true } } as never, h.value)
+    expect(handled).toBe(false)
+    expect(stopped.stopped).toBe(false)
+    expect(h.actions).toEqual(['chat:s1'])
   })
 })
 
