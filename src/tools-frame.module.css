@@ -1,0 +1,19 @@
+/* 工具调用帧：外框与裁切由 [data-chat-power-frame-box] 统一给，这里只管内部排布。 */
+
+.frame {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+/* 框里的标题行：工具调用。 */
+.label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 0;
+  color: var(--dsw-alias-label-secondary, inherit);
+  font-size: 12px;
+  line-height: 18px;
+}

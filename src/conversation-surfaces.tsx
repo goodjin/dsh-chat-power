@@ -26,9 +26,11 @@
  */
 
 import { createElement } from 'react'
+import type { ReactNode } from 'react'
 import type { ComponentType } from 'react'
 import { AnswerCard } from './answer-card.tsx'
 import { ThinkFrame } from './think-frame.tsx'
+import { ToolsFrame } from './tools-frame.tsx'
 import { createMarkdownTurnReaders } from './markdown-turn-sources.ts'
 import type { MarkdownTurnReaders } from './markdown-turn-sources.ts'
 import { registerMarkdownTurn } from './markdown-turn.tsx'
@@ -48,6 +50,8 @@ export const SEGMENT_RENDERER_SLOT = 'conversation.chat.node.acp-segment-rendere
 /** 目标渲染位与 wrap 优先级。 */
 const NODE_SLOT = 'conversation.chat.node'
 const NODE_KEY = 'assistant-step'
+/** 工具调用节点的插槽键。 */
+const TOOL_NODE_KEY = 'tool-call'
 /**
  * 本包必须在外层：数值要**小于** acp-agent 的兜底层（那里固定 -40）。
  *
@@ -252,6 +256,35 @@ export function registerConversationSurfaces(ctx: Surface): void {
   }
   const unsubscribeRenderer = slots.subscribe(NODE_SLOT, attachRenderer)
   attachRenderer()
+
+  // 工具调用节点：同样接管——原生工具视图放进我们的框里（框、标题、裁切归我们）。
+  let removeToolRenderer: (() => void) | undefined
+  let originalToolComponent: unknown
+  let installingTool = false
+  const attachToolRenderer = (): void => {
+    if (installingTool) return
+    const entry = slots.entries(NODE_SLOT).find(
+      candidate => candidate.options.key === TOOL_NODE_KEY && (candidate.options.priority as number | undefined ?? 0) >= 0,
+    )
+    if (entry === undefined || entry.component === originalToolComponent) return
+    installingTool = true
+    try {
+      removeToolRenderer?.()
+      originalToolComponent = entry.component
+      const NativeTool = entry.component as ComponentType<AssistantStepProps>
+      const Renderer = (props: AssistantStepProps): ReactNode => createElement(
+        ToolsFrame,
+        { t: dshT, children: createElement(NativeTool, props) },
+      )
+      removeToolRenderer = slots.register({
+        name: NODE_SLOT, key: TOOL_NODE_KEY, priority: WRAP_PRIORITY,
+        ...(entry.locale === undefined ? {} : { locale: entry.locale }),
+        ...(entry.inject === undefined ? {} : { inject: entry.inject }),
+      }, Renderer)
+    } finally { installingTool = false }
+  }
+  const unsubscribeToolRenderer = slots.subscribe(NODE_SLOT, attachToolRenderer)
+  attachToolRenderer()
 
   // 会话尾部文件卡片：通用座位，排在官方改动卡片之后。
   try {

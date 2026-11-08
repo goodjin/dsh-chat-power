@@ -44,3 +44,18 @@ describe('帧接管', () => {
     expect(frame).toContain('data-chat-power-frame-box')
   })
 })
+
+describe('工具调用帧', () => {
+  it('工具调用节点由我们的帧接管（原生内容 + 我们的框与标题）', () => {
+    const wrapper = source('../src/conversation-surfaces.tsx')
+    expect(wrapper).toContain('ToolsFrame')
+    expect(wrapper).toContain("'tool-call'")
+    const frame = source('../src/tools-frame.tsx')
+    expect(frame).toContain('data-chat-power-frame-box')
+    expect(frame).toContain('data-chat-power-tools-frame')
+  })
+  it('框里有工具调用帧时，DOM 层不再另加一行文案', () => {
+    const dom = source('../src/turn-fold.ts')
+    expect(dom).toContain('data-chat-power-tools-frame')
+  })
+})

@@ -531,6 +531,7 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
       && framed.querySelector('[data-answer-body]') === null
       && framed.querySelector('[data-variant="think"]') === null
       && framed.querySelector('[data-chat-power-think-frame]') === null
+      && framed.querySelector('[data-chat-power-tools-frame]') === null
     if (!needLabel) {
       record.frameLabel?.remove()
       record.frameLabel = undefined
