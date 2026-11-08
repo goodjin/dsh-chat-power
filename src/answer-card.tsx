@@ -135,9 +135,10 @@ export function AnswerCard(props: {
           {notice !== null && <p key={notice.seq} className={statusNoticeClass} data-variant="error" role="alert">{notice.text}</p>}
         </ComposeCard>
       ) : (
-        <div className={styles.answerCard} data-answer-card="" data-chat-power-frame-box="" data-answer-status={props.status ?? 'settled'}>
-          <div className={styles.answerCardHeader} data-answer-header="">
+        <div className={styles.answerCard} data-answer-card="" data-chat-power-frame-box="" data-chat-power-kind="answer" data-answer-status={props.status ?? 'settled'}>
+          <div className={styles.answerCardHeader} data-answer-header="" data-chat-power-frame-header="">
             <span className={styles.answerCardTitle} data-answer-title="">{t('answerCard.title')}</span>
+            <span className={styles.answerState} data-chat-power-state="" />
             <div className={styles.answerHeaderActions}>
               {canEdit && settled && (
                 <Tooltip portal label={t('answerCard.edit')} side="bottom" delayMs={500}>

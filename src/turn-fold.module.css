@@ -21,6 +21,27 @@
   background: var(--dsw-alias-bg-layer-1, transparent);
 }
 
+/* 不同类型的框用不同颜色区分（边框与标题）。 */
+[data-chat-power-frame-box][data-chat-power-kind='thinking'] {
+  border-color: color-mix(in srgb, var(--dsw-alias-state-business-primary, transparent) 42%, transparent);
+}
+
+[data-chat-power-frame-box][data-chat-power-kind='tools'] {
+  border-color: color-mix(in srgb, var(--dsw-alias-brand-primary, transparent) 42%, transparent);
+}
+
+[data-chat-power-frame-box][data-chat-power-kind='answer'] {
+  border-color: color-mix(in srgb, var(--dsw-alias-state-success-primary, transparent) 42%, transparent);
+}
+
+[data-chat-power-frame-box][data-chat-power-kind='error'] {
+  border-color: color-mix(in srgb, var(--dsw-alias-state-error-primary, transparent) 52%, transparent);
+}
+
+[data-chat-power-frame-box][data-chat-power-kind='retry'] {
+  border-color: color-mix(in srgb, var(--dsw-alias-brand-primary, transparent) 42%, transparent);
+}
+
 /* 回答完成（不再流式输出）后：框内可滚动，结果太长时出滚动条，
    顶栏（文案与编辑/复制）吸顶不动。 */
 [data-chat-power-capped][data-chat-power-scroll='auto'] {

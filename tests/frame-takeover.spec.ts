@@ -12,10 +12,10 @@ describe('帧接管', () => {
     expect(wrapper).toContain('ThinkFrame')
     expect(wrapper).toContain("groupPart === 'reasoning'")
     const frame = source('../src/think-frame.tsx')
-    // 标题行照抄官方：DisclosureRow + 官方图标 + 官方 Markdown 渲染
-    expect(frame).toContain('DisclosureRow')
+    // 标题行：官方图标 + 官方 Markdown 渲染
     expect(frame).toContain('IconThinkOutlineRegular')
     expect(frame).toContain('MarkdownText')
+    expect(frame).toContain('data-chat-power-frame-header')
   })
 
   it('思考帧有自己的标记，DOM 层据此认出并收起它', () => {
@@ -62,6 +62,28 @@ describe('帧类型补全', () => {
     expect(css).toMatch(/\.answerHeaderActions[\s\S]*?flex:\s*none/)
     const turnCss = source('../src/turn-fold.module.css')
     expect(turnCss).toContain('[data-answer-title][data-chat-power-hint-text]::after')
+  })
+})
+
+describe('框的类型与状态', () => {
+  it('每种帧有自己的类型标记，边框颜色按类型区分', () => {
+    const css = source('../src/turn-fold.module.css')
+    expect(css).toContain("data-chat-power-kind='thinking'")
+    expect(css).toContain("data-chat-power-kind='tools'")
+    expect(css).toContain("data-chat-power-kind='answer'")
+    expect(css).toContain("data-chat-power-kind='error'")
+    const card = source('../src/answer-card.tsx')
+    expect(card).toContain('data-chat-power-kind="answer"')
+  })
+
+  it('输出中时，标题栏挂「进行中」徽标（各帧一致）', () => {
+    const dom = source('../src/turn-fold.ts')
+    expect(dom).toContain('markFrameState')
+    expect(dom).toContain('data-chat-power-state')
+    expect(dom).toContain('turnFold.frameRunning')
+    for (const file of ['../src/think-frame.tsx', '../src/tools-frame.tsx', '../src/answer-card.tsx']) {
+      expect(source(file)).toContain('data-chat-power-state')
+    }
   })
 })
 

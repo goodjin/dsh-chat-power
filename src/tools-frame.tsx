@@ -1,8 +1,6 @@
 /**
- * 工具调用帧：工具调用内容由本包接管编排。
- *
- * 内容仍由宿主渲染（我们把原生工具视图放进来，样式与官方一致）；**框的外壳、
- * 标题文案、裁切由我们决定**——与思考帧、回答帧同一套框机制。
+ * 工具调用帧（也用于错误、重试、压缩等其它节点类型）：内容由宿主渲染，
+ * **框的外壳、标题、裁切由我们决定**——与思考帧、回答帧同一套框机制。
  */
 import type { ReactNode } from 'react'
 import type { RuntimeT } from './locales.ts'
@@ -16,12 +14,24 @@ export function ToolsFrame(props: {
   readonly t: RuntimeT
   /** 标题文案；不传就用「工具调用」。 */
   readonly label?: string
-  /** 内容（宿主的原生工具视图）。 */
+  /** 帧的类型（决定边框颜色）。 */
+  readonly kind?: string
+  /** 内容（宿主的原生渲染）。 */
   readonly children: ReactNode
 }): ReactNode {
   return (
-    <div className={styles.frame} {...{ [TOOLS_FRAME_ATTR]: '', 'data-chat-power-frame-box': '' }}>
-      <div className={styles.label}>{props.label ?? props.t('turnFold.frameTools')}</div>
+    <div
+      className={styles.frame}
+      {...{
+        [TOOLS_FRAME_ATTR]: '',
+        'data-chat-power-frame-box': '',
+        'data-chat-power-kind': props.kind ?? 'tools',
+      }}
+    >
+      <div className={styles.header} data-chat-power-frame-header="">
+        <span className={styles.title}>{props.label ?? props.t('turnFold.frameTools')}</span>
+        <span className={styles.state} data-chat-power-state="" />
+      </div>
       {props.children}
     </div>
   )

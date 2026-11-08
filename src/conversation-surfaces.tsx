@@ -287,15 +287,15 @@ export function registerConversationSurfaces(ctx: Surface): void {
   attachToolRenderer()
 
   // 其余节点类型也各成一帧：标题说清这一块是什么，内容仍是宿主渲染。
-  const EXTRA_FRAMES: readonly { key: string; label: string }[] = [
-    { key: 'turn-error', label: 'turnFold.frameError' },
-    { key: 'model-retry', label: 'turnFold.frameRetry' },
-    { key: 'compaction', label: 'turnFold.frameCompaction' },
-    { key: 'manual-compaction', label: 'turnFold.frameCompaction' },
-    { key: 'context', label: 'turnFold.frameContext' },
-    { key: 'turn-max-tokens', label: 'turnFold.frameLimit' },
-    { key: 'question-reply', label: 'turnFold.frameQuestion' },
-    { key: 'workflow-run', label: 'turnFold.frameWorkflow' },
+  const EXTRA_FRAMES: readonly { key: string; label: string; kind: string }[] = [
+    { key: 'turn-error', label: 'turnFold.frameError', kind: 'error' },
+    { key: 'model-retry', label: 'turnFold.frameRetry', kind: 'retry' },
+    { key: 'compaction', label: 'turnFold.frameCompaction', kind: 'plain' },
+    { key: 'manual-compaction', label: 'turnFold.frameCompaction', kind: 'plain' },
+    { key: 'context', label: 'turnFold.frameContext', kind: 'plain' },
+    { key: 'turn-max-tokens', label: 'turnFold.frameLimit', kind: 'plain' },
+    { key: 'question-reply', label: 'turnFold.frameQuestion', kind: 'plain' },
+    { key: 'workflow-run', label: 'turnFold.frameWorkflow', kind: 'plain' },
   ]
   const removeExtraRenderers: (() => void)[] = []
   const originalExtraComponents = new Map<string, unknown>()
@@ -314,7 +314,12 @@ export function registerConversationSurfaces(ctx: Surface): void {
         const NativeNode = entry.component as ComponentType<AssistantStepProps>
         const Renderer = (props: AssistantStepProps): ReactNode => createElement(
           ToolsFrame,
-          { t: dshT, label: dshT(frame.label as never), children: createElement(NativeNode, props) },
+          {
+            t: dshT,
+            label: dshT(frame.label as never),
+            kind: frame.kind,
+            children: createElement(NativeNode, props),
+          },
         )
         removeExtraRenderers.push(slots.register({
           name: NODE_SLOT, key: frame.key, priority: WRAP_PRIORITY,

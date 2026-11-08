@@ -2,13 +2,14 @@
  * 思考帧：思考内容由本包接管渲染。
  *
  * 正文用宿主自己的 Markdown 组件渲染（`MarkdownText`，样式与官方一致）；**帧的
- * 外壳与标题行由我们决定**：标题行用官方的 `DisclosureRow`（思考 + 官方图标），
- * 外框、裁切、贴底交给 DOM 层（`src/turn-fold.ts`）按帧的标记统一处理。
+ * 外壳与标题行由我们决定**：标题行用官方图标 + 我们的文案，框的边框颜色按
+ * 帧的类型区分；外框、裁切、贴底交给 DOM 层（`src/turn-fold.ts`）按帧的标记
+ * 统一处理。
  *
  * 这样宿主「流式只给一行摘要」的预览规则就管不到我们：正文我们自己取，
  * 逐行长出来。
  */
-import { DisclosureRow, IconThinkOutlineRegular, MarkdownText } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconThinkOutlineRegular, MarkdownText } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useState, type ReactNode } from 'react'
 import { labelsFor } from './markdown-labels.ts'
 import type { RuntimeT } from './locales.ts'
@@ -27,21 +28,20 @@ export function ThinkFrame(props: {
 }): ReactNode {
   const [open, setOpen] = useState(true)
   return (
-    <div className={styles.frame} {...{ [THINK_FRAME_ATTR]: '', 'data-chat-power-frame-box': '' }}>
-      <DisclosureRow
-        icon={<IconThinkOutlineRegular size={14} />}
-        title={props.t('turnFold.frameThinking')}
-        running={props.running}
-        open={open}
-        expandable
-        expandOnRowClick
-        onToggle={() => { setOpen(value => !value) }}
-        rowClassName={styles.row}
-        titleClassName={styles.title}
-        leadingClassName={styles.leading}
-      >
-        <MarkdownText text={props.text} streaming={props.running} labels={labelsFor(props.t)} />
-      </DisclosureRow>
+    <div
+      className={styles.frame}
+      {...{
+        [THINK_FRAME_ATTR]: '',
+        'data-chat-power-frame-box': '',
+        'data-chat-power-kind': 'thinking',
+      }}
+    >
+      <div className={styles.header} data-chat-power-frame-header="">
+        <IconThinkOutlineRegular size={14} className={styles.icon} />
+        <span className={styles.title}>{props.t('turnFold.frameThinking')}</span>
+        <span className={styles.state} data-chat-power-state="" />
+      </div>
+      {open && <MarkdownText text={props.text} streaming={props.running} labels={labelsFor(props.t)} />}
     </div>
   )
 }

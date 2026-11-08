@@ -35,6 +35,23 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* 状态徽标：DOM 层在输出中时填上「进行中」。 */
+.answerState {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 6px;
+  border-radius: var(--dsw-radius-sm, 4px);
+  background: var(--dsw-alias-interactive-bg-hover, transparent);
+  color: var(--dsw-alias-label-tertiary, inherit);
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 400;
+}
+
+.answerState:empty {
+  display: none;
+}
+
 .answerCardIcon { flex: none; color: var(--dsw-alias-label-secondary, inherit); }
 .copiedIcon { color: var(--dsw-alias-state-success-primary, var(--dsw-alias-brand-primary, inherit)); }
 .answerHeaderActions {

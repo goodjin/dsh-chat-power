@@ -395,6 +395,23 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
   const frameBoxOf = (row: HTMLElement): HTMLElement =>
     row.querySelector<HTMLElement>('[data-chat-power-frame-box]') ?? row
 
+  /**
+   * 输出中：框的标题栏挂上「进行中」。
+   *
+   * 徽标位置由各帧自己渲染（`data-chat-power-state`），这里只管填字——
+   * 这样思考帧、工具调用帧、回答帧的标题栏表现一致。
+   */
+  const markFrameState = (record: TurnRecord): void => {
+    const live = isLiveOutput()
+    const text = live ? t('turnFold.frameRunning') : ''
+    for (const row of record.rows) {
+      const box = frameBoxOf(row)
+      const badge = box.querySelector('[data-chat-power-state]')
+      if (badge === null) continue
+      if (badge.textContent !== text) badge.textContent = text
+    }
+  }
+
   const applyCaps = (record: TurnRecord, available: number): void => {
     if (available <= 0) {
       clearCaps(record)
@@ -750,6 +767,7 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
         applyCaps(record, availableHeight(container, record))
         applyProcessHint(record, captureProcessHint(record))
         ensureFrameLabel(record)
+        markFrameState(record)
         continue
       }
       ensureStrip(record, firstRow)

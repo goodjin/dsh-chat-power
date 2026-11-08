@@ -1,5 +1,5 @@
-/* 思考帧：外框由 DOM 层统一给（border/radius/一屏裁切），这里只管内部排布，
-   以及官方 DisclosureRow 的标题行位置。 */
+/* 思考帧：外框与裁切由 [data-chat-power-frame-box] 统一给，这里只管内部排布
+   与标题行。 */
 
 .frame {
   display: flex;
@@ -7,17 +7,37 @@
   min-width: 0;
 }
 
-/* 标题行（思考 + 图标）：官方组件的样式，只调间距。 */
-.row {
+/* 标题行：图标 + 文案在左，状态徽标随后。 */
+.header {
+  display: flex;
+  align-items: center;
   gap: 6px;
+  padding: 6px 12px 0;
+  color: var(--dsw-alias-label-secondary, inherit);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.icon {
+  flex: none;
 }
 
 .title {
-  font-size: 12px;
+  font-weight: 600;
 }
 
-.leading {
+/* 状态徽标：DOM 层在输出中时填上「进行中」。 */
+.state {
   display: inline-flex;
   align-items: center;
-  color: var(--dsw-alias-label-secondary, inherit);
+  padding: 0 6px;
+  border-radius: var(--dsw-radius-sm, 4px);
+  background: var(--dsw-alias-interactive-bg-hover, transparent);
+  color: var(--dsw-alias-label-tertiary, inherit);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.state:empty {
+  display: none;
 }
