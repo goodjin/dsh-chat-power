@@ -9,9 +9,9 @@
   display: none !important;
 }
 
-/* 输出框：内容超出时向上裁掉（不出现滚动条，历史直接消失，输出贴底继续）。
-   框至少占满一屏——这样上方的历史摘要条被顶到屏幕外，屏里只剩当前轮。 */
-[data-chat-power-capped] {
+/* 输出框（框本体是我们的元素：回答卡 / 思考帧）：一屏高，超出向上裁掉，
+   不出现滚动条，历史直接消失，输出贴底继续。 */
+[data-chat-power-frame-box] {
   min-height: var(--chat-power-floor, none);
   max-height: var(--chat-power-cap, none);
   overflow-y: hidden;
@@ -49,13 +49,6 @@
 /* 历史轮的框不再显示吸顶的「回答」标题（当前轮的框才有）。 */
 [data-chat-power-frame='history'] [data-answer-title] {
   display: none;
-}
-
-/* 框里不再套第二层边框：外框由 [data-chat-power-capped] 提供。 */
-[data-chat-power-capped] [data-answer-card] {
-  border: none;
-  border-radius: 0;
-  background: transparent;
 }
 
 /* 宿主的过程组头（「已完成 · 用时」）：收成提示，不再独占一行、也不再可展开。 */

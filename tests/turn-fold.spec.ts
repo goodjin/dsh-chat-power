@@ -139,9 +139,9 @@ describe('请求条的形态', () => {
 describe('输出外框', () => {
   it('框内不出现滚动条：超出的一屏向上裁掉（历史消失，输出继续贴底）', () => {
     const css = readFileSync(new URL('../src/turn-fold.module.css', import.meta.url), 'utf8')
-    const capped = css.slice(css.indexOf('[data-chat-power-capped]'), css.indexOf('[data-chat-power-capped]') + 300)
-    expect(capped).toMatch(/overflow-y:\s*hidden/)
-    expect(capped).not.toMatch(/overflow-y:\s*auto/)
+    const box = css.slice(css.indexOf('[data-chat-power-frame-box]'), css.indexOf('[data-chat-power-frame-box]') + 400)
+    expect(box).toMatch(/overflow-y:\s*hidden/)
+    expect(box).not.toMatch(/overflow-y:\s*auto/)
   })
   it('框上左侧按内容显示 思考 / 工具调用 / 回答', () => {
     expect(frameKindOf({ hasAnswer: false, hasToolCalls: false, hasReasoning: true })).toBe('thinking')
@@ -223,11 +223,12 @@ describe('框顶栏只在本轮', () => {
 })
 
 describe('回答框只有一层', () => {
-  it('框内不再套第二层边框（外框由插件的输出框提供）', () => {
+  it('答案卡就是框本体（只一层框）', () => {
     const css = readFileSync(new URL('../src/turn-fold.module.css', import.meta.url), 'utf8')
-    expect(css).toContain('[data-chat-power-capped] [data-answer-card]')
+    expect(css).toContain('[data-chat-power-frame-box]')
     const card = readFileSync(new URL('../src/answer-card.tsx', import.meta.url), 'utf8')
     expect(card).toContain('data-answer-card')
+    expect(card).toContain('data-chat-power-frame-box')
   })
   it('「已完成 · 用时」搬进回答栏，只作提示、不再独占一行、也不可展开', () => {
     const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')

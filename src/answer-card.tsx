@@ -135,7 +135,7 @@ export function AnswerCard(props: {
           {notice !== null && <p key={notice.seq} className={statusNoticeClass} data-variant="error" role="alert">{notice.text}</p>}
         </ComposeCard>
       ) : (
-        <div className={styles.answerCard} data-answer-card="" data-answer-status={props.status ?? 'settled'}>
+        <div className={styles.answerCard} data-answer-card="" data-chat-power-frame-box="" data-answer-status={props.status ?? 'settled'}>
           <div className={styles.answerCardHeader} data-answer-header="">
             <span className={styles.answerCardTitle} data-answer-title="">{t('answerCard.title')}</span>
             <div className={styles.answerHeaderActions}>

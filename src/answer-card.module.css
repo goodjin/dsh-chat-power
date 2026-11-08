@@ -2,10 +2,9 @@
    思考（reasoning）留在卡内、保留原生折叠/展开行为。
    编辑态不再用这里的样式——走 ui-theme 的统一 ComposeCard 外壳。 */
 
+/* 答案卡就是框本体：边框、圆角、底色由 [data-chat-power-frame-box] 统一给，
+   这里只留排布。 */
 .answerCard {
-  border: 1px solid var(--dsw-alias-settings-card-stroke, rgba(127, 127, 127, 0.25));
-  border-radius: var(--dsw-radius-md, 8px);
-  background: var(--dsw-alias-settings-card-fill, transparent);
   margin-block: 6px;
   /* Clip vertical overflow so long content keeps the rounded corners, but let a
      wide markdown table's own horizontal scroll wrapper reach the card edge —

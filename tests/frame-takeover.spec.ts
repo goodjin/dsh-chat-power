@@ -29,4 +29,18 @@ describe('帧接管', () => {
     const dom = source('../src/turn-fold.ts')
     expect(dom).toContain('data-chat-power-think-frame')
   })
+
+  it('回答帧由我们的元素当外框（不再把框挂在宿主行上）', () => {
+    const card = source('../src/answer-card.tsx')
+    expect(card).toContain('data-chat-power-frame-box')
+    const dom = source('../src/turn-fold.ts')
+    // 限高与裁切落在我们的框元素上
+    expect(dom).toContain('frameBoxOf')
+    expect(dom).toContain('data-chat-power-frame-box')
+  })
+
+  it('思考帧也是同一套框', () => {
+    const frame = source('../src/think-frame.tsx')
+    expect(frame).toContain('data-chat-power-frame-box')
+  })
 })

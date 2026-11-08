@@ -411,6 +411,10 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     }
   }
 
+  /** 框本体：我们的元素（回答卡 / 思考帧）；没有就退回宿主行。 */
+  const frameBoxOf = (row: HTMLElement): HTMLElement =>
+    row.querySelector<HTMLElement>('[data-chat-power-frame-box]') ?? row
+
   const applyCaps = (record: TurnRecord, available: number): void => {
     if (available <= 0) {
       clearCaps(record)
@@ -431,29 +435,31 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     const framed = answerIndex >= 0 ? answerIndex : tallest
     record.rows.forEach((row, index) => {
       const height = heights[index] ?? 0
-      // 上限：框内最多一屏（内容超出就裁掉，不出滚动条）。
-      const cap = index === framed ? Math.min(height, available) : height
+      // 框本体是我们的元素（回答卡 / 思考帧）；没有就退回宿主行。
+      const box = frameBoxOf(row)
       if (index !== framed) {
-        row.removeAttribute(CAPPED_ATTR)
-        row.style.removeProperty('--chat-power-cap')
-        row.style.removeProperty('--chat-power-floor')
+        box.removeAttribute(CAPPED_ATTR)
+        box.style.removeProperty('--chat-power-cap')
+        box.style.removeProperty('--chat-power-floor')
         return
       }
       // 输出框：至少占满一屏，超出的部分向上裁掉（不出现滚动条，历史直接消失）。
-      row.style.setProperty('--chat-power-floor', `${Math.floor(available)}px`)
-      row.setAttribute(CAPPED_ATTR, '')
+      box.style.setProperty('--chat-power-floor', `${Math.floor(available)}px`)
+      box.setAttribute(CAPPED_ATTR, '')
       // 标出这是不是当前轮的框：历史轮不再显示吸顶的「回答」标题。
-      row.setAttribute('data-chat-power-frame', record.number === currentTurn ? 'current' : 'history')
+      box.setAttribute('data-chat-power-frame', record.number === currentTurn ? 'current' : 'history')
       // 还在流式输出：裁切、不出滚动条；回答完成：允许在框内滚动（出滚动条）。
-      row.setAttribute('data-chat-power-scroll', isLiveOutput() ? 'clip' : 'auto')
+      box.setAttribute('data-chat-power-scroll', isLiveOutput() ? 'clip' : 'auto')
+      // 上限：框内最多一屏（内容超出就裁掉，不出滚动条）。
+      const cap = Math.min(height, available)
       if (cap >= height) {
-        row.style.removeProperty('--chat-power-cap')
+        box.style.removeProperty('--chat-power-cap')
         return
       }
       // 贴着底部才跟着长；用户手动上滚过就不再抢滚动。
-      const atBottom = row.scrollTop + row.clientHeight >= row.scrollHeight - 4
-      row.style.setProperty('--chat-power-cap', `${Math.floor(cap)}px`)
-      if (atBottom) row.scrollTop = row.scrollHeight
+      const atBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 4
+      box.style.setProperty('--chat-power-cap', `${Math.floor(cap)}px`)
+      if (atBottom) box.scrollTop = box.scrollHeight
     })
   }
 
@@ -554,9 +560,10 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
   /** 收起折叠态的行不需要限高（它们不可见），清掉之前的限高痕迹。 */
   const clearCaps = (record: TurnRecord): void => {
     for (const row of record.rows) {
-      row.removeAttribute(CAPPED_ATTR)
-      row.style.removeProperty('--chat-power-cap')
-      row.style.removeProperty('--chat-power-floor')
+      const box = frameBoxOf(row)
+      box.removeAttribute(CAPPED_ATTR)
+      box.style.removeProperty('--chat-power-cap')
+      box.style.removeProperty('--chat-power-floor')
     }
   }
 

@@ -27,7 +27,7 @@ export function ThinkFrame(props: {
 }): ReactNode {
   const [open, setOpen] = useState(true)
   return (
-    <div className={styles.frame} {...{ [THINK_FRAME_ATTR]: '' }}>
+    <div className={styles.frame} {...{ [THINK_FRAME_ATTR]: '', 'data-chat-power-frame-box': '' }}>
       <DisclosureRow
         icon={<IconThinkOutlineRegular size={14} />}
         title={props.t('turnFold.frameThinking')}
