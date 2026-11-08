@@ -45,6 +45,26 @@ describe('帧接管', () => {
   })
 })
 
+describe('帧类型补全', () => {
+  it('宿主其余节点类型也各成一帧（错误、重试、压缩、上下文、上限、提问、工作流）', () => {
+    const wrapper = source('../src/conversation-surfaces.tsx')
+    for (const key of ['turn-error', 'model-retry', 'compaction', 'context', 'turn-max-tokens', 'question-reply', 'workflow-run']) {
+      expect(wrapper).toContain(`'${key}'`)
+    }
+    const locales = source('../src/locales.ts')
+    expect(locales).toContain('turnFold.frameError')
+    expect(locales).toContain('turnFold.frameWorkflow')
+  })
+
+  it('标题栏：左边文案、右边按钮（提示跟在标题后面）', () => {
+    const css = source('../src/answer-card.module.css')
+    expect(css).toContain('justify-content: space-between')
+    expect(css).toMatch(/\.answerHeaderActions[\s\S]*?flex:\s*none/)
+    const turnCss = source('../src/turn-fold.module.css')
+    expect(turnCss).toContain('[data-answer-title][data-chat-power-hint-text]::after')
+  })
+})
+
 describe('工具调用帧', () => {
   it('工具调用节点由我们的帧接管（原生内容 + 我们的框与标题）', () => {
     const wrapper = source('../src/conversation-surfaces.tsx')

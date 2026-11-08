@@ -286,6 +286,47 @@ export function registerConversationSurfaces(ctx: Surface): void {
   const unsubscribeToolRenderer = slots.subscribe(NODE_SLOT, attachToolRenderer)
   attachToolRenderer()
 
+  // 其余节点类型也各成一帧：标题说清这一块是什么，内容仍是宿主渲染。
+  const EXTRA_FRAMES: readonly { key: string; label: string }[] = [
+    { key: 'turn-error', label: 'turnFold.frameError' },
+    { key: 'model-retry', label: 'turnFold.frameRetry' },
+    { key: 'compaction', label: 'turnFold.frameCompaction' },
+    { key: 'manual-compaction', label: 'turnFold.frameCompaction' },
+    { key: 'context', label: 'turnFold.frameContext' },
+    { key: 'turn-max-tokens', label: 'turnFold.frameLimit' },
+    { key: 'question-reply', label: 'turnFold.frameQuestion' },
+    { key: 'workflow-run', label: 'turnFold.frameWorkflow' },
+  ]
+  const removeExtraRenderers: (() => void)[] = []
+  const originalExtraComponents = new Map<string, unknown>()
+  let installingExtra = false
+  const attachExtraRenderers = (): void => {
+    if (installingExtra) return
+    installingExtra = true
+    try {
+      for (const frame of EXTRA_FRAMES) {
+        const entry = slots.entries(NODE_SLOT).find(
+          candidate => candidate.options.key === frame.key && (candidate.options.priority as number | undefined ?? 0) >= 0,
+        )
+        if (entry === undefined) continue
+        if (originalExtraComponents.get(frame.key) === entry.component) continue
+        originalExtraComponents.set(frame.key, entry.component)
+        const NativeNode = entry.component as ComponentType<AssistantStepProps>
+        const Renderer = (props: AssistantStepProps): ReactNode => createElement(
+          ToolsFrame,
+          { t: dshT, label: dshT(frame.label as never), children: createElement(NativeNode, props) },
+        )
+        removeExtraRenderers.push(slots.register({
+          name: NODE_SLOT, key: frame.key, priority: WRAP_PRIORITY,
+          ...(entry.locale === undefined ? {} : { locale: entry.locale }),
+          ...(entry.inject === undefined ? {} : { inject: entry.inject }),
+        }, Renderer))
+      }
+    } finally { installingExtra = false }
+  }
+  const unsubscribeExtraRenderer = slots.subscribe(NODE_SLOT, attachExtraRenderers)
+  attachExtraRenderers()
+
   // 会话尾部文件卡片：通用座位，排在官方改动卡片之后。
   try {
     registerMarkdownTurn(slots as unknown as Parameters<typeof registerMarkdownTurn>[0], readers)

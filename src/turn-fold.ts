@@ -487,7 +487,7 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
   const applyProcessHint = (record: TurnRecord, hint: string | undefined): void => {
     let header: Element | undefined
     for (const row of record.rows) {
-      const found = row.querySelector('[data-answer-header]')
+      const found = row.querySelector('[data-answer-title]')
       if (found !== null) {
         header = found
         break

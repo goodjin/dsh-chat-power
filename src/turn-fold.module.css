@@ -61,10 +61,9 @@
   display: none !important;
 }
 
-/* 提示文字进回答栏：标题之后、按钮之前。 */
-[data-answer-header][data-chat-power-hint-text]::before {
-  content: attr(data-chat-power-hint-text);
-  margin-right: 8px;
+/* 提示文字进回答栏：跟在标题后面（左边的文案区，���钮在右边）。 */
+[data-answer-title][data-chat-power-hint-text]::after {
+  content: " \00b7 " attr(data-chat-power-hint-text);
   color: var(--dsw-alias-label-tertiary, inherit);
   font-weight: 400;
 }

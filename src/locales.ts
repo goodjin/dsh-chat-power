@@ -51,6 +51,9 @@ export type ChatPowerLocaleKey =
   | 'turnFold.label' | 'turnFold.labelWithSummary' | 'turnFold.requestLabel'
   | 'turnFold.requestExpand' | 'turnFold.requestCollapse'
   | 'turnFold.frameThinking' | 'turnFold.frameTools' | 'turnFold.frameAnswer'
+  | 'turnFold.frameError' | 'turnFold.frameRetry' | 'turnFold.frameCompaction'
+  | 'turnFold.frameContext' | 'turnFold.frameLimit' | 'turnFold.frameQuestion'
+  | 'turnFold.frameWorkflow'
   | 'turnFold.collapseAria' | 'turnFold.expandAria'
   | 'tools.chat' | 'tools.files' | 'tools.browser' | 'tools.terminal'
   | 'tools.openLocalFile' | 'tools.more' | 'tools.linkOpenDefault'
@@ -146,6 +149,13 @@ export const zh: Record<ChatPowerLocaleKey, string> = {
   'turnFold.frameThinking': '思考',
   'turnFold.frameTools': '工具调用',
   'turnFold.frameAnswer': '回答',
+  'turnFold.frameError': '错误',
+  'turnFold.frameRetry': '重试',
+  'turnFold.frameCompaction': '上下文压缩',
+  'turnFold.frameContext': '上下文',
+  'turnFold.frameLimit': '达到长度上限',
+  'turnFold.frameQuestion': '提问',
+  'turnFold.frameWorkflow': '工作流',
   'turnFold.requestLabel': '你的请求 · {summary}',
   'turnFold.requestExpand': '展开请求',
   'turnFold.requestCollapse': '收起请求',
@@ -253,6 +263,13 @@ export const en: Record<ChatPowerLocaleKey, string> = {
   'turnFold.frameThinking': 'Thinking',
   'turnFold.frameTools': 'Tool calls',
   'turnFold.frameAnswer': 'Answer',
+  'turnFold.frameError': 'Error',
+  'turnFold.frameRetry': 'Retry',
+  'turnFold.frameCompaction': 'Context compaction',
+  'turnFold.frameContext': 'Context',
+  'turnFold.frameLimit': 'Length limit reached',
+  'turnFold.frameQuestion': 'Question',
+  'turnFold.frameWorkflow': 'Workflow',
   'turnFold.requestLabel': 'Your request · {summary}',
   'turnFold.requestExpand': 'Expand request',
   'turnFold.requestCollapse': 'Collapse request',

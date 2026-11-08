@@ -14,12 +14,14 @@ export const TOOLS_FRAME_ATTR = 'data-chat-power-tools-frame'
 export function ToolsFrame(props: {
   /** 文案（标题「工具调用」）。 */
   readonly t: RuntimeT
+  /** 标题文案；不传就用「工具调用」。 */
+  readonly label?: string
   /** 内容（宿主的原生工具视图）。 */
   readonly children: ReactNode
 }): ReactNode {
   return (
     <div className={styles.frame} {...{ [TOOLS_FRAME_ATTR]: '', 'data-chat-power-frame-box': '' }}>
-      <div className={styles.label}>{props.t('turnFold.frameTools')}</div>
+      <div className={styles.label}>{props.label ?? props.t('turnFold.frameTools')}</div>
       {props.children}
     </div>
   )
