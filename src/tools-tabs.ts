@@ -173,7 +173,7 @@ export function syncSessionToolsRow(root: RowElementLike, doc: RowDocumentLike, 
   // 打满且饿死定时器与调试器。签名比对必须先于**任何** DOM 写（setAttribute
   // 即使写同值也会产生变异记录）：快照没变、行没换、子节点齐全就原样返回。
   const sig = signatureOf(snapshot)
-  const expectedChildren = 3 + snapshot.tabs.filter(tab => !['chat', 'files', 'browser', 'terminal'].includes(tab.kind)).length * 2
+  const expectedChildren = snapshot.tabs.filter(tab => !['chat', 'files', 'browser', 'terminal'].includes(tab.kind)).length * 2
   const prev = lastSync.get(root)
   const groupForCheck = row.querySelector(`[${GROUP_ATTR}]`)
   if (prev !== undefined && prev.sig === sig && prev.row === row && groupForCheck !== null && (groupForCheck.children?.length ?? -1) === expectedChildren) return row
@@ -197,27 +197,6 @@ export function syncSessionToolsRow(root: RowElementLike, doc: RowDocumentLike, 
   // 标签开关都会反复走到这里，不清空就会越叠越多）。
   group.replaceChildren()
   const render = (element: RowElementLike): void => { group!.append(element) }
-  for (const kind of ['files', 'browser', 'terminal'] as const) {
-    const kindTab = snapshot.tabs.find(tab => tab.kind === kind)
-    const button = doc.createElement('button')
-    button.setAttribute('type', 'button')
-    button.setAttribute('role', 'tab')
-    button.setAttribute(TAB_ATTR, '')
-    button.setAttribute(TAB_KIND_ATTR, kind)
-    button.setAttribute('aria-selected', kindTab !== undefined && isActive(snapshot, kindTab) ? 'true' : 'false')
-    button.setAttribute('title', handlers.labels.kinds[kind])
-    // 入口带图标：先图标后文字（图标是纯装饰，文字才是名字）。
-    const icon = handlers.icons?.[kind]
-    if (icon !== undefined && icon !== '') {
-      const mark = doc.createElement('span')
-      mark.setAttribute('aria-hidden', 'true')
-      mark.setAttribute('data-chat-tools-icon', '')
-      mark.innerHTML = icon
-      button.append(mark)
-    }
-    button.append(doc.createTextNode(handlers.labels.kinds[kind]))
-    render(button)
-  }
   for (const tab of snapshot.tabs) {
     if (tab.kind === 'chat' || tab.kind === 'files' || tab.kind === 'browser' || tab.kind === 'terminal') continue
     const button = doc.createElement('button')
