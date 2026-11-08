@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { CHAT_TAB_ID, ToolsState } from '../src/tools-state.ts'
 describe('conversation tabs workspace', () => {
-  it('新会话：先摆聊天，并记下「没有历史」（会话区据此摆出工具入口）', () => {
+  it('seeds a brand-new session with the workspace files tab active and no chat tab', () => {
     const state = new ToolsState()
     state.seed('one', false)
     const s = state.get('one')
-    expect(s.tabs.map(t => t.kind)).toEqual(['chat'])
-    expect(s.active).toBe(CHAT_TAB_ID)
-    expect(s.hasHistory).toBe(false)
+    expect(s.tabs.map(t => t.kind)).toEqual(['files'])
+    expect(s.active).toBe(s.tabs[0]!.id)
+    expect(s.tabs.find(t => t.kind === 'chat')).toBeUndefined()
   })
   it('seeds an existing session with the conversation tab active', () => {
     const state = new ToolsState()
@@ -20,21 +20,20 @@ describe('conversation tabs workspace', () => {
     const state = new ToolsState()
     state.seed('one', false)
     state.seed('one', true)
-    expect(state.get('one').tabs.map(t => t.kind)).toEqual(['chat'])
-    expect(state.get('one').hasHistory).toBe(false)
+    expect(state.get('one').tabs.map(t => t.kind)).toEqual(['files'])
   })
   it('first send adds one conversation tab and switches to it, keeping tool tabs', () => {
     const state = new ToolsState()
-    state.seed('one', true)
-    const browser = state.open('one', 'browser', 'Browser')
+    state.seed('one', false)
+    const files = state.get('one').tabs[0]!
     state.activateChat('one')
     const s = state.get('one')
-    expect(s.tabs.map(t => t.kind)).toEqual(['chat', 'browser'])
+    expect(s.tabs.map(t => t.kind)).toEqual(['files', 'chat'])
     expect(s.active).toBe(CHAT_TAB_ID)
     state.activateChat('one')
     expect(state.get('one').tabs).toHaveLength(2)
-    state.select('one', browser.id)
-    expect(state.get('one').active).toBe(browser.id)
+    state.select('one', files.id)
+    expect(state.get('one').active).toBe(files.id)
   })
   it('an old session keeps a single conversation tab across sends', () => {
     const state = new ToolsState()
@@ -65,8 +64,7 @@ describe('conversation tabs workspace', () => {
     expect(tab.controller.signal.aborted).toBe(false)
     expect(state.get('two').tabs).toEqual([])
     state.activateChat('one')
-    expect(state.get('one').tabs.at(-1)?.kind).toBe('browser')
-    expect(state.get('one').tabs[0]?.kind).toBe('chat')
+    expect(state.get('one').tabs.at(-1)?.kind).toBe('chat')
     expect(state.get('one').tabs[1]).toBe(tab)
     expect(state.get('one').active).toBe(CHAT_TAB_ID)
   })
@@ -78,8 +76,7 @@ describe('conversation tabs workspace', () => {
     state.close('one', b.id)
     expect(b.controller.signal.aborted).toBe(true)
     expect(a.controller.signal.aborted).toBe(false)
-    // 关掉一个工具标签后回到剩下的那个（这里剩的是聊天标签）。
-    expect(state.get('one').active).toBe(CHAT_TAB_ID)
+    expect(state.get('one').active).toBe(a.id)
     state.dispose()
     expect(a.controller.signal.aborted).toBe(true)
   })

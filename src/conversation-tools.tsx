@@ -6,7 +6,6 @@ import { createToolsAdapter, toolSlot } from './tools-adapter.tsx'
 import { attachToolsRow } from './tools-tabs.ts'
 import { attachFilesTreeAugment, hasHistoryForPhase, type AugmentHandlers } from './file-tree-augment.tsx'
 import { LazyFileTree } from './file-tree-lazy.tsx'
-import { ToolEntries } from './tools-entries.tsx'
 import { checkedFiles, toolsNotice } from './checked-files.ts'
 import { createReferenceApplier } from './composer-references.ts'
 import { readEntireWorkspaceText } from './workspace-text.ts'
@@ -106,15 +105,6 @@ export function registerConversationTools(ctx: any) {
     return <section className={css.tools} data-chat-tools="" aria-label="会话工具">
       {(notice !== '') && <p role="alert" className={statusNoticeClass} data-variant="error">{notice}</p>}
       <div className={css.content} data-chat-tools-bodies="" data-chat-tools-session={id}>
-        {s.hasHistory === false && (
-          <ToolEntries
-            entries={[
-              { kind: 'files', label: fallbackT('tools.files'), icon: TOOL_ENTRY_ICONS.files },
-              { kind: 'browser', label: fallbackT('tools.browser'), icon: TOOL_ENTRY_ICONS.browser },
-              { kind: 'terminal', label: fallbackT('tools.terminal'), icon: TOOL_ENTRY_ICONS.terminal },
-            ]}
-            onOpen={kind => { openKind(id, kind) }} />
-        )}
         {s.tabs.map(tab => {
           if (tab.kind === 'chat') return null
           const visible = tab.id === s.active
