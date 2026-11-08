@@ -32,6 +32,31 @@ export interface LayoutNode {
   readonly children?: unknown
 }
 
+/**
+ * 工具激活时收起宿主视图、退出时恢复：初始视图与**激活期间宿主新补渲染**的视图都
+ * 记原 display，退出时一并恢复。
+ *
+ * 早先布局效果只把初始视图记进 `previous`、退出时只还原它们；而 guard 在激活期间
+ * 新隐藏的视图节点没进 `previous`，于是「激活 → 插入新视图 → 退出」后新视图永远
+ * `display:none`（2026-11-08 审查发现）。所有隐藏都走 `hide`，`restore` 才完整。
+ */
+export interface ToolMessageHider {
+  hide(node: HTMLElement): void
+  restore(): void
+}
+export function createToolMessageHider(): ToolMessageHider {
+  const hidden: Array<[HTMLElement, string]> = []
+  const hide = (node: HTMLElement): void => {
+    hidden.push([node, node.style.display])
+    node.style.display = 'none'
+  }
+  const restore = (): void => {
+    for (const [node, display] of hidden) node.style.display = display
+    hidden.length = 0
+  }
+  return { hide, restore }
+}
+
 /** 工具正文挂载标记（与 conversation-tools 的 `data-chat-tools-mount` 一致）。 */
 export const TOOLS_MOUNT_ATTR = 'data-chat-tools-mount'
 

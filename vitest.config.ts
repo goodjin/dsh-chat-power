@@ -7,7 +7,9 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   test: {
     include: ['tests/**/*.spec.ts'],
-    exclude: ['lib/**', 'node_modules/**'],
+    // 真 React 渲染 + 真 DOM 的用例单独走 vitest.dom.config.ts（jsdom、不挂哑代理
+    // 的 setup），这里排除掉，免得 node 环境 + 被 mock 的 react-dom 去跑它们。
+    exclude: ['lib/**', 'node_modules/**', 'tests/**/*.dom.spec.ts'],
     setupFiles: ['./tests/setup.ts'],
   },
 })

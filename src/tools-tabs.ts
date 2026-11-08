@@ -80,6 +80,8 @@ export interface RowElementLike {
   querySelector(selector: string): RowElementLike | null
   querySelectorAll(selector: string): Iterable<RowElementLike>
   closest(selector: string): RowElementLike | null
+  /** 真实 DOM 有；测试假件可缺省。向上找「含 content 的会话容器」用（见 sessionContentOf）。 */
+  readonly parentElement?: RowElementLike | null
   /** 真实 DOM 有 children；测试假件可缺省（护栏签名比对退化到总是重画）。 */
   readonly children?: { readonly length: number }
   ownerDocument?: RowDocumentLike
@@ -106,6 +108,29 @@ export interface ToolsRowClasses {}
 function sessionOfContent(root: RowElementLike): string | undefined {
   const value = root.getAttribute('data-conversation-session')
   return value === null || value === '' ? undefined : value
+}
+
+/**
+ * 找这次点击归属的会话内容根。
+ *
+ * 点击落点有两种：要么在 content 内（我们的工具标签 / 自建行，`closest` 直接命中）；
+ *要么在 header 的宿主视图标签行（`[data-conversation-tabs]` 在 header 里、与
+ * content 是兄弟、不在 content 内——核对过 app.asar 的 ConversationHeader/
+ * ConversationContent）。后者若只靠 `closest('[data-conversation-content]')` 会拿到
+ * null，于是点「对话/轨迹/提示词」既回不了对话、也放行不了宿主切换。所以就近取不到
+ * 内容根时，沿 parentElement 向上找到**这次点击所在的会话容器**（header 与 content
+ * 的共同父），再取它的 content——作用域限定在本会话，不会乱抓全局第一个。
+ */
+function sessionContentOf(target: RowElementLike): RowElementLike | null {
+  const near = target.closest('[data-conversation-content]')
+  if (near !== null) return near
+  let node: RowElementLike | null = target.parentElement ?? null
+  while (node !== null) {
+    const content = node.querySelector('[data-conversation-content]')
+    if (content !== null) return content
+    node = node.parentElement ?? null
+  }
+  return null
 }
 
 /** 每个会话内容根上次同步的签名：快照与行都没变就不再碰 DOM。 */
@@ -250,9 +275,9 @@ export function syncSessionToolsRow(root: RowElementLike, doc: RowDocumentLike, 
  * @returns 是否是我们处理了这次点击。
  */
 export function handleToolsRowClick(event: { target: unknown; preventDefault(): void; stopPropagation(): void }, handlers: ToolsRowHandlers): boolean {
-  const target = event.target as { closest?: (selector: string) => unknown } | null
+  const target = event.target as unknown as RowElementLike | null
   if (target === null || typeof target.closest !== 'function') return false
-  const content = target.closest('[data-conversation-content]') as RowElementLike | null
+  const content = sessionContentOf(target)
   const sessionId = content === null ? undefined : sessionOfContent(content)
   if (sessionId === undefined) return false
   const close = target.closest(`[${TAB_CLOSE_ATTR}]`) as RowElementLike | null

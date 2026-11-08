@@ -4,7 +4,7 @@ import { IconChevronDownOutlineRegular, IconFolderOpenOutlineRegular, IconRightU
 import { toolsState } from './tools-state.ts'
 import { createToolsAdapter, toolSlot } from './tools-adapter.tsx'
 import { attachToolsRow } from './tools-tabs.ts'
-import { isToolMessageNode, mountToolBody, toolHiddenNodes } from './tools-layout.ts'
+import { createToolMessageHider, isToolMessageNode, mountToolBody, toolHiddenNodes } from './tools-layout.ts'
 import { attachFilesTreeAugment, hasHistoryForPhase, type AugmentHandlers } from './file-tree-augment.tsx'
 import { LazyFileTree } from './file-tree-lazy.tsx'
 import { checkedFiles, toolsNotice } from './checked-files.ts'
@@ -232,24 +232,26 @@ export function registerConversationTools(ctx: any) {
       body.hidden = !id
       const content = mounts.content
       const scroll = content?.querySelector<HTMLElement>('[data-conversation-scroll]') ?? null
-      const hide = (node: HTMLElement): void => { node.style.display = 'none' }
       // 工具标签激活才收起宿主视图（对话/轨迹）；回到对话 / 轨迹即恢复——content 保持
       // 宿主 flex:1 不塌缩，正文（flex:1）自然落在标签行与 composer 之间。
+      // 初始视图与激活期间宿主新补渲染的视图都走同一个 hider：隐藏时记原 display，
+      // 退出时一并恢复——不再只还初始节点（否则「激活→插入新视图→退出」后新视图永远
+      // display:none，2026-11-08 审查发现）。
+      const hider = createToolMessageHider()
       const messages = scroll === null
         ? []
         : toolHiddenNodes(scroll, body, toolActive).filter((node): node is HTMLElement =>
             node instanceof HTMLElement)
-      const previous = messages.map(node => [node, node.style.display] as const)
       let guard: MutationObserver | undefined
       if (toolActive && id) {
-        for (const node of messages) hide(node)
+        for (const node of messages) hider.hide(node)
         body.dataset.chatStripLive = ''
         // 兜底：工具标签激活期间宿主补渲染的新视图节点也要收起。
         if (scroll !== null && typeof MutationObserver !== 'undefined') {
           guard = new MutationObserver(records => {
             for (const record of records) {
               for (const node of record.addedNodes) {
-                if (node instanceof HTMLElement && isToolMessageNode(node, body)) hide(node)
+                if (node instanceof HTMLElement && isToolMessageNode(node, body)) hider.hide(node)
               }
             }
           })
@@ -260,7 +262,7 @@ export function registerConversationTools(ctx: any) {
       }
       return () => {
         guard?.disconnect()
-        for (const [node, display] of previous) node.style.display = display
+        hider.restore()
       }
     }, [mounts, toolActive, id])
     if (!mounts) return null
