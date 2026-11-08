@@ -524,6 +524,7 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
       && record.number === currentTurn
       && framed.querySelector('[data-answer-body]') === null
       && framed.querySelector('[data-variant="think"]') === null
+      && framed.querySelector('[data-chat-power-think-frame]') === null
     if (!needLabel) {
       record.frameLabel?.remove()
       record.frameLabel = undefined
@@ -586,7 +587,9 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     // 否则它会跑到框下面去——框里只留结果块。
     if (turnHasAnswer) {
       for (const row of record.rows) {
-        if (row.querySelector('[data-variant="think"]') === null) continue
+        const isThinking = row.querySelector('[data-variant="think"]') !== null
+          || row.querySelector('[data-chat-power-think-frame]') !== null
+        if (!isThinking) continue
         // 行里同时有答案卡时不能整行藏掉（那是结果块本身）。
         if (row.querySelector('[data-answer-body]') !== null) continue
         row.setAttribute(GROUP_HIDDEN_ATTR, '')

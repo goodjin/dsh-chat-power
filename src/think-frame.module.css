@@ -1,0 +1,23 @@
+/* 思考帧：外框由 DOM 层统一给（border/radius/一屏裁切），这里只管内部排布，
+   以及官方 DisclosureRow 的标题行位置。 */
+
+.frame {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* 标题行（思考 + 图标）：官方组件的样式，只调间距。 */
+.row {
+  gap: 6px;
+}
+
+.title {
+  font-size: 12px;
+}
+
+.leading {
+  display: inline-flex;
+  align-items: center;
+  color: var(--dsw-alias-label-secondary, inherit);
+}

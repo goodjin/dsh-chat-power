@@ -28,6 +28,7 @@
 import { createElement } from 'react'
 import type { ComponentType } from 'react'
 import { AnswerCard } from './answer-card.tsx'
+import { ThinkFrame } from './think-frame.tsx'
 import { createMarkdownTurnReaders } from './markdown-turn-sources.ts'
 import type { MarkdownTurnReaders } from './markdown-turn-sources.ts'
 import { registerMarkdownTurn } from './markdown-turn.tsx'
@@ -126,6 +127,16 @@ function segmentRendererOf(slots: NodeSlots): SegmentRenderer | undefined {
  * - ACP 进程段 → 挂钩渲染器（缺席退回原生）；
  * - 最终答案步 → 答案卡片；其余 → 原生。
  */
+/** 把节点里的 reasoning 块拼成一段正文（思考帧自己渲染用）。 */
+function reasoningTextOf(blocks: readonly { kind: string; text?: string }[] | undefined): string {
+  if (blocks === undefined) return ''
+  return blocks
+    .filter(block => block.kind === 'reasoning')
+    .map(block => block.text ?? '')
+    .filter(text => text.trim() !== '')
+    .join('\n\n')
+}
+
 function makeAssistantStepWrapper(
   Native: ComponentType<AssistantStepProps>,
   host: { readonly slots: NodeSlots; readonly dshT: RuntimeT; readonly readers: MarkdownTurnReaders },
@@ -137,6 +148,18 @@ function makeAssistantStepWrapper(
       if (renderer !== undefined) return createElement(renderer, { segment, t: props.t })
       // 挂钩缺席（acp-agent 没装）：退回原生，别让 ACP 段渲染成空白。
       return createElement(Native, props)
+    }
+    // 思考节点：由我们的思考帧接管（官方标题行 + 官方 Markdown 正文），
+    // 宿主「流式只给一行摘要」的预览规则就管不到我们。
+    if (props.groupPart === 'reasoning') {
+      const text = reasoningTextOf(props.node?.data?.blocks)
+      if (text !== '') {
+        return createElement(ThinkFrame, {
+          t: host.dshT,
+          text,
+          running: props.node?.data?.status === 'running',
+        })
+      }
     }
     const answerStep = props.turnProcess?.spec?.answerStep
     const isAnswer = answerStep != null && answerStep === props.node?.data?.step
