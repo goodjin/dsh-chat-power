@@ -16,6 +16,8 @@
   max-height: var(--chat-power-cap, none);
   overflow-y: hidden;
   overscroll-behavior: contain;
+  /* 滚动锚定交给我们自己管：浏览器自动挪位置会让正在输出的文字闪。 */
+  overflow-anchor: none;
   border: 1px solid var(--dsw-alias-border-l2, rgba(127, 127, 127, 0.2));
   border-radius: 8px;
   background: var(--dsw-alias-bg-layer-1, transparent);

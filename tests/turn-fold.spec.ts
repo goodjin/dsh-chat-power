@@ -287,6 +287,13 @@ describe('思考逐行展开', () => {
 })
 
 describe('思考与框的关系', () => {
+  it('外层会话不在底部时，框里不再贴底（文字不闪）', () => {
+    const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
+    expect(source).toContain('viewAtBottom')
+    expect(source).toContain('if (atBottom && viewAtBottom)')
+    const css = readFileSync(new URL('../src/turn-fold.module.css', import.meta.url), 'utf8')
+    expect(css).toContain('overflow-anchor: none')
+  })
   it('DOM 层不再替宿主点控件（帧由我们渲染，DOM 层只管布局）', () => {
     const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
     expect(source).not.toContain('data-disclosure-row')

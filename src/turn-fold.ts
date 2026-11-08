@@ -455,8 +455,13 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
       }
       // 贴着底部才跟着长；用户手动上滚过就不再抢滚动。
       const atBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 4
+      // 外层会话也停在最底部才贴底：用户往上翻看历史时，框里的字也要停住，
+      // 否则它一边被推到上面、一边还在往下写，看着就是闪。
+      const container = observedContainer
+      const viewAtBottom = container === undefined
+        || container.scrollTop + container.clientHeight >= container.scrollHeight - 4
       box.style.setProperty('--chat-power-cap', `${Math.floor(cap)}px`)
-      if (atBottom) box.scrollTop = box.scrollHeight
+      if (atBottom && viewAtBottom) box.scrollTop = box.scrollHeight
     })
   }
 
