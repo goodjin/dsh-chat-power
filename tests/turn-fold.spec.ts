@@ -286,6 +286,23 @@ describe('思考逐行展开', () => {
   })
 })
 
+describe('思考与框的关系', () => {
+  it('展开思考要点宿主真正的展开控件（data-disclosure-row）', () => {
+    const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
+    expect(source).toContain('data-disclosure-row')
+  })
+  it('框顶那行文案放进框里（不再漂在框外）', () => {
+    const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
+    const body = source.slice(source.indexOf('const ensureFrameLabel'), source.indexOf('const ensureFrameLabel') + 1600)
+    expect(body).toContain('framed.insertBefore')
+  })
+  it('结果出来后，思考块（不管它在哪一行）都收起', () => {
+    const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
+    const body = source.slice(source.indexOf('const collapseThinking'), source.indexOf('const collapseThinking') + 1800)
+    expect(body).toContain('data-variant="think"')
+  })
+})
+
 describe('折叠条', () => {
   it('摘要条文本含轮次号、时刻与首句摘要', () => {
     expect(turnStripText(3, '17:31', '把工具栏收进更多')).toBe('第 3 轮 · 17:31 · 把工具栏收进更多')

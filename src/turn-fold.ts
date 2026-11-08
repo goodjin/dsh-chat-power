@@ -389,7 +389,7 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
       for (const think of Array.from(thinkRows)) {
         if (think.getAttribute('data-state') !== 'running') continue
         if (think.hasAttribute('data-expanded')) continue
-        const toggle = think.querySelector('button')
+        const toggle = (think.querySelector('[data-disclosure-row]') ?? think.querySelector('button')) as HTMLElement | null
         if (toggle === null) continue
         toggle.click()
       }
@@ -530,18 +530,13 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
       return
     }
     if (framed === undefined) return
-    const parent = framed.parentElement
-    if (parent === null) {
-      record.frameLabel?.remove()
-      record.frameLabel = undefined
-      return
-    }
     let label = record.frameLabel
-    if (label === undefined || !label.isConnected || label.parentElement !== parent) {
+    if (label === undefined || !label.isConnected || label.parentElement !== framed) {
       label = document.createElement('div')
       label.className = css.frameLabel ?? ''
       label.setAttribute(FRAME_LABEL_ATTR, '')
-      parent.insertBefore(label, framed)
+      // 放进框里（框的第一行）：吸顶，不会漂到框外跟别的字叠在一起。
+      framed.insertBefore(label, framed.firstChild)
       record.frameLabel = label
     }
     const kind = frameLabelOf(framed)
@@ -587,6 +582,16 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
   const collapseThinking = (record: TurnRecord): void => {
     // 结果块可能在组外（单独一行），也可能在组内（宿主把结果步并进过程组）。
     const turnHasAnswer = record.rows.some(row => row.querySelector('[data-answer-body]') !== null)
+    // 思考块有时是独立的一行（不在过程组里）：结果出来后它也得收起，
+    // 否则它会跑到框下面去——框里只留结果块。
+    if (turnHasAnswer) {
+      for (const row of record.rows) {
+        if (row.querySelector('[data-variant="think"]') === null) continue
+        // 行里同时有答案卡时不能整行藏掉（那是结果块本身）。
+        if (row.querySelector('[data-answer-body]') !== null) continue
+        row.setAttribute(GROUP_HIDDEN_ATTR, '')
+      }
+    }
     for (const row of record.rows) {
       if (!row.matches('[data-step-process]')) continue
       const members = Array.from(row.querySelectorAll<HTMLElement>(`[${TURN_ATTR}]`)).filter(el => el !== row)
