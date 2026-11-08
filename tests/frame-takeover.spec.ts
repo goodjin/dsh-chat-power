@@ -65,6 +65,15 @@ describe('帧类型补全', () => {
   })
 })
 
+describe('吸顶的是标题栏', () => {
+  it('每个框的标题行都吸顶（内容从标题栏下面过去，不直接顶到框顶）', () => {
+    for (const file of ['../src/think-frame.module.css', '../src/tools-frame.module.css', '../src/answer-card.module.css']) {
+      const css = source(file)
+      expect(css).toMatch(/\.\w*[Hh]eader[^{]*\{[^}]*position:\s*sticky/)
+    }
+  })
+})
+
 describe('框的类型与状态', () => {
   it('每种帧有自己的类型标记，边框颜色按类型区分', () => {
     const css = source('../src/turn-fold.module.css')

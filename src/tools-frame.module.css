@@ -14,6 +14,11 @@
   align-items: center;
   gap: 6px;
   padding: 6px 12px 0;
+  /* 吸顶的是标题栏：框内滚动时它留在框顶，内容从它下面过去。 */
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--dsw-alias-bg-layer-1, transparent);
   color: var(--dsw-alias-label-secondary, inherit);
   font-size: 12px;
   line-height: 18px;

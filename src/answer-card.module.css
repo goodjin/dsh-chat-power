@@ -23,7 +23,7 @@
   position: sticky;
   top: 0;
   z-index: 1;
-  background: var(--dsw-alias-settings-card-fill, transparent);
+  background: var(--dsw-alias-bg-layer-1, transparent);
 }
 .answerCardTitle {
   font-size: 12px;
