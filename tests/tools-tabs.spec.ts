@@ -9,6 +9,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import {
+  CHAT_BUTTON_ATTR,
   GROUP_ATTR,
   LIVE_ATTR,
   ROW_ATTR,
@@ -151,6 +152,12 @@ function handlers(snapshot: (sessionId: string) => ToolsRowSnapshot): { value: T
     closeTab: (id, tabId) => { actions.push(`close:${id}:${tabId}`) },
     subscribe: () => () => {},
     labels: { chat: '对话', kinds: { files: '文件', browser: '浏览器', terminal: '终端' } },
+    icons: {
+      chat: '<svg data-icon="chat"></svg>',
+      files: '<svg data-icon="files"></svg>',
+      browser: '<svg data-icon="browser"></svg>',
+      terminal: '<svg data-icon="terminal"></svg>',
+    },
   }
   return { value, actions }
 }
@@ -180,13 +187,38 @@ describe('syncSessionToolsRow（同步）', () => {
     expect(group!.querySelectorAll(`[${TAB_CLOSE_ATTR}]`)).toHaveLength(1)
   })
 
-  it('宿主行缺席：自建行不再画「会话」标签（宿主那一行自带「对话」）', () => {
+  it('宿主行缺席：自建行带「对话」标签（图标 + 文字），排在工具标签组之前', () => {
     const root = content('s1', false)
     const h = handlers(() => snapshotOf([{ id: 't1', kind: 'files', title: '工作区文件' }], 't1'))
     const row = syncSessionToolsRow(root, fakeDoc(), h.value, {})
     expect(row!.hasAttribute(ROW_ATTR)).toBe(true)
-    expect(row!.querySelector('[data-chat-tools-chat-button]')).toBeNull()
+    const chat = row!.querySelector(`[${CHAT_BUTTON_ATTR}]`)
+    expect(chat).not.toBeNull()
+    expect(chat!.getAttribute('role')).toBe('tab')
+    // 带文字「对话」。
+    const kids = chat!.children as unknown as unknown[]
+    expect(kids.some(child => (child as { text?: string }).text === '对话')).toBe(true)
+    // 带图标（图标在文字之前）。
+    const icon = chat!.querySelector('[data-chat-tools-icon]')
+    expect(icon).not.toBeNull()
+    expect((icon as { innerHTML?: string }).innerHTML).toBe(h.value.icons!.chat)
+    expect(kids.indexOf(icon as unknown)).toBe(0)
+    // 排在工具标签组之前。
+    const group = row!.querySelector(`[${GROUP_ATTR}]`)!
+    const rowKids = row!.children as unknown as unknown[]
+    expect(rowKids.indexOf(chat as unknown)).toBeLessThan(rowKids.indexOf(group as unknown))
+    // 工具激活时对话不高亮、行带 LIVE 标记压暗宿主标签。
+    expect(chat!.getAttribute('aria-selected')).toBe('false')
     expect(row!.getAttribute(LIVE_ATTR)).toBe('')
+  })
+
+  it('没有工具激活时对话标签高亮（含对话标签本身处于激活）', () => {
+    const root = content('s1', false)
+    // 旧会话：对话标签激活（active 指向 chat 标签）——对话钮仍应高亮。
+    const h = handlers(() => snapshotOf([{ id: 'chat', kind: 'chat', title: '会话' }], 'chat'))
+    const row = syncSessionToolsRow(root, fakeDoc(), h.value, {})
+    expect(row!.querySelector(`[${CHAT_BUTTON_ATTR}]`)!.getAttribute('aria-selected')).toBe('true')
+    expect(row!.hasAttribute(LIVE_ATTR)).toBe(false)
   })
 
   it('回到对话：激活标记摘除，自建行对话标签恢复高亮', () => {
@@ -194,6 +226,7 @@ describe('syncSessionToolsRow（同步）', () => {
     const h = handlers(() => snapshotOf([{ id: 't1', kind: 'local', title: 'a.md' }], undefined))
     const row = syncSessionToolsRow(root, fakeDoc(), h.value, {})
     expect(row!.hasAttribute(LIVE_ATTR)).toBe(false)
+    expect(row!.querySelector(`[${CHAT_BUTTON_ATTR}]`)!.getAttribute('aria-selected')).toBe('true')
   })
 
   it('同步是全量重画：两次同步不叠出两份标签', () => {
@@ -273,6 +306,18 @@ describe('handleToolsRowClick（点击路由）', () => {
     expect(actions).toEqual(['kind:s1:browser'])
   })
 
+  it('点自建行「对话」标签 → activateChat 并截住事件', () => {
+    const root = content('s1', false)
+    const h = handlers(() => snapshotOf([{ id: 't1', kind: 'files', title: '工作区文件' }], 't1'))
+    const row = syncSessionToolsRow(root, fakeDoc(), h.value, {})
+    const chat = row!.querySelector(`[${CHAT_BUTTON_ATTR}]`)!
+    const stopped = { stopped: false }
+    const handled = handleToolsRowClick({ target: chat, preventDefault: () => {}, stopPropagation: () => { stopped.stopped = true } } as never, h.value)
+    expect(handled).toBe(true)
+    expect(stopped.stopped).toBe(true)
+    expect(h.actions).toEqual(['chat:s1'])
+  })
+
   it('工具激活时点宿主标签 → 先回对话，不吞事件', () => {
     const { root, actions, value } = build()
     const hostRow = root.querySelector('[data-conversation-tabs]')!
@@ -307,9 +352,11 @@ describe('handleToolsRowClick（点击路由）', () => {
 })
 
 describe('工具标签行的按钮样式', () => {
-  it('我们不再自己画「会话」标签', () => {
+  it('自建行画「对话」标签：图标 + 文字，排在工具标签之前', () => {
     const source = readFileSync(new URL('../src/tools-tabs.ts', import.meta.url), 'utf8')
-    expect(source).not.toContain("setAttribute('data-chat-tools-chat-button'")
+    expect(source).toContain('setAttribute(CHAT_BUTTON_ATTR')
+    expect(source).toContain('handlers.labels.chat')
+    expect(source).toContain('handlers.icons?.chat')
   })
   it('四个标签统一成按钮样式，选中的变色', () => {
     const css = readFileSync(new URL('../src/conversation-tools.module.css', import.meta.url), 'utf8')

@@ -32,6 +32,8 @@ export const TAB_CLOSE_ATTR = 'data-chat-tools-tab-close'
 export const ROW_ATTR = 'data-chat-tools-row'
 /** 行容器上的「工具标签激活」标记：样式据此压暗宿主自己的标签。 */
 export const LIVE_ATTR = 'data-chat-tools-live'
+/** 自建行的「对话」标签标记（仅宿主行缺席时才有；点它回到对话界面）。 */
+export const CHAT_BUTTON_ATTR = 'data-chat-tools-chat-button'
 
 /** 会话视图种类：与 toolsState 的 kind 一致。 */
 export type ToolRowKind = 'files' | 'browser' | 'terminal'
@@ -168,7 +170,23 @@ export function syncSessionToolsRow(root: RowElementLike, doc: RowDocumentLike, 
       owned = doc.createElement('div')
       owned.setAttribute(ROW_ATTR, '')
       owned.setAttribute('role', 'tablist')
-      // 「会话」按钮不画：宿主那一行自带「对话 / 轨迹」。
+      // 自建行的「对话」标签：宿主行缺席（只注册了对话一个视图、或隐藏了标题栏）
+      // 时没有别的入口回对话，所以自己画一个，排在工具标签之前。图标 + 文字。
+      const chat = doc.createElement('button')
+      chat.setAttribute('type', 'button')
+      chat.setAttribute('role', 'tab')
+      chat.setAttribute(CHAT_BUTTON_ATTR, '')
+      chat.setAttribute('aria-selected', 'true')
+      const chatIcon = handlers.icons?.chat
+      if (chatIcon !== undefined && chatIcon !== '') {
+        const mark = doc.createElement('span')
+        mark.setAttribute('aria-hidden', 'true')
+        mark.setAttribute('data-chat-tools-icon', '')
+        mark.innerHTML = chatIcon
+        chat.append(mark)
+      }
+      chat.append(doc.createTextNode(handlers.labels.chat))
+      owned.append(chat)
       const group = doc.createElement('div')
       group.setAttribute(GROUP_ATTR, '')
       owned.append(group)
@@ -190,14 +208,15 @@ export function syncSessionToolsRow(root: RowElementLike, doc: RowDocumentLike, 
   if (prev !== undefined && prev.sig === sig && prev.row === row && groupForCheck !== null && (groupForCheck.children?.length ?? -1) === expectedChildren) return row
   lastSync.set(root, { sig, row, children: expectedChildren })
   // 以下是重画路径：只在快照或行结构真的变了时走到。
-  if (ownsChatButton) {
-    // 自建行的「对话」标签：工具激活时它不该高亮。
-    const chatButton = row.querySelector('[data-chat-tools-chat-button]')
-    if (chatButton !== null) chatButton.setAttribute('aria-selected', snapshot.active === undefined || snapshot.active === '' ? 'true' : 'false')
-  }
   const activeTool = snapshot.tabs.find(tab => tab.kind !== 'chat' && isActive(snapshot, tab))
   if (activeTool === undefined) row.removeAttribute(LIVE_ATTR)
   else row.setAttribute(LIVE_ATTR, '')
+  if (ownsChatButton) {
+    // 自建行的「对话」标签：没有工具激活时它高亮——当前正看对话（含对话标签
+    // 本身激活、或尚无激活标签）；某个工具激活时让位给那个工具。
+    const chatButton = row.querySelector(`[${CHAT_BUTTON_ATTR}]`)
+    if (chatButton !== null) chatButton.setAttribute('aria-selected', activeTool === undefined ? 'true' : 'false')
+  }
   let group = row.querySelector(`[${GROUP_ATTR}]`)
   if (group === null) {
     group = doc.createElement('div')
@@ -276,7 +295,7 @@ export function handleToolsRowClick(event: { target: unknown; preventDefault(): 
     return true
   }
   // 自建行自己的「对话」标签：回到对话（自建行模式下宿主对话标签不在场）。
-  const chatButton = target.closest('[data-chat-tools-chat-button]') as RowElementLike | null
+  const chatButton = target.closest(`[${CHAT_BUTTON_ATTR}]`) as RowElementLike | null
   if (chatButton !== null) {
     event.stopPropagation()
     handlers.activateChat(sessionId)
