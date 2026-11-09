@@ -295,26 +295,10 @@ export function registerConversationTools(ctx: any) {
   // 工具标签并进宿主标签行后，这两个入口不再占标签行的位置。
   function HeaderToolsEntry(props: { readonly sessionId?: string }) {
     const id = props.sessionId
-    const pick = useRef<HTMLInputElement>(null)
     const [mode, setMode] = useState(readDefaultLinkOpenMode)
     const [moreOpen, setMoreOpen] = useState(false)
     if (id === undefined || id === '') return null
-    const selectFile = async (file?: File) => {
-      if (!file) return
-      if (file.size > LOCAL_FILE_MAX_BYTES) { toolsNotice.set(id, '文件超过 5 MB，请选择较小的文本文件。'); return }
-      try {
-        const text = await file.text()
-        const tab = toolsState.open(id, 'local', file.name, `local://${crypto.randomUUID()}`)
-        docs.set(docKey(id, tab.contentId), { name: file.name, text, seq: Date.now() })
-        toolsState.select(id, tab.id)
-        toolsNotice.clear(id)
-      } catch (err) { toolsNotice.set(id, `读取失败：${String(err)}`) }
-    }
     return <>
-      <button type="button" className={css.iconEntry} aria-label={fallbackT('tools.openLocalFile')}
-        title={fallbackT('tools.openLocalFile')} onClick={() => pick.current?.click()}>
-        <IconFolderOpenOutlineRegular size={16} />
-      </button>
       <Menu
         open={moreOpen}
         portal
@@ -337,7 +321,6 @@ export function registerConversationTools(ctx: any) {
           setMoreOpen(false)
         }}
       />
-      <input ref={pick} hidden type="file" accept={LOCAL_FILE_ACCEPT} onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; void selectFile(f) }} />
     </>
   }
   ctx.slots.inject('conversation.session.header.actions', () => ctx.slots.register({
