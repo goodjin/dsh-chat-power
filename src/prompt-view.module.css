@@ -1,0 +1,90 @@
+/* 「提示词」视图：查看/编辑当前会话生效的系统提示词。 */
+
+.frame {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 16px;
+  min-width: 0;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.title {
+  color: var(--dsw-alias-label-primary, inherit);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.state {
+  color: var(--dsw-alias-label-tertiary, inherit);
+  font-size: 12px;
+}
+
+.body {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--dsw-alias-border-l2, transparent);
+  border-radius: var(--dsw-radius-md, 8px);
+  background: var(--dsw-alias-bg-layer-1, transparent);
+  color: var(--dsw-alias-label-primary, inherit);
+  font-family: var(--dsw-font-mono, inherit);
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow: auto;
+}
+
+.editor {
+  padding: 10px 12px;
+  border: 1px solid var(--dsw-alias-border-l2, transparent);
+  border-radius: var(--dsw-radius-md, 8px);
+  background: var(--dsw-alias-bg-layer-1, transparent);
+  color: var(--dsw-alias-label-primary, inherit);
+  font-family: var(--dsw-font-mono, inherit);
+  font-size: 12px;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+}
+
+.button {
+  padding: 4px 12px;
+  border: 1px solid var(--dsw-alias-border-l2, transparent);
+  border-radius: var(--dsw-radius-sm, 4px);
+  background: var(--dsw-alias-interactive-bg-hover, transparent);
+  color: var(--dsw-alias-label-primary, inherit);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.button:hover {
+  background: var(--dsw-alias-interactive-bg-active, transparent);
+}
+
+.button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.notice {
+  margin: 0;
+  color: var(--dsw-alias-label-tertiary, inherit);
+  font-size: 12px;
+}
+
+.hint {
+  margin: 0;
+  color: var(--dsw-alias-label-tertiary, inherit);
+  font-size: 12px;
+}
