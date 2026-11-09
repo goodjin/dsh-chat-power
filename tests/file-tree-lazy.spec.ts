@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
 import { FILE_PAGE_SIZE, formatSize, parseListing, sortEntries } from '../src/file-tree-lazy.tsx'
 
 describe('工作区文件树（懒加载）', () => {
@@ -43,5 +44,12 @@ describe('工作区文件树（懒加载）', () => {
     expect(formatSize(512)).toBe('512 B')
     expect(formatSize(2048)).toBe('2.0 KB')
     expect(formatSize(5 * 1024 * 1024)).toBe('5.0 MB')
+  })
+})
+
+describe('根目录列目录', () => {
+  it('根目录用「.」表示（宿主拒绝空路径）', () => {
+    const source = readFileSync(new URL('../src/file-tree-lazy.tsx', import.meta.url), 'utf8')
+    expect(source).toContain("path === '' ? '.' : path")
   })
 })

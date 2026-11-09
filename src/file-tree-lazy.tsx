@@ -200,7 +200,8 @@ export function LazyFileTree(props: {
       return
     }
     setLevels(prev => ({ ...prev, [path]: { entries: prev[path]?.entries ?? [], shown: prev[path]?.shown ?? 0, loading: true } }))
-    void api.list(props.sessionId, path).then((value) => {
+    // 根目录用「.」表示：宿主拒绝空路径（直接报 path is required）。
+    void api.list(props.sessionId, path === '' ? '.' : path).then((value) => {
       setLevels(prev => ({ ...prev, [path]: applyListing(prev[path]?.shown, value, FILE_PAGE_SIZE) }))
     }).catch(() => {
       setLevels(prev => ({ ...prev, [path]: failedLevel(LIST_ERROR) }))
