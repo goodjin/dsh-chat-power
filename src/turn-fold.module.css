@@ -187,12 +187,11 @@
   background: var(--dsw-alias-bg-layer-1, transparent);
 }
 
-[data-answer-card] [data-chat-power-feedback] {
-  position: absolute;
-  top: 0;
-  right: 92px;
-  height: 30px;
+/* 挪进标题栏之后：跟编辑/复制按钮并排，靠右。 */
+[data-answer-header] [data-chat-power-feedback] {
+  position: static;
+  margin-left: auto;
   padding: 0;
   background: transparent;
-  z-index: 2;
+  z-index: auto;
 }
