@@ -686,10 +686,14 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
   /** 请求条与请求行的状态同步（收起 / 展开、文案、指示箭头）。 */
   const applyRequestBar = (record: TurnRecord): void => {
     const bar = record.requestBar
-    const userRow = record.rows.find(row => row.matches(USER_ROW_SELECTOR))
-    if (bar === undefined || userRow === undefined) return
-    if (record.requestCollapsed) userRow.setAttribute(REQUEST_HIDDEN_ATTR, '')
-    else userRow.removeAttribute(REQUEST_HIDDEN_ATTR)
+    const userRows = record.rows.filter(row => row.matches(USER_ROW_SELECTOR))
+    if (bar === undefined || userRows.length === 0) return
+    // 请求收起时，这一轮的**所有**提问行（含中途引导）都要藏起——
+    // 只要有一行还在占位，就会把回答框往下挤。
+    for (const userRow of userRows) {
+      if (record.requestCollapsed) userRow.setAttribute(REQUEST_HIDDEN_ATTR, '')
+      else userRow.removeAttribute(REQUEST_HIDDEN_ATTR)
+    }
     const signature = `${record.requestCollapsed ? 'c' : 'e'}|${record.requestSummary}`
     if (bar.dataset['signature'] === signature) return
     bar.dataset['signature'] = signature
