@@ -383,6 +383,29 @@ export function registerConversationTools(ctx: any) {
   // 文件树行控件：宿主 0.2.2 起不能再包宿主面板，改为在渲染出来的树上补控件。
   // 「提示词」视图：查看/编辑当前会话的系统提示词（router/worker 可编辑，普通会话只读）。
   ctx.effect(() => registerPromptView(ctx), 'chat-power: prompt view')
+  // 回答块里的文档链接：改为在会话区打开（编辑标签 ✓），不再跳右侧栏。
+  ctx.effect(() => {
+    if (typeof document === 'undefined') return () => {}
+    const onClick = (event: Event): void => {
+      const target = event.target as Element | null
+      const link = target?.closest?.('a[href]') ?? null
+      if (link === null) return
+      // 只拦回答框里的文件资源链接；普通网页链接照旧。
+      if (link.closest('[data-chat-power-frame-box]') === null) return
+      const href = link.getAttribute('href') ?? ''
+      if (!href.startsWith('dsh-resource://file/')) return
+      const sessionId = link.closest('[data-conversation-session]')?.getAttribute('data-conversation-session') ?? ''
+      if (sessionId === '') return
+      event.preventDefault()
+      event.stopPropagation()
+      const raw = href.slice('dsh-resource://file/'.length)
+      let path = raw
+      try { path = decodeURIComponent(raw) } catch { /* 保留原文 */ }
+      openWorkspaceEditor(sessionId, path)
+    }
+    document.addEventListener('click', onClick, true)
+    return () => { document.removeEventListener('click', onClick, true) }
+  }, 'chat-power: answer link open')
   ctx.effect(() => attachFilesTreeAugment(augmentHandlers), 'chat-power: files tree augment')
   // One policy for ordinary HTTP links across the application. Explicit modifiers
   // retain browser conventions. Native browser's external button remains explicit.
