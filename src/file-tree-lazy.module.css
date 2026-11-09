@@ -17,13 +17,23 @@
 
 .item {
   margin: 0;
+  /* 勾选框、行、编辑钮排成一行：装饰控件挂在 li 上，不排 flex 就会各自换行。 */
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.item > [data-chat-file-check],
+.item > [data-chat-file-edit] {
+  flex: none;
 }
 
 .row {
   display: flex;
   align-items: center;
   gap: 8px;
-  width: 100%;
+  flex: 1 1 auto;
+  min-width: 0;
   padding: 3px 6px;
   border: none;
   border-radius: var(--dsw-radius-sm, 4px);

@@ -79,3 +79,16 @@
   align-items: center;
   color: currentColor;
 }
+
+/* 我们的标签组：追加进宿主「对话 / 轨迹」那一行时要在同一行排开
+   （组是宿主 tablist 里的一个子元素，块级会被挤到下一行）。 */
+[data-chat-tools-group] {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+[data-chat-tools-group] > [data-chat-tools-tab] {
+  flex: none;
+}
