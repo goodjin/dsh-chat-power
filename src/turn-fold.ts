@@ -186,6 +186,12 @@ interface TurnRecord {
 }
 
 /** 折叠控制器的可注入面（便于测试与宿主差异适配）。 */
+/** git 快捷动作的种类。 */
+export type GitAction = 'commit' | 'merge' | 'push'
+
+/** git 按钮的文案（git 动词保持英文习惯）。 */
+const GIT_LABELS: Record<GitAction, string> = { commit: 'Commit', merge: 'Merge', push: 'Push' }
+
 export interface TurnFoldOptions {
   /** 聊天滚动容器；缺省按 `[data-conversation-scroll]` 查。 */
   root?: () => Element | null
@@ -195,6 +201,8 @@ export interface TurnFoldOptions {
   observe?: (target: Element, callback: () => void) => () => void
   /** 注入时钟。 */
   now?: () => number
+  /** 点 git 快捷按钮：把对应指令发给当前会话执行。 */
+  onGitAction?: (sessionId: string, action: GitAction) => void
 }
 
 /**
@@ -446,6 +454,26 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
       const holder = like.parentElement
       if (holder === null) continue
       holder.setAttribute('data-chat-power-feedback', '')
+      // git 快捷按钮：commit / merge / push（发指令给当前会话执行）。
+      if (options.onGitAction !== undefined && holder.querySelector('[data-chat-power-git-actions]') === null) {
+        const sessionId = row.closest('[data-conversation-session]')?.getAttribute('data-conversation-session') ?? ''
+        if (sessionId !== '') {
+          const bar = document.createElement('span')
+          bar.setAttribute('data-chat-power-git-actions', '')
+          for (const kind of ['commit', 'merge', 'push'] as const) {
+            const btn = document.createElement('button')
+            btn.setAttribute('type', 'button')
+            btn.setAttribute('data-chat-power-git-btn', kind)
+            btn.textContent = GIT_LABELS[kind]
+            btn.addEventListener('click', event => {
+              event.stopPropagation()
+              options.onGitAction?.(sessionId, kind)
+            })
+            bar.append(btn)
+          }
+          holder.append(bar)
+        }
+      }
       // 宿主把这排按钮画在答案**外面**（和文件块一样是独立的一行）。
       // 要它进标题栏，就把它挪进答案卡的标题栏里——只挪这一处稳定的元素，
       // 每次同步都校正一次：宿主重绘后会自动归位。

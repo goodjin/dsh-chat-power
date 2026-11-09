@@ -402,3 +402,15 @@ describe('会话区排布', () => {
     expect(css).toContain('[data-answer-header] [data-chat-power-feedback]')
   })
 })
+
+describe('git 快捷按钮', () => {
+  it('点赞行里挂上 Commit / Merge / Push 三个按钮', () => {
+    const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
+    expect(source).toContain('data-chat-power-git-actions')
+    expect(source).toContain('data-chat-power-git-btn')
+    expect(source).toContain('GIT_LABELS')
+    const index = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
+    expect(index).toContain('onGitAction')
+    expect(index).toContain('sendToSession')
+  })
+})
