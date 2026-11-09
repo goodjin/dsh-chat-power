@@ -385,11 +385,17 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
    * （底部文件块、点赞行、行间距、宿主尾部空隙全在里面，不会漏 ✓）。
    * 输入框本身也排在滚动容器末尾、占位计入 scrollHeight，单独扣除 ✓。
    */
+  /** 输入框的可见高度（会话可用高度要从它里面扣）。 */
+  const measureComposerHeight = (container: Element): number => {
+    const composer = container.querySelector('[data-composer-seat]')
+    return composer === null ? 0 : composer.getBoundingClientRect().height
+  }
+
   const belowFrameHeight = (framed: HTMLElement, container: Element): number => {
     const frameRect = framed.getBoundingClientRect()
     const viewRect = container.getBoundingClientRect()
     const contentBottom = viewRect.top + container.scrollHeight - container.scrollTop
-    return Math.max(0, Math.round(contentBottom - frameRect.bottom - composerHeight(container)))
+    return Math.max(0, Math.round(contentBottom - frameRect.bottom - measureComposerHeight(container)))
   }
 
   /** 框本体：我们的元素（回答卡 / 思考帧）；没有就退回宿主行。 */
