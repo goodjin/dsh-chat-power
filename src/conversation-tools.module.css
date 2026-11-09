@@ -79,21 +79,3 @@
   align-items: center;
   color: currentColor;
 }
-
-/* 宿主那一行里我们的视图标签：塞了图标，用 flex 对齐；
-   选中态跟着宿主的 aria-selected 走。 */
-[data-chat-power-view-tab] {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-[data-chat-power-view-tab] [data-chat-power-view-icon] {
-  display: inline-flex;
-  align-items: center;
-  color: var(--dsw-alias-label-secondary, inherit);
-}
-
-[data-chat-power-view-tab][aria-selected='true'] [data-chat-power-view-icon] {
-  color: var(--dsw-alias-label-primary, inherit);
-}

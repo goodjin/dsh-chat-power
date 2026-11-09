@@ -332,17 +332,3 @@ describe('工具注册成宿主会话视图', () => {
     expect(body).not.toContain('for (const kind of [')
   })
 })
-
-describe('宿主那一行的视图标签', () => {
-  it('我们的三个视图标签由 DOM 补图标（宿主只画文字）', () => {
-    const source = readFileSync(new URL('../src/tool-views.tsx', import.meta.url), 'utf8')
-    expect(source).toContain('attachViewTabIcons')
-    expect(source).toContain('data-chat-power-view-tab')
-    const tools = readFileSync(new URL('../src/conversation-tools.tsx', import.meta.url), 'utf8')
-    expect(tools).toContain('attachViewTabIcons')
-  })
-  it('选中态样式跟着宿主的 aria-selected 走', () => {
-    const css = readFileSync(new URL('../src/conversation-tools.module.css', import.meta.url), 'utf8')
-    expect(css).toContain("[data-chat-power-view-tab][aria-selected='true']")
-  })
-})

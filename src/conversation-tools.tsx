@@ -7,7 +7,7 @@ import { attachToolsRow } from './tools-tabs.ts'
 import { createToolMessageHider, isToolMessageNode, mountToolBody, toolHiddenNodes } from './tools-layout.ts'
 import { attachFilesTreeAugment, hasHistoryForPhase, type AugmentHandlers } from './file-tree-augment.tsx'
 import { LazyFileTree } from './file-tree-lazy.tsx'
-import { attachViewTabIcons, registerToolViews, VIEW_IDS, toolKindOfView, type ToolViewKind } from './tool-views.tsx'
+import { registerToolViews, VIEW_IDS, toolKindOfView } from './tool-views.tsx'
 import { checkedFiles, toolsNotice } from './checked-files.ts'
 import { createReferenceApplier } from './composer-references.ts'
 import { readEntireWorkspaceText } from './workspace-text.ts'
@@ -389,11 +389,6 @@ export function registerConversationTools(ctx: any) {
   // 文件树行控件：宿主 0.2.2 起不能再包宿主面板，改为在渲染出来的树上补控件。
   // 三个工具注册成宿主会话视图：由宿主那一行标签统一画（对话/轨迹旁边）。
   ctx.effect(() => registerToolViews(ctx, () => null), 'chat-power: tool views')
-  // 宿主那一行的标签只有文字：给我们的三个补图标；选中态跟宿主的 aria-selected 走。
-  ctx.effect(() => attachViewTabIcons(
-    TOOL_ENTRY_ICONS as Record<ToolViewKind, string>,
-    kind => fallbackT('tools.' + kind as never),
-  ), 'chat-power: view tab icons')
   // 点宿主那一行里的我们的视图标签 → 打开对应工具（内容由工具区画）。
   ctx.effect(() => {
     if (typeof document === 'undefined') return () => {}
