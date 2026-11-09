@@ -87,4 +87,57 @@ export function toolEntries(icons: Record<string, string>): ToolEntryView[] {
   }))
 }
 
+/** 宿主那一行里，我们的视图标签带的标记。 */
+export const VIEW_TAB_ATTR = 'data-chat-power-view-tab'
+/** 标签里图标的标记。 */
+export const VIEW_ICON_ATTR = 'data-chat-power-view-icon'
+
+/**
+ * 给宿主画出来的我们的视图标签补图标。
+ *
+ * 宿主那一行的标签只有文字；这里按文案认出我们的三个，塞进图标并打上标记，
+ * 选中态由宿主的 `aria-selected` 加我们的 CSS 负责。
+ * 观察整页：那一行是宿主按视图数量现画的，宽窄变化还会重排。
+ * 文案对不上时摘掉标记与图标（换语言、别的插件改了标签都要能退回去）。
+ */
+export function attachViewTabIcons(
+  icons: Record<ToolViewKind, string>,
+  label: (kind: ToolViewKind) => string,
+): () => void {
+  if (typeof document === 'undefined' || typeof MutationObserver === 'undefined') return () => {}
+  const kinds: readonly ToolViewKind[] = ['files', 'browser', 'terminal']
+  const decorate = (): void => {
+    for (const row of document.querySelectorAll('[data-conversation-tabs]')) {
+      for (const tab of Array.from(row.querySelectorAll('[role="tab"]'))) {
+        const text = (tab.textContent ?? '').trim()
+        let matched: ToolViewKind | undefined
+        for (const kind of kinds) {
+          if (text === label(kind)) { matched = kind; break }
+        }
+        if (matched === undefined) {
+          if (tab.hasAttribute(VIEW_TAB_ATTR)) {
+            tab.removeAttribute(VIEW_TAB_ATTR)
+            tab.querySelector(`[${VIEW_ICON_ATTR}]`)?.remove()
+          }
+          continue
+        }
+        if (tab.getAttribute(VIEW_TAB_ATTR) === matched) continue
+        tab.setAttribute(VIEW_TAB_ATTR, matched)
+        let mark = tab.querySelector(`[${VIEW_ICON_ATTR}]`)
+        if (mark === null) {
+          mark = document.createElement('span')
+          mark.setAttribute('aria-hidden', 'true')
+          tab.prepend(mark)
+        }
+        mark.setAttribute(VIEW_ICON_ATTR, matched)
+        mark.innerHTML = icons[matched] ?? ''
+      }
+    }
+  }
+  const observer = new MutationObserver(decorate)
+  observer.observe(document.body, { childList: true, subtree: true, characterData: true })
+  decorate()
+  return () => observer.disconnect()
+}
+
 export { createElement }
