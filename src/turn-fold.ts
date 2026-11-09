@@ -343,7 +343,7 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
       const framed = record.rows.find(row => row.hasAttribute(CAPPED_ATTR))
       if (framed !== undefined) {
         above = aboveFrameHeight(record, framed)
-        below = belowFrameHeight(record, framed)
+        below = belowFrameHeight(framed, container)
       }
     }
     return viewport - composerHeight - HEIGHT_MARGIN - above - below
@@ -383,21 +383,20 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
   }
 
   /**
-   * 框**下面**占了多少高度：底部的文件块、点赞那一排等。
-   *
-   * 它们排在框后面，要一起放进一屏里，所以限高时得让出它们的位置——
-   * 否则框的底边会被它们顶到输入框下面。
+   * 框**下面**占了多少高度：从框底到滚动内容末尾的**实测距离** ✓
+   * （底部文件块、点赞行、行间距、宿主尾部空隙全在里面，不会漏 ✓）。
+   * 输入框本身也排在滚动容器末尾、占位计入 scrollHeight，单独扣除 ✓。
    */
-  const belowFrameHeight = (record: TurnRecord, framed: HTMLElement): number => {
-    let total = 0
-    for (const row of record.rows) {
-      if (row === framed) continue
-      // 只算排在框后面的行（文档顺序）。
-      if ((row.compareDocumentPosition(framed) & Node.DOCUMENT_POSITION_PRECEDING) === 0) continue
-      total += row.getBoundingClientRect().height
-    }
-    return total
+  const belowFrameHeight = (framed: HTMLElement, container: Element): number => {
+    const frameRect = framed.getBoundingClientRect()
+    const viewRect = container.getBoundingClientRect()
+    const contentBottom = viewRect.top + container.scrollHeight - container.scrollTop
+    return Math.max(0, Math.round(contentBottom - frameRect.bottom - composerHeight(container)))
   }
+
+  /** 框本体：我们的元素（回答卡 / 思考帧）；没有就退回宿主行。 */
+  const frameBoxOf = (row: HTMLElement): HTMLElement =>
+    row.querySelector<HTMLElement>('[data-chat-power-frame-box]') ?? row
 
   /**
    * 过程组自己的组头（宿主的那句「工作步骤」摘要）让位给我们的帧。
@@ -414,16 +413,6 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     }
   }
 
-  /** 框本体：我们的元素（回答卡 / 思考帧）；没有就退回宿主行。 */
-  const frameBoxOf = (row: HTMLElement): HTMLElement =>
-    row.querySelector<HTMLElement>('[data-chat-power-frame-box]') ?? row
-
-  /**
-   * 输出中：框的标题栏挂上「进行中」。
-   *
-   * 徽标位置由各帧自己渲染（`data-chat-power-state`），这里只管填字——
-   * 这样思考帧、工具调用帧、回答帧的标题栏表现一致。
-   */
   const markFrameState = (record: TurnRecord): void => {
     const live = isLiveOutput()
     const text = live ? t('turnFold.frameRunning') : ''
