@@ -7,7 +7,6 @@ import { attachToolsRow } from './tools-tabs.ts'
 import { createToolMessageHider, isToolMessageNode, mountToolBody, toolHiddenNodes } from './tools-layout.ts'
 import { attachFilesTreeAugment, hasHistoryForPhase, type AugmentHandlers } from './file-tree-augment.tsx'
 import { LazyFileTree } from './file-tree-lazy.tsx'
-import { registerToolViews, VIEW_IDS, toolKindOfView } from './tool-views.tsx'
 import { checkedFiles, toolsNotice } from './checked-files.ts'
 import { createReferenceApplier } from './composer-references.ts'
 import { readEntireWorkspaceText } from './workspace-text.ts'
@@ -387,26 +386,6 @@ export function registerConversationTools(ctx: any) {
   }, DocumentActions))
   adapter.install()
   // 文件树行控件：宿主 0.2.2 起不能再包宿主面板，改为在渲染出来的树上补控件。
-  // 三个工具注册成宿主会话视图：由宿主那一行标签统一画（对话/轨迹旁边）。
-  ctx.effect(() => registerToolViews(ctx, () => null), 'chat-power: tool views')
-  // 点宿主那一行里的我们的视图标签 → 打开对应工具（内容由工具区画）。
-  ctx.effect(() => {
-    if (typeof document === 'undefined') return () => {}
-    const onClick = (event: Event): void => {
-      const target = event.target as Element | null
-      if (target === null || typeof target.closest !== 'function') return
-      const tab = target.closest('[role="tab"]')
-      if (tab === null) return
-      const label = tab.textContent ?? ''
-      const sessionId = tab.closest('[data-conversation-session]')?.getAttribute('data-conversation-session')
-      if (sessionId === null || sessionId === undefined || sessionId === '') return
-      for (const kind of ['files', 'browser', 'terminal'] as const) {
-        if (label === fallbackT('tools.' + kind as never)) { openKind(sessionId, kind); return }
-      }
-    }
-    document.addEventListener('click', onClick, true)
-    return () => { document.removeEventListener('click', onClick, true) }
-  }, 'chat-power: tool view clicks')
   ctx.effect(() => attachFilesTreeAugment(augmentHandlers), 'chat-power: files tree augment')
   // One policy for ordinary HTTP links across the application. Explicit modifiers
   // retain browser conventions. Native browser's external button remains explicit.

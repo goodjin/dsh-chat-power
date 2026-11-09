@@ -174,9 +174,9 @@ describe('syncSessionToolsRow（同步）', () => {
     const group = root.querySelector(`[${GROUP_ATTR}]`)
     expect(group).not.toBeNull()
     expect(row!.getAttribute(LIVE_ATTR)).toBe('')
-    // 三个工具入口已是宿主会话视图，这里只剩一个文件标签（+ 一枚关闭钮）。
+    // 三个种类启动器 + 一个文件标签 + 一枚关闭钮。
     const tabs = group!.querySelectorAll(`[${TAB_ATTR}]`)
-    expect(tabs).toHaveLength(1)
+    expect(tabs).toHaveLength(4)
     expect(group!.querySelectorAll(`[${TAB_CLOSE_ATTR}]`)).toHaveLength(1)
   })
 
@@ -202,7 +202,7 @@ describe('syncSessionToolsRow（同步）', () => {
     syncSessionToolsRow(root, fakeDoc(), h.value, {})
     syncSessionToolsRow(root, fakeDoc(), h.value, {})
     const group = root.querySelector(`[${GROUP_ATTR}]`)
-    expect(group!.querySelectorAll(`[${TAB_ATTR}]`)).toHaveLength(1)
+    expect(group!.querySelectorAll(`[${TAB_ATTR}]`)).toHaveLength(4)
   })
 })
 
@@ -234,7 +234,7 @@ describe('自反馈护栏（2026-11-07 一核空转现场）', () => {
     snap = snapshotOf([localTab('t1', 'a.md'), localTab('t2', 'b.md')], 't2')
     syncSessionToolsRow(root, doc, h.value, {})
     expect(log.length).toBeGreaterThan(0)
-    expect(root.querySelectorAll(`[${TAB_ATTR}]`)).toHaveLength(2) // 只剩文件标签（工具入口是宿主视图）
+    expect(root.querySelectorAll(`[${TAB_ATTR}]`)).toHaveLength(5) // 3 个种类启动器 + 2 个文件标签
     expect(root.querySelectorAll(`[${TAB_CLOSE_ATTR}]`)).toHaveLength(2)
   })
 })
@@ -266,9 +266,11 @@ describe('handleToolsRowClick（点击路由）', () => {
     expect(actions).toEqual(['close:s1:t1'])
   })
 
-  it('工具入口不再由我们画（交给宿主会话视图那一行）', () => {
-    const { group } = build()
-    expect(group.querySelectorAll(`[${TAB_KIND_ATTR}]`)).toHaveLength(0)
+  it('点种类启动器 → openKind', () => {
+    const { group, actions, value } = build()
+    const kindTab = group.querySelectorAll(`[${TAB_KIND_ATTR}]`)[1]!
+    handleToolsRowClick({ target: kindTab, preventDefault: () => {}, stopPropagation: () => {} } as never, value)
+    expect(actions).toEqual(['kind:s1:browser'])
   })
 
   it('工具激活时点宿主标签 → 先回对话，不吞事件', () => {
@@ -313,22 +315,5 @@ describe('工具标签行的按钮样式', () => {
     const css = readFileSync(new URL('../src/conversation-tools.module.css', import.meta.url), 'utf8')
     expect(css).toContain('[data-chat-tools-chat-button]')
     expect(css).toContain("[data-chat-tools-tab][aria-selected=true]")
-  })
-})
-
-describe('工具注册成宿主会话视图', () => {
-  it('三个工具注册进 conversation.view 座位，id 带包名前缀（不与别的插件撞名）', () => {
-    const source = readFileSync(new URL('../src/tool-views.tsx', import.meta.url), 'utf8')
-    expect(source).toContain('conversation.view')
-    expect(source).toContain('chat-power-files')
-    expect(source).toContain('chat-power-browser')
-    expect(source).toContain('chat-power-terminal')
-    const tools = readFileSync(new URL('../src/conversation-tools.tsx', import.meta.url), 'utf8')
-    expect(tools).toContain('registerToolViews')
-  })
-  it('我们不再自己画那三个入口（宿主那一行统一画）', () => {
-    const source = readFileSync(new URL('../src/tools-tabs.ts', import.meta.url), 'utf8')
-    const body = source.slice(source.indexOf('group.replaceChildren()'), source.indexOf('group.replaceChildren()') + 600)
-    expect(body).not.toContain('for (const kind of [')
   })
 })
