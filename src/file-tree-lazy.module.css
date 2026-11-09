@@ -32,6 +32,20 @@
   flex: none;
 }
 
+/* 编辑钮默认隐藏，悬停（或键盘聚焦）所在行时才出现。
+   提高优先级：盖过装饰样式里的「触屏常显」分支，桌面上不常驻。 */
+.item > [data-chat-file-edit] {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.item:hover > [data-chat-file-edit],
+.item:focus-within > [data-chat-file-edit],
+.item > [data-chat-file-edit]:focus-visible {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
 .row {
   display: flex;
   align-items: center;
