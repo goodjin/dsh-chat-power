@@ -163,6 +163,8 @@ export const CAPPED_ATTR = 'data-chat-power-capped'
 
 /** 插件插在输出框左上角的文案（思考 / 工具调用 / 回答）。 */
 export const FRAME_LABEL_ATTR = 'data-chat-power-frame-label'
+/** 框下面的行被钉住时的标记。 */
+export const PINNED_ATTR = 'data-chat-power-pinned'
 
 /** 限高时给会话区留的余量（框底到输入框之间的间距）。 */
 const HEIGHT_MARGIN = 42
@@ -434,24 +436,41 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
   }
 
   /**
-   * 认出宿主那排点赞/点踩按钮，交给样式摆到回答框的标题栏里。
+   * 框下面的行（底部文件块、点赞那排）：当前轮的框还在视野里时，钉在可视区
+   * 底部（输入框上方），像输入框一样一直在；框滚出视野就取消钉住，跟着内容
+   * 滚走。
    *
-   * 宿主把它们画在答案下面；我们只做标记（按 `aria-pressed` 认，不看文案），
-   * 位置交给 CSS。
+   * 钉住用 sticky（保持文档占位，限高计算不受影响）；多条时自下而上垒，
+   * 底部从输入框的高度起算（内联样式，随同步与滚动更新）。
    */
-  const markFeedbackRow = (record: TurnRecord): void => {
-    for (const row of record.rows) {
-      const like = row.querySelector('button[aria-pressed]')
-      if (like === null) continue
-      const holder = like.parentElement
-      if (holder === null) continue
-      holder.setAttribute('data-chat-power-feedback', '')
-      // 宿主把这排按钮画在答案**外面**（和文件块一样是独立的一行）。
-      // 要它进标题栏，就把它挪进答案卡的标题栏里——只挪这一处稳定的元素，
-      // 每次同步都校正一次：宿主重绘后会自动归位。
-      const header = row.querySelector('[data-answer-header]')
-      if (header === null) continue
-      if (holder.parentElement !== header) header.append(holder)
+  /** 输入框的可见高度（钉住的行要从它上面起算）。 */
+  const composerHeight = (container: Element): number => {
+    const composer = container.querySelector('[data-composer-seat]')
+    return composer === null ? 0 : composer.getBoundingClientRect().height
+  }
+
+  const pinRowsBelowFrame = (record: TurnRecord, container: Element): void => {
+    const framed = record.rows.find(row => row.hasAttribute(CAPPED_ATTR))
+    const below = record.rows.filter(row => {
+      if (row === framed || row.hasAttribute(GROUP_HIDDEN_ATTR)) return false
+      return framed !== undefined && (framed.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
+    })
+    if (framed === undefined) { for (const row of below) row.removeAttribute(PINNED_ATTR); return }
+    const frameRect = framed.getBoundingClientRect()
+    const viewRect = container.getBoundingClientRect()
+    // 框还有一截在视野里 → 钉住；整框滚出去了 → 回到原位跟着滚走。
+    const visible = frameRect.bottom > viewRect.top + 1
+    let offset = composerHeight(container)
+    for (let index = below.length - 1; index >= 0; index -= 1) {
+      const row = below[index]!
+      if (visible) {
+        row.setAttribute(PINNED_ATTR, '')
+        row.style.setProperty('bottom', `${Math.round(offset)}px`)
+        offset += row.getBoundingClientRect().height
+      } else {
+        row.removeAttribute(PINNED_ATTR)
+        row.style.removeProperty('bottom')
+      }
     }
   }
 
@@ -780,11 +799,16 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
         yieldGroupHeadToThinking(record)
         applyCaps(record, availableHeight(container, record))
         applyProcessHint(record, captureProcessHint(record))
-        markFeedbackRow(record)
+        pinRowsBelowFrame(record, container)
         markFrameState(record)
         continue
       }
       ensureStrip(record, firstRow)
+      for (const row of record.rows) {
+        if (!row.hasAttribute(PINNED_ATTR)) continue
+        row.removeAttribute(PINNED_ATTR)
+        row.style.removeProperty('bottom')
+      }
       setCollapsed(record, record.collapsed)
       if (record.collapsed) {
         clearCaps(record)
@@ -817,8 +841,12 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
   /** 把观察器挂到当前滚动容器；容器换了（切会话/重渲染）就重挂。 */
   const attachTo = (container: Element): void => {
     stopObserving?.()
+    observedContainer?.removeEventListener('scroll', scheduleSync)
     observedContainer = container
     stopObserving = observe(container, () => { scheduleSync() })
+    if (typeof container.addEventListener === 'function') {
+      container.addEventListener('scroll', scheduleSync, { passive: true })
+    }
     const composer = container.querySelector('[data-composer-seat]')
     composerObserver?.disconnect()
     composerObserver = undefined
@@ -858,6 +886,7 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     composerObserver = undefined
     if (retryTimer !== undefined && typeof window !== 'undefined') window.clearInterval(retryTimer)
     retryTimer = undefined
+    observedContainer?.removeEventListener('scroll', scheduleSync)
     if (typeof window !== 'undefined') window.removeEventListener('resize', onViewportChange)
     for (const record of records.values()) {
       record.strip?.remove()

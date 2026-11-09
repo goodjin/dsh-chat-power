@@ -174,24 +174,11 @@
   white-space: nowrap;
 }
 
-/* 点赞/点踩那排按钮：宿主画在答案下面。
-   贴到框顶跟着标题栏走；若它本来就在答案卡里，就摆进标题栏右侧（编辑/复制前面）。 */
-[data-chat-power-feedback] {
+/* 框下面的行（底部文件块、点赞那排）：当前轮的框还在视野里时钉在可视区
+   底部（输入框上方），像输入框一样一直在；框滚出视野就跟着内容滚走。
+   bottom 由 DOM 层按输入框高度与各自行高现算（内联样式）。 */
+[data-chat-power-pinned] {
   position: sticky;
-  top: 0;
   z-index: 2;
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 0 12px 2px;
   background: var(--dsw-alias-bg-layer-1, transparent);
-}
-
-/* 挪进标题栏之后：跟编辑/复制按钮并排，靠右。 */
-[data-answer-header] [data-chat-power-feedback] {
-  position: static;
-  margin-left: auto;
-  padding: 0;
-  background: transparent;
-  z-index: auto;
 }
