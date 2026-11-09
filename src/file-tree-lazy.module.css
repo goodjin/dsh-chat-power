@@ -12,11 +12,15 @@
 .list {
   list-style: none;
   margin: 0;
-  padding: 0 0 0 12px;
+  padding: 0 0 0 14px;
+  /* 缩进参考线：子层左侧一条竖线，层级关系一眼可读。 */
+  border-left: 1px solid var(--dsw-alias-border-l2, rgba(127, 127, 127, 0.16));
+  margin-left: 6px;
 }
 
 .item {
   margin: 0;
+  border-radius: var(--dsw-radius-sm, 4px);
   /* 勾选框、行、编辑钮排成一行：装饰控件挂在 li 上，不排 flex 就会各自换行。 */
   display: flex;
   align-items: center;
@@ -42,6 +46,36 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
+}
+
+/* 树形标识：展开/收起箭头（展开时转向下）、文件夹与文件图标。 */
+.caret {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  color: var(--dsw-alias-label-tertiary, inherit);
+  transition: transform 0.15s ease;
+}
+
+.caret[data-open] {
+  transform: rotate(90deg);
+}
+
+.icon {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  color: var(--dsw-alias-label-secondary, inherit);
+}
+
+/* 目录行整行淡色（子项的缩进参考线从它下面延伸）。 */
+li[data-files-entry='directory'] > .row {
+  color: var(--dsw-alias-label-secondary, inherit);
+}
+
+/* 编辑钮靠最右（紧跟文件名时往右推到底）。 */
+.item > [data-chat-file-edit] {
+  margin-left: auto;
 }
 
 .row:hover {

@@ -92,3 +92,17 @@
 [data-chat-tools-group] > [data-chat-tools-tab] {
   flex: none;
 }
+
+/* 工具标签里的编辑卡：占满工具区可用高度（文本域随卡片拉伸）。
+   之前卡片高度按内容自适应，编辑长文件时高度不够。 */
+[data-chat-tools-session] .body > [data-compose-card] {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+[data-chat-tools-session] .body > [data-compose-card] textarea[data-local-file-text] {
+  flex: 1 1 auto;
+  min-height: 0;
+}
