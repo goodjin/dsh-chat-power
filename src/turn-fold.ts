@@ -712,7 +712,9 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
   const alignCurrentTurnToTop = (record: TurnRecord, container: Element): void => {
     const scrollable = container as HTMLElement
     if (typeof scrollable.scrollTop !== 'number') return
-    const anchor = record.requestBar ?? record.rows[0]
+    // 吸顶对象：回答框已出现时对齐**回答框**（不是请求条）。
+    const anchor =
+      record.rows.find(row => row.hasAttribute(CAPPED_ATTR)) ?? record.requestBar ?? record.rows[0]
     if (anchor === undefined) return
     const target = scrollTopForTurnTop(
       anchor.getBoundingClientRect().top,
@@ -770,6 +772,13 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
         record.strip?.remove()
         record.strip = undefined
         if (record.collapsed) setCollapsed(record, false)
+        // 回答框已出现（上一轮限高标记还在）：收起请求——请求行与请求条都藏起，
+        // 回答框顶到最上，底下的点赞行与文件块才留得住（限高会给它们让位）。
+        if (record.rows.some(row => row.hasAttribute(CAPPED_ATTR)) && !record.requestCollapsed) {
+          record.requestCollapsed = true
+          pendingAlign = true
+        }
+        if (record.requestCollapsed) record.requestBar?.setAttribute(REQUEST_HIDDEN_ATTR, '')
         ensureRequestBar(record)
         collapseThinking(record)
         yieldGroupHeadToThinking(record)
