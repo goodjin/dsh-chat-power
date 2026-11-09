@@ -338,7 +338,7 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     let above = 0
     let below = 0
     if (record !== undefined) {
-      const framed = record.rows.find(row => row.hasAttribute(CAPPED_ATTR))
+      const framed = record.rows.map(frameBoxOf).find(box => box.hasAttribute(CAPPED_ATTR))
       if (framed !== undefined) {
         above = aboveFrameHeight(record, framed)
         below = belowFrameHeight(framed, container)
@@ -369,12 +369,13 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
    *
    * 可用高度要把它们扣掉，否则框的底边会伸到输入框下面（底部被压住）。
    */
-  const aboveFrameHeight = (record: TurnRecord, framed: HTMLElement): number => {
+  const aboveFrameHeight = (record: TurnRecord, framedBox: HTMLElement): number => {
     let total = record.requestBar?.offsetHeight ?? 0
     for (const row of record.rows) {
-      if (row === framed) continue
+      const box = frameBoxOf(row)
+      if (box === framedBox) continue
       // 只算排在框前面的行（文档顺序）。
-      if ((row.compareDocumentPosition(framed) & Node.DOCUMENT_POSITION_FOLLOWING) === 0) continue
+      if ((box.compareDocumentPosition(framedBox) & Node.DOCUMENT_POSITION_FOLLOWING) === 0) continue
       total += row.getBoundingClientRect().height
     }
     return total
@@ -718,7 +719,7 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     if (typeof scrollable.scrollTop !== 'number') return
     // 吸顶对象：回答框已出现时对齐**回答框**（不是请求条）。
     const anchor =
-      record.rows.find(row => row.hasAttribute(CAPPED_ATTR)) ?? record.requestBar ?? record.rows[0]
+      record.rows.map(frameBoxOf).find(box => box.hasAttribute(CAPPED_ATTR)) ?? record.requestBar ?? record.rows[0]
     if (anchor === undefined) return
     const target = scrollTopForTurnTop(
       anchor.getBoundingClientRect().top,
@@ -778,7 +779,7 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
         if (record.collapsed) setCollapsed(record, false)
         // 回答框已出现（上一轮限高标记还在）：收起请求——请求行与请求条都藏起，
         // 回答框顶到最上，底下的点赞行与文件块才留得住（限高会给它们让位）。
-        if (record.rows.some(row => row.hasAttribute(CAPPED_ATTR)) && !record.requestCollapsed) {
+        if (record.rows.some(row => frameBoxOf(row).hasAttribute(CAPPED_ATTR)) && !record.requestCollapsed) {
           record.requestCollapsed = true
           pendingAlign = true
         }
