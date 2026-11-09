@@ -444,30 +444,22 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
       if (row === framed || row.hasAttribute(GROUP_HIDDEN_ATTR)) return false
       return framed !== undefined && (framed.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
     })
-    const cleanup = (row: HTMLElement): void => {
-      row.removeAttribute(PINNED_ATTR)
-      for (const prop of ['left', 'width', 'bottom', 'margin-bottom']) row.style.removeProperty(prop)
-    }
-    if (framed === undefined) { for (const row of below) cleanup(row); return }
+    if (framed === undefined) { for (const row of below) row.removeAttribute(PINNED_ATTR); return }
     const frameRect = framed.getBoundingClientRect()
     const viewRect = container.getBoundingClientRect()
     // 框还有一截在视野里 → 钉住；整框滚出去了 → 回到原位跟着滚走。
     const visible = frameRect.bottom > viewRect.top + 1
-    // 自下而上垒：最靠下的行贴着输入框，上面的行依次往上叠。
-    let stack = composerHeight(container)
+    let offset = composerHeight(container)
     for (let index = below.length - 1; index >= 0; index -= 1) {
       const row = below[index]!
-      if (!visible) { cleanup(row); continue }
-      const rect = row.getBoundingClientRect()
-      // 固定定位：贴着会话区底部（输入框上方），宽度与滚动区对齐。
-      const bottom = window.innerHeight - viewRect.bottom + stack
-      row.setAttribute(PINNED_ATTR, '')
-      row.style.setProperty('left', `${Math.round(viewRect.left)}px`)
-      row.style.setProperty('width', `${Math.round(viewRect.width)}px`)
-      row.style.setProperty('bottom', `${Math.round(bottom)}px`)
-      // fixed 脱离文档流：留等高原占位，滚动高度与限高计算都不跳变。
-      row.style.setProperty('margin-bottom', `${Math.round(rect.height)}px`)
-      stack += rect.height
+      if (visible) {
+        row.setAttribute(PINNED_ATTR, '')
+        row.style.setProperty('bottom', `${Math.round(offset)}px`)
+        offset += row.getBoundingClientRect().height
+      } else {
+        row.removeAttribute(PINNED_ATTR)
+        row.style.removeProperty('bottom')
+      }
     }
   }
 

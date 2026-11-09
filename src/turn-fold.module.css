@@ -178,9 +178,7 @@
    底部（输入框上方），像输入框一样一直在；框滚出视野就跟着内容滚走。
    bottom 由 DOM 层按输入框高度与各自行高现算（内联样式）。 */
 [data-chat-power-pinned] {
-  position: fixed;
-  z-index: 3;
+  position: sticky;
+  z-index: 2;
   background: var(--dsw-alias-bg-layer-1, transparent);
-  border-top: 1px solid var(--dsw-alias-border-l2, rgba(127, 127, 127, 0.16));
-  padding: 4px 12px;
 }
