@@ -436,8 +436,12 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
    */
   const markFeedbackRow = (record: TurnRecord): void => {
     for (const row of record.rows) {
-      const like = row.querySelector('button[aria-pressed]')
-      if (like === null) continue
+      // 只认答案框**外面**的点赞/点踩钮（代码块工具栏的换行开关也带
+      // aria-pressed，且在框内——不能误认，否则整个工具栏会被搬进标题栏）。
+      const like = Array.from(row.querySelectorAll('button[aria-pressed]'))
+        .filter(button => button.closest('[data-chat-power-frame-box]') === null)
+        .at(-1)
+      if (like === undefined) continue
       const holder = like.parentElement
       if (holder === null) continue
       holder.setAttribute('data-chat-power-feedback', '')
