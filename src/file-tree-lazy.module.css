@@ -36,8 +36,10 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  flex: 1 1 auto;
+  /* 跟着文件名走（自适应宽度，过长才省略），编辑钮紧随其后。 */
+  flex: 0 1 auto;
   min-width: 0;
+  max-width: 100%;
   padding: 3px 6px;
   border: none;
   border-radius: var(--dsw-radius-sm, 4px);
@@ -73,10 +75,7 @@ li[data-files-entry='directory'] > .row {
   color: var(--dsw-alias-label-secondary, inherit);
 }
 
-/* 编辑钮靠最右（紧跟文件名时往右推到底）。 */
-.item > [data-chat-file-edit] {
-  margin-left: auto;
-}
+
 
 .row:hover {
   background: var(--dsw-alias-interactive-bg-hover, transparent);

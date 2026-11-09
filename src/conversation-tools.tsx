@@ -152,6 +152,8 @@ export function registerConversationTools(ctx: any) {
     const s = useSyncExternalStore(toolsState.subscribe, () => toolsState.get(id ?? ''), () => toolsState.get(id ?? ''))
     const activeTab = s.tabs.find(t => t.id === s.active)
     const toolActive = activeTab !== undefined && activeTab.kind !== 'chat'
+    // 编辑标签（edit://）打开：连输入框一起隐藏，编辑卡距底 20px。
+    const editorActive = toolActive && activeTab !== undefined && activeTab.kind === 'local' && activeTab.contentId.startsWith('edit://')
     const [mounts, setMounts] = useState<{ button: HTMLElement | null; body: HTMLElement; content: Element | null } | null>(null)
     const [reference, setReference] = useState<any>(null)
     useEffect(() => {
@@ -244,9 +246,15 @@ export function registerConversationTools(ctx: any) {
         : toolHiddenNodes(scroll, body, toolActive).filter((node): node is HTMLElement =>
             node instanceof HTMLElement)
       let guard: MutationObserver | undefined
+      let hiddenComposer: HTMLElement | undefined
       if (toolActive && id) {
         for (const node of messages) hider.hide(node)
         body.dataset.chatStripLive = ''
+        if (editorActive) {
+          body.dataset.chatEditorLive = ''
+          const composer = content?.querySelector<HTMLElement>('[data-composer-seat]') ?? null
+          if (composer !== null) { composer.style.display = 'none'; hiddenComposer = composer }
+        }
         // 兜底：工具标签激活期间宿主补渲染的新视图节点也要收起。
         if (scroll !== null && typeof MutationObserver !== 'undefined') {
           guard = new MutationObserver(records => {
@@ -260,12 +268,15 @@ export function registerConversationTools(ctx: any) {
         }
       } else {
         delete body.dataset.chatStripLive
+        delete body.dataset.chatEditorLive
       }
       return () => {
         guard?.disconnect()
+        hiddenComposer?.style.removeProperty('display')
+        delete body.dataset.chatEditorLive
         hider.restore()
       }
-    }, [mounts, toolActive, id])
+    }, [mounts, toolActive, id, editorActive])
     if (!mounts) return null
     return <>
       {reference && reference.id === id && createPortal(
