@@ -420,6 +420,12 @@ export function registerConversationTools(ctx: any) {
       let node: Element | null = target
       let path: string | undefined
       while (node !== null) {
+        // 锚点：markdown 文档链接（相对工作区路径）→ 会话区打开；网页链接放行。
+        if (node.tagName === 'A') {
+          const href = node.getAttribute('href') ?? ''
+          if (/^(https?:|mailto:|javascript:|#)/i.test(href)) return
+          if (href !== '') { path = pathFrom(href); break }
+        }
         const found = addressAt(node)
         if (found !== undefined && found !== '') { path = found; break }
         node = node.parentElement
