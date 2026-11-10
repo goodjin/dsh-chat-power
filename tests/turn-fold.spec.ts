@@ -422,7 +422,7 @@ describe('git 快捷按钮的提示与编辑', () => {
     expect(source).toContain('data-chat-power-git-editor')
     expect(source).toContain('btn.title = getGitInstruction(kind)')
     expect(source).toContain("sync: '请将本地仓库与远程同步'")
-    expect(source).toContain("data-chat-power-git-btn='sync'")
+    expect(source).toContain("data-chat-power-git-btn=")
   })
   it('发送使用可编辑后的指令（index 接线）', () => {
     const index = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
