@@ -222,3 +222,65 @@
   background: var(--dsw-alias-interactive-bg-hover, rgba(127, 127, 127, 0.12));
   color: var(--dsw-alias-label-primary, inherit);
 }
+
+/* git 按钮组：作为编辑浮层的锚点（相对定位）。 */
+[data-chat-power-git-actions] {
+  position: relative;
+}
+
+/* 指令编辑浮层：三条指令各一行，保存后按钮 tooltip 同步更新。 */
+[data-chat-power-git-editor] {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 320px;
+  padding: 10px;
+  border: 1px solid var(--dsw-alias-border-l2, rgba(127, 127, 127, 0.2));
+  border-radius: var(--dsw-radius-md, 8px);
+  background: var(--dsw-alias-bg-layer-1, transparent);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+}
+
+[data-chat-power-git-editor] [data-chat-power-git-row] {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+[data-chat-power-git-editor] [data-chat-power-git-row] > span {
+  color: var(--dsw-alias-label-secondary, inherit);
+  font-size: 11px;
+}
+
+[data-chat-power-git-editor] textarea {
+  min-height: 44px;
+  padding: 6px 8px;
+  border: 1px solid var(--dsw-alias-border-l2, rgba(127, 127, 127, 0.2));
+  border-radius: var(--dsw-radius-sm, 4px);
+  background: var(--dsw-alias-bg-layer-1, transparent);
+  color: var(--dsw-alias-label-primary, inherit);
+  font: inherit;
+  font-size: 12px;
+  resize: vertical;
+}
+
+[data-chat-power-git-editor] [data-chat-power-git-editor-actions] {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+[data-chat-power-git-editor] button {
+  padding: 3px 10px;
+  border: 1px solid var(--dsw-alias-border-l2, rgba(127, 127, 127, 0.2));
+  border-radius: var(--dsw-radius-sm, 4px);
+  background: transparent;
+  color: var(--dsw-alias-label-primary, inherit);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}

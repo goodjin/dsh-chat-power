@@ -17,7 +17,7 @@ import { registerSessionIdBar } from './session-id-bar/index.js'
 import { startMermaidDiagrams } from './mermaid.ts'
 import { injectTablePadCss } from './table-pad.ts'
 import { injectUiThemeCss } from './ui-theme.ts'
-import { startTurnFold } from './turn-fold.ts'
+import { getGitInstruction, startTurnFold } from './turn-fold.ts'
 import { createMarkdownTurnReaders } from './markdown-turn-sources.ts'
 import { registerSelectionToolbar } from './selection-toolbar.tsx'
 import { startMultiSelectPanel } from './selection-actions.ts'
@@ -79,16 +79,11 @@ export function apply(ctx: PluginContext): void {
   try {
     // 轮次折叠与当前轮限高：新一轮开始时历史轮折叠成摘要条，当前轮不超过一屏。
     // 纯 DOM 增强（加属性、插自己的摘要条），失败只损失这个观感。
-    // git 快捷指令（发文本给会话，由 agent 按自己的门禁执行）。
-    const gitInstructions: Record<string, string> = {
-      commit: '请将当前改动提交到本地仓库（commit）。',
-      merge: '请将当前分支合并回 main（merge）。',
-      push: '请推送远程仓库（push）。',
-    }
+    // git 快捷指令（发文本给会话，由 agent 按自己的门禁执行；文案可在按钮旁编辑）。
     const disposeTurnFold = startTurnFold({
       t: fallbackT,
       onGitAction: (sessionId, action) => {
-        const text = gitInstructions[action] ?? ''
+        const text = getGitInstruction(action)
         if (text === '') return
         const readers = createMarkdownTurnReaders(() => ctx.get('remote'))
         void readers.sendToSession(sessionId, text).catch((error: unknown) => {

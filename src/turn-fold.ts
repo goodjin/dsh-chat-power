@@ -187,10 +187,29 @@ interface TurnRecord {
 
 /** 折叠控制器的可注入面（便于测试与宿主差异适配）。 */
 /** git 快捷动作的种类。 */
-export type GitAction = 'commit' | 'merge' | 'push'
+export type GitAction = 'commit' | 'merge' | 'sync'
 
 /** git 按钮的文案（git 动词保持英文习惯）。 */
-const GIT_LABELS: Record<GitAction, string> = { commit: 'Commit', merge: 'Merge', push: 'Push' }
+const GIT_LABELS: Record<GitAction, string> = { commit: 'Commit', merge: 'Merge', sync: 'Sync' }
+
+/** 各动作当前会发送的指令（可经编辑钮修改；页内有效）。 */
+const gitInstructionStore: Record<GitAction, string> = {
+  commit: '请将当前改动提交到本地仓库（commit）。',
+  merge: '请将当前分支合并回 main（merge）。',
+  sync: '请将本地仓库与远程同步：先拉取远端更新，再推送本地提交。',
+}
+
+/** 某动作当前会发送的指令（按钮 tooltip 与发送都用它）。 */
+export function getGitInstruction(action: GitAction): string {
+  return gitInstructionStore[action] ?? ''
+}
+
+function setGitInstruction(action: GitAction, text: string): void {
+  gitInstructionStore[action] = text
+}
+
+/** 编辑浮层的铅笔图标。 */
+const PENCIL_SVG = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M11.2 2.2a1.6 1.6 0 0 1 2.6 2.6L6 12.5l-3.5.9.9-3.5 7.8-7.7Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>'
 
 export interface TurnFoldOptions {
   /** 聊天滚动容器；缺省按 `[data-conversation-scroll]` 查。 */
@@ -460,17 +479,30 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
         if (sessionId !== '') {
           const bar = document.createElement('span')
           bar.setAttribute('data-chat-power-git-actions', '')
-          for (const kind of ['commit', 'merge', 'push'] as const) {
+          for (const kind of ['commit', 'merge', 'sync'] as const) {
             const btn = document.createElement('button')
             btn.setAttribute('type', 'button')
             btn.setAttribute('data-chat-power-git-btn', kind)
             btn.textContent = GIT_LABELS[kind]
+            // tooltip：悬停展示这条按钮会发送的指令内容。
+            btn.title = getGitInstruction(kind)
             btn.addEventListener('click', event => {
               event.stopPropagation()
               options.onGitAction?.(sessionId, kind)
             })
             bar.append(btn)
           }
+          // 编辑钮：打开浮层修改各按钮会发送的指令。
+          const edit = document.createElement('button')
+          edit.setAttribute('type', 'button')
+          edit.setAttribute('data-chat-power-git-edit', '')
+          edit.title = '编辑指令'
+          edit.insertAdjacentHTML('afterbegin', PENCIL_SVG)
+          edit.addEventListener('click', event => {
+            event.stopPropagation()
+            toggleGitEditor(bar)
+          })
+          bar.append(edit)
           holder.append(bar)
         }
       }
@@ -481,6 +513,55 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
       if (header === null) continue
       if (holder.parentElement !== header) header.append(holder)
     }
+  }
+
+  /** 打开/关闭指令编辑浮层：三条指令各一行，保存后按钮 tooltip 同步更新。 */
+  const toggleGitEditor = (bar: HTMLElement): void => {
+    const existing = bar.querySelector('[data-chat-power-git-editor]')
+    if (existing !== null) { existing.remove(); return }
+    const editor = document.createElement('div')
+    editor.setAttribute('data-chat-power-git-editor', '')
+    for (const kind of ['commit', 'merge', 'sync'] as const) {
+      const row = document.createElement('div')
+      row.setAttribute('data-chat-power-git-row', '')
+      row.dataset['kind'] = kind
+      const label = document.createElement('span')
+      label.textContent = GIT_LABELS[kind]
+      const box = document.createElement('textarea')
+      box.value = getGitInstruction(kind)
+      row.append(label, box)
+      editor.append(row)
+    }
+    const actions = document.createElement('div')
+    actions.setAttribute('data-chat-power-git-editor-actions', '')
+    const save = document.createElement('button')
+    save.setAttribute('type', 'button')
+    save.textContent = '保存'
+    save.addEventListener('click', () => {
+      for (const row of Array.from(editor.querySelectorAll<HTMLElement>('[data-chat-power-git-row]'))) {
+        const kind = row.dataset['kind'] as GitAction
+        const box = row.querySelector('textarea')
+        if (kind === undefined || box === null) continue
+        setGitInstruction(kind, box.value)
+        const btn = bar.querySelector<HTMLElement>(`[data-chat-power-git-btn="${kind}"]`)
+        if (btn !== null) btn.title = box.value
+      }
+      editor.remove()
+    })
+    const cancel = document.createElement('button')
+    cancel.setAttribute('type', 'button')
+    cancel.textContent = '取消'
+    cancel.addEventListener('click', () => { editor.remove() })
+    actions.append(save, cancel)
+    editor.append(actions)
+    bar.append(editor)
+    const closeAway = (event: Event): void => {
+      const target = event.target as Element | null
+      if (target !== null && target.closest('[data-chat-power-git-editor]') !== null) return
+      document.removeEventListener('pointerdown', closeAway, true)
+      editor.remove()
+    }
+    document.addEventListener('pointerdown', closeAway, true)
   }
 
   const applyCaps = (record: TurnRecord, available: number): void => {
