@@ -383,28 +383,62 @@ export function registerConversationTools(ctx: any) {
   // 文件树行控件：宿主 0.2.2 起不能再包宿主面板，改为在渲染出来的树上补控件。
   // 「提示词」视图：查看/编辑当前会话的系统提示词（router/worker 可编辑，普通会话只读）。
   ctx.effect(() => registerPromptView(ctx), 'chat-power: prompt view')
-  // 回答块里的文档链接：改为在会话区打开（编辑标签 ✓），不再跳右侧栏。
+  // 回答块里的文档链接（含 CSV 等文档卡片）：改为在会话区打开，不再跳右侧栏。
+  // 宿主的文档卡片不一定是 <a>：地址可能放在任意层的属性里——从点击处向上
+  // 逐层扫属性，命中文件资源地址即在会话区打开。
   ctx.effect(() => {
     if (typeof document === 'undefined') return () => {}
-    const onClick = (event: Event): void => {
+    const pathFrom = (value: string): string => {
+      let path = value
+      const idx = path.indexOf('dsh-resource://file/')
+      if (idx >= 0) path = path.slice(idx + 'dsh-resource://file/'.length)
+      else if (path.startsWith('file://')) path = path.slice('file://'.length)
+      try { path = decodeURIComponent(path) } catch { /* 保留原文 */ }
+      return path.replace(/^\/+/, '')
+    }
+    const addressAt = (node: Element): string | undefined => {
+      for (const attr of Array.from(node.attributes)) {
+        const value = attr.value
+        if (value.includes('dsh-resource://file/') || value.startsWith('file://')) return pathFrom(value)
+        const name = attr.name.toLowerCase()
+        if ((name.includes('resource') || name.includes('textpreview')) && value !== '' && !value.startsWith('#') && !value.startsWith('http')) {
+          return pathFrom(value)
+        }
+      }
+      return undefined
+    }
+    let lastKey = ''
+    let lastAt = 0
+    const onOpen = (event: Event): void => {
       const target = event.target as Element | null
-      const link = target?.closest?.('a[href]') ?? null
-      if (link === null) return
-      // 只拦回答框里的文件资源链接；普通网页链接照旧。
-      if (link.closest('[data-chat-power-frame-box]') === null) return
-      const href = link.getAttribute('href') ?? ''
-      if (!href.startsWith('dsh-resource://file/')) return
-      const sessionId = link.closest('[data-conversation-session]')?.getAttribute('data-conversation-session') ?? ''
+      if (target === null || typeof target.closest !== 'function') return
+      if (target.closest('[data-chat-power-frame-box]') === null) return
+      let node: Element | null = target
+      let path: string | undefined
+      while (node !== null) {
+        const found = addressAt(node)
+        if (found !== undefined && found !== '') { path = found; break }
+        node = node.parentElement
+      }
+      if (path === undefined || path === '') return
+      const sessionId = target.closest('[data-conversation-session]')?.getAttribute('data-conversation-session') ?? ''
       if (sessionId === '') return
       event.preventDefault()
       event.stopPropagation()
-      const raw = href.slice('dsh-resource://file/'.length)
-      let path = raw
-      try { path = decodeURIComponent(raw) } catch { /* 保留原文 */ }
+      const key = sessionId + '|' + path
+      const now = Date.now()
+      if (key === lastKey && now - lastAt < 800) return
+      lastAt = now
+      lastKey = key
       openWorkspaceEditor(sessionId, path)
     }
-    document.addEventListener('click', onClick, true)
-    return () => { document.removeEventListener('click', onClick, true) }
+    // 捕获阶段、pointerdown 与 click 都拦：宿主可能绑在任意一处。
+    document.addEventListener('pointerdown', onOpen, true)
+    document.addEventListener('click', onOpen, true)
+    return () => {
+      document.removeEventListener('pointerdown', onOpen, true)
+      document.removeEventListener('click', onOpen, true)
+    }
   }, 'chat-power: answer link open')
   ctx.effect(() => attachFilesTreeAugment(augmentHandlers), 'chat-power: files tree augment')
   // One policy for ordinary HTTP links across the application. Explicit modifiers
