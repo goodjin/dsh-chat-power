@@ -1,46 +1,50 @@
 /**
- * 展开大编辑区的纯逻辑：高度夹取、草稿快照解析。
+ * 输入框「大编辑区」的纯逻辑：大编辑区判定、回车改写判定。
  *
- * 只钉不依赖 DOM / React 的决策部分；整组件的展开 / 换行 / 发送行为在
- * `expand-editor-dom.spec.ts`（真 react-dom + jsdom）里钉。
+ * 只钉不依赖 DOM / React 的决策部分；整组件浮钮 / 回车拦截在
+ * `expand-editor.dom.spec.ts`（真 react-dom + jsdom）里钉。
  */
 import { describe, expect, it } from 'vitest'
-import { clampEditorHeight, draftTextOf, EXPAND_EDITOR_MAX_PX, EXPAND_EDITOR_MIN_PX } from '../src/expand-editor.tsx'
+import { isBigMode, shouldRedirectEnterToNewline } from '../src/expand-editor.tsx'
 
-describe('clampEditorHeight', () => {
-  it('内容小于下限时夹到下限（约 8 行）', () => {
-    expect(clampEditorHeight(10)).toBe(EXPAND_EDITOR_MIN_PX)
-    expect(clampEditorHeight(0)).toBe(EXPAND_EDITOR_MIN_PX)
-    expect(clampEditorHeight(-500)).toBe(EXPAND_EDITOR_MIN_PX)
+describe('isBigMode', () => {
+  it('hero 阶段（新会话）天然是大编辑区，与卡片类名无关', () => {
+    expect(isBigMode(null, 'hero')).toBe(true)
+    expect(isBigMode({} as Element, 'hero')).toBe(true)
   })
 
-  it('内容在区间内时原样返回（随内容撑高）', () => {
-    expect(clampEditorHeight(240)).toBe(240)
-    expect(clampEditorHeight(360)).toBe(360)
+  it('非 hero 时，只有卡片挂了展开标记才算大编辑区', () => {
+    const card = { classList: { contains: (c: string) => c === 'dshcp-big' } } as unknown as Element
+    expect(isBigMode(card, 'composer')).toBe(true)
+    expect(isBigMode(card, 'active')).toBe(true)
   })
 
-  it('内容超过上限时夹到上限（约 20 行，再多就内部滚动）', () => {
-    expect(clampEditorHeight(2000)).toBe(EXPAND_EDITOR_MAX_PX)
-    expect(clampEditorHeight(100000)).toBe(EXPAND_EDITOR_MAX_PX)
-  })
-
-  it('非有限值退回下限，不写进 NaN 高度', () => {
-    expect(clampEditorHeight(Number.NaN)).toBe(EXPAND_EDITOR_MIN_PX)
-    expect(clampEditorHeight(Number.POSITIVE_INFINITY)).toBe(EXPAND_EDITOR_MIN_PX)
-    expect(clampEditorHeight(Number.NEGATIVE_INFINITY)).toBe(EXPAND_EDITOR_MIN_PX)
+  it('非 hero 且卡片未展开 → 不是大编辑区（宿主小框回车行为原样保留）', () => {
+    const card = { classList: { contains: () => false } } as unknown as Element
+    expect(isBigMode(card, 'composer')).toBe(false)
+    expect(isBigMode(card, undefined)).toBe(false)
+    expect(isBigMode(null, 'composer')).toBe(false)
   })
 })
 
-describe('draftTextOf', () => {
-  it('从 { text } 快照里取正文', () => {
-    expect(draftTextOf({ text: 'hello' })).toBe('hello')
-    expect(draftTextOf({ text: '', references: [] })).toBe('')
+describe('shouldRedirectEnterToNewline', () => {
+  const base = { key: 'Enter', shiftKey: false, ctrlKey: false, metaKey: false, altKey: false, defaultPrevented: false }
+
+  it('大编辑区里的裸回车 → 改写为换行', () => {
+    expect(shouldRedirectEnterToNewline(base, false)).toBe(true)
   })
 
-  it('不是草稿形状时返回空串，不抛错', () => {
-    expect(draftTextOf(null)).toBe('')
-    expect(draftTextOf('hello')).toBe('')
-    expect(draftTextOf({ references: [] })).toBe('')
-    expect(draftTextOf(undefined)).toBe('')
+  it('带修饰的回车一律放过（交给宿主 / Lexical：Shift 换行、Ctrl/Meta 发送）', () => {
+    expect(shouldRedirectEnterToNewline({ ...base, shiftKey: true }, false)).toBe(false)
+    expect(shouldRedirectEnterToNewline({ ...base, ctrlKey: true }, false)).toBe(false)
+    expect(shouldRedirectEnterToNewline({ ...base, metaKey: true }, false)).toBe(false)
+    expect(shouldRedirectEnterToNewline({ ...base, altKey: true }, false)).toBe(false)
+  })
+
+  it('输入法组词中、非回车键、已被处理的键 → 放过', () => {
+    expect(shouldRedirectEnterToNewline({ ...base, isComposing: true }, true)).toBe(false)
+    expect(shouldRedirectEnterToNewline(base, true)).toBe(false)
+    expect(shouldRedirectEnterToNewline({ ...base, key: 'a' }, false)).toBe(false)
+    expect(shouldRedirectEnterToNewline({ ...base, defaultPrevented: true }, false)).toBe(false)
   })
 })

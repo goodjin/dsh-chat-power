@@ -26,6 +26,7 @@ const HOST_TOKENS: readonly string[] = [
   '--dsw-alias-button-info-hover',
   '--dsw-alias-interactive-bg-active',
   '--dsw-alias-interactive-bg-hover',
+  '--dsw-alias-interactive-bg-hover-solid',
   '--dsw-alias-label-caption',
   '--dsw-alias-label-primary',
   '--dsw-alias-label-primary-foreground',

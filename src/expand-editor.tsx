@@ -1,78 +1,166 @@
 /**
- * 会话输入框的「展开大编辑区」。
+ * 会话输入框的「大编辑区」——直接改造宿主自带的 composer，不另起第二个框。
  *
- * 宿主的 composer 是**单行、回车即发送**的文本框（用户输入大段内容时高度不够）。
- * 本模块在 composer 上方的 `conversation.input.overlay` 座位里挂一枚**向上展开**
- * 图标按钮：点击后在同一处展开一个多行编辑区——这里**回车只是换行**，必须点
- * 「发送」按钮才发。发送走与本包其它发送入口（选区「发送会话」、文件阅读区、答案
- * 卡片）同一条队列通道 `readers.sendToSession`。
+ * 宿主 composer 是单行、回车即发送的 Lexical 内容editable。本插件不做替代编辑器，
+ * 只干两件事：
  *
- * 草稿与下方小输入框共享宿主输入外壳（`conversation.input.shell` 的
- * `draftSnapshot` / `setDraft`）：展开时从小框种入、编辑即写回，收起不丢字。
- * 外壳不可达（服务未就绪 / 会话无外壳）时退回独立草稿，发送照常，只是不同步小框。
+ * 1. **把宿主 composer 撑成半屏高**。新会话（宿主 hero 阶段）默认就大、居中偏下；
+ *    普通会话时 composer 仍是小框，输入框上方一枚**向上箭头**浮钮，点一下把宿主
+ *    composer 撑成半屏（再点收起）。撑高靠全局样式命中宿主稳定锚点
+ *    （`data-composer-card` / `data-input-scroll`），不动宿主结构。
  *
- * 发送统一走 `send-actions.ts` 的控制器：空白拒绝、在途防重复、**成功才清空并收起**，
- * 失败保留正文并提示。与 ComposeCard 同一套观感（`inputClass` / `sendClass`）。
+ * 2. **大编辑区里回车换行、只有发送按钮才发**。宿主 composer 原生支持 Shift+回车
+ *    换行，但普通回车是提交。于是在「大编辑区」状态（hero 或已展开）拦掉普通回车，
+ *    合成一个 Shift+回车喂给 Lexical，让它自己插软换行——不碰 Lexical 内部节点，
+ *    宿主升级最不易坏。发送仍走宿主自己的发送按钮，草稿天然同步、发送逻辑不用重写。
+ *
+ * 箭头浮钮注册在 composer 的 `conversation.input.overlay` 座位（与本机文件卡同思路）：
+ * 该座位渲染在 composer 卡片顶部一个 0 高的绝对定位锚点里，浮钮以 `top:-40px` 浮在
+ * 卡片上沿**之外**，不压输入框文字。
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { IconChevronDownOutlineRegular, IconChevronUpOutlineRegular, IconSendOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { MarkdownTurnReaders } from './markdown-turn-sources.ts'
-import { createPortal } from 'react-dom'
-import type { RuntimeT } from './locales.ts'
-import { NAMESPACE } from './locales.ts'
-import { createSendController, type SendController } from './send-actions.ts'
-import { sendClass, statusNoticeClass } from './ui-theme.ts'
+import { IconChevronDownOutlineRegular, IconChevronUpOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
+import { NAMESPACE, type RuntimeT } from './locales.ts'
 import css from './expand-editor.module.css'
 
+/** 展开大编辑区后，挂在宿主 composer 卡片上的标记类名（全局样式据此撑高）。 */
+export const BIG_CLASS = 'dshcp-big'
+
+/** 箭头浮钮的稳定类名（全局样式据此在 hero 阶段隐藏）。 */
+export const TOGGLE_CLASS = 'dshcp-composer-toggle'
+
+/** 座位条目 id；只用自己的 id，不占别人的格子。 */
+export const EXPAND_EDITOR_ID = 'chat-power-expand-editor'
+
 /**
- * 输入外壳里 chat-power 用到的最小面（与 composer-references.ts 同一形状）。
- * `draftSnapshot` 读草稿、`setDraft` 写回；外壳不可达时整个函数返回 undefined。
+ * 当前是否处于「大编辑区」状态：宿主 hero 阶段（新会话）天然是大编辑区；
+ * 或普通会话时用户已点箭头展开（卡片挂了 `BIG_CLASS`）。
+ * 纯函数，单测钉住。
  */
-export interface InputShellFace {
-  readonly draftSnapshot: unknown
-  setDraft(draft: unknown): void
-}
-
-/** 大编辑区向会话发消息的口子（本包 `MarkdownTurnReaders` 的子集，便于测试注入）。 */
-export interface ExpandEditorReaders {
-  sendToSession(sessionId: string, text: string): Promise<void>
-}
-
-/** 展开编辑区的 props。`getShell` / `readComposerValue` 缺省即不同步小输入框。 */
-export interface ExpandEditorProps {
-  readonly sessionId: string
-  readonly t: RuntimeT
-  readonly readers: ExpandEditorReaders
-  /** 当前会话的输入外壳；读草稿、写回草稿。 */
-  readonly getShell?: (sessionId: string) => InputShellFace | undefined
-  /** 外壳不可达时的兜底种子：读小输入框的当前文本。 */
-  readonly readComposerValue?: () => string
-}
-
-/** 展开编辑区高度的下限（约 8 行，24px 行高）与上限（约 20 行）。 */
-export const EXPAND_EDITOR_MIN_PX = 192
-export const EXPAND_EDITOR_MAX_PX = 480
-
-/** 把 scrollHeight 夹进 [min, max]；非有限值退回下限。纯函数，单测钉住。 */
-export function clampEditorHeight(scrollHeight: number, min = EXPAND_EDITOR_MIN_PX, max = EXPAND_EDITOR_MAX_PX): number {
-  if (!Number.isFinite(scrollHeight)) return min
-  return Math.min(Math.max(scrollHeight, min), max)
+export function isBigMode(card: Element | null, phase: string | undefined): boolean {
+  if (phase === 'hero') return true
+  return card !== null && card.classList.contains(BIG_CLASS)
 }
 
 /**
- * 从宿主草稿快照里取正文文本。快照形状为 `{ text, references, ... }`（见
- * composer-references.ts 的 `asSnapshot`）；不是这个形状时返回空串。
+ * 普通回车是否应被改写成换行。仅「大编辑区」里的裸回车改写：Shift/Ctrl/Meta/Alt
+ * 修饰的回车、输入法组词中、已被处理过的键、非回车键一律放过，交给宿主 / Lexical。
+ * 纯函数，单测钉住。
  */
-export function draftTextOf(snapshot: unknown): string {
-  if (typeof snapshot === 'object' && snapshot !== null) {
-    const text = (snapshot as { text?: unknown }).text
-    if (typeof text === 'string') return text
+export function shouldRedirectEnterToNewline(
+  e: { key: string; shiftKey: boolean; ctrlKey: boolean; metaKey: boolean; altKey: boolean; defaultPrevented: boolean; isComposing?: boolean },
+  composing: boolean,
+): boolean {
+  if (e.defaultPrevented) return false
+  if (e.key !== 'Enter') return false
+  if (e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return false
+  if (composing || e.isComposing === true) return false
+  return true
+}
+
+/** 宿主 composer 卡片（撑高目标）。 */
+function composerCardFromDom(): HTMLElement | null {
+  return typeof document === 'undefined' ? null : document.querySelector<HTMLElement>('[data-composer-card]')
+}
+
+/** 会话内容区元素；读 `data-content-phase` 判断是否 hero（新会话）。 */
+function conversationContentFromDom(): Element | null {
+  return typeof document === 'undefined' ? null : document.querySelector('[data-conversation-content]')
+}
+
+/** 当前阶段：hero（新会话）/ composer / active / settling / undefined。 */
+function phaseFromDom(): string | undefined {
+  return conversationContentFromDom()?.getAttribute('data-content-phase') ?? undefined
+}
+
+/** 宿主 composer 的输入表面（Lexical 内容editable）；合成 Shift+回车喂给它。 */
+function composerInputFromDom(): HTMLElement | null {
+  return typeof document === 'undefined' ? null : document.querySelector<HTMLElement>('[data-composer-input]')
+}
+
+/**
+ * 在大编辑区状态下，把普通回车改写成软换行。
+ *
+ * 做法：捕获阶段拦掉宿主对这次回车的提交（`stopPropagation` 让 Lexical 的
+ * KEY_ENTER 命令永不派发），再合成一个 Shift+回车派发到输入框——Lexical 原生
+ * 就支持 Shift+回车软换行，于是走它自己的路径插换行，草稿与发送都不受影响。
+ * `inserting` 标记防止合成事件回头又被自己拦一次。
+ *
+ * @returns 清理函数。
+ */
+export function installEnterInterceptor(): () => void {
+  if (typeof document === 'undefined') return () => {}
+  let composing = false
+  let inserting = false
+  const onCompositionStart = (): void => { composing = true }
+  const onCompositionEnd = (): void => { composing = false }
+  const onKeyDown = (event: KeyboardEvent): void => {
+    if (inserting) return
+    if (!isBigMode(composerCardFromDom(), phaseFromDom())) return
+    if (!shouldRedirectEnterToNewline(event, composing)) return
+    const input = composerInputFromDom()
+    if (input === null) return
+    event.preventDefault()
+    // 阻断宿主对这次回车的提交：Lexical 的 KEY_ENTER 命令挂在输入框自身的 keydown
+    // 上，捕获阶段于 document 止传播即可让它不触发，宿主提交逻辑（keyboard.submit）因此不跑。
+    event.stopPropagation()
+    inserting = true
+    try {
+      input.dispatchEvent(new KeyboardEvent('keydown', {
+        key: 'Enter',
+        code: 'Enter',
+        shiftKey: true,
+        bubbles: true,
+        cancelable: true,
+        composed: true,
+      }))
+    } finally {
+      inserting = false
+    }
   }
-  return ''
+  document.addEventListener('compositionstart', onCompositionStart)
+  document.addEventListener('compositionend', onCompositionEnd)
+  document.addEventListener('keydown', onKeyDown, true)
+  return () => {
+    document.removeEventListener('compositionstart', onCompositionStart)
+    document.removeEventListener('compositionend', onCompositionEnd)
+    document.removeEventListener('keydown', onKeyDown, true)
+  }
 }
 
-/** 当前会话编号。composer 座位 props 不带 sessionId，从会话根节点读（与本机文件卡一致）。 */
+/**
+ * 把宿主 composer 撑成半屏高的全局样式注入页面 head。
+ *
+ * 只命中宿主稳定锚点（`data-conversation-content` / `data-composer-card` /
+ * `data-input-scroll`），不改宿主结构；颜色不写死（此处只调尺寸与布局）。
+ * 与 table-pad.ts / ui-theme.ts 同一套 data 标记去重约定。
+ */
+export const COMPOSER_SIZE_CSS = `
+[data-conversation-content][data-content-phase="hero"] [data-conversation-scroll]{justify-content:flex-end !important}
+[data-conversation-content][data-content-phase="hero"] [data-composer-card]{min-height:50vh !important;display:flex !important;flex-direction:column !important}
+[data-conversation-content][data-content-phase="hero"] [data-composer-card] [data-input-scroll]{flex:1 1 auto !important;max-height:none !important;min-height:0 !important}
+[data-composer-card].${BIG_CLASS}{min-height:50vh !important;display:flex !important;flex-direction:column !important}
+[data-composer-card].${BIG_CLASS} [data-input-scroll]{flex:1 1 auto !important;max-height:none !important;min-height:0 !important}
+[data-content-phase="hero"] .${TOGGLE_CLASS}{display:none}
+`.trim()
+
+/** 注入标记；重复注入与诊断都靠它。 */
+export const COMPOSER_SIZE_TAG = 'dsh-chat-power/composer-size'
+
+/** 注入 composer 撑高样式；已注入过则跳过，非浏览器环境安静返回。 */
+export function injectComposerSizeCss(doc?: Document): void {
+  const target = doc ?? (typeof document === 'undefined' ? undefined : document)
+  if (target === undefined) return
+  if (target.querySelector(`style[data-plugin-css="${COMPOSER_SIZE_TAG}"]`) !== null) return
+  const style = target.createElement('style')
+  style.dataset.plugin = 'dsh-chat-power'
+  style.dataset.pluginCss = COMPOSER_SIZE_TAG
+  style.textContent = COMPOSER_SIZE_CSS
+  target.head.appendChild(style)
+}
+
+/** 当前会话编号（composer 座位 props 不带，从会话根节点读；与本包其它注册一致）。 */
 function currentSessionIdFromDom(): string | undefined {
   if (typeof document === 'undefined') return undefined
   const node = document.querySelector('[data-conversation-session]')
@@ -80,162 +168,39 @@ function currentSessionIdFromDom(): string | undefined {
   return value === null || value === '' ? undefined : value
 }
 
-/** 把正文写回宿主草稿，保留已有的引用 / 引用块等字段；外壳不可达时静默。 */
-function writeDraftToShell(getShell: ExpandEditorProps['getShell'], sessionId: string, text: string): void {
-  if (getShell === undefined) return
-  let shell: InputShellFace | undefined
-  try { shell = getShell(sessionId) } catch { shell = undefined }
-  if (shell === undefined || typeof shell.setDraft !== 'function') return
-  try {
-    const snapshot = shell.draftSnapshot
-    const base = typeof snapshot === 'object' && snapshot !== null
-      ? snapshot as Record<string, unknown>
-      : {}
-    shell.setDraft({ ...base, text })
-  } catch {
-    // 外壳写回失败不影响编辑：大编辑区仍有独立草稿，发送照常。
-  }
-}
-
 /**
- * 展开大编辑区。收起时是一枚向上展开的图标按钮；展开时是一个自动撑高的多行
- * textarea + 圆形发送钮。**回车只换行**（textarea 默认行为，不挂任何 Enter→发送），
- * 只有点发送才发。
+ * 箭头浮钮。普通会话时浮在输入框上方，点了把宿主 composer 撑成半屏、再点收起；
+ * 新会话（hero）时输入框本就大，浮钮由全局样式隐藏。展开时聚焦宿主输入框。
  */
-export function ExpandEditor(props: ExpandEditorProps): ReactNode {
-  const [expanded, setExpanded] = useState(false)
-  const [text, setText] = useState('')
-  // 首次展开才种入一次草稿；之后收起再展开保留大编辑区里没发完的内容。
-  const [seeded, setSeeded] = useState(false)
-  const [pending, setPending] = useState(false)
-  const [notice, setNotice] = useState<{ seq: number; text: string } | null>(null)
-  const taRef = useRef<HTMLTextAreaElement>(null)
-  const propsRef = useRef(props)
-  propsRef.current = props
+export function ExpandEditor(props: { readonly t: RuntimeT }): ReactNode {
+  const [big, setBig] = useState(false)
   const t = props.t
 
-  const controller: SendController = useMemo(() => createSendController({
-    send: (body: string): Promise<void> => propsRef.current.readers.sendToSession(propsRef.current.sessionId, body),
-    onPendingChange: setPending,
-    onSuccess: (): void => {
-      setNotice(null)
-      setText('')
-      writeDraftToShell(propsRef.current.getShell, propsRef.current.sessionId, '')
-      setExpanded(false)
-    },
-    onFailure: (error: unknown): void => {
-      const reason = error instanceof Error ? error.message : String(error)
-      setNotice(state => ({ seq: (state?.seq ?? 0) + 1, text: `${t('markdownTurn.sendFailed')}：${reason}` }))
-    },
-  }), [t])
+  // 装上回车拦截：仅在大编辑区状态改写回车，普通小框回车的宿主行为原样保留。
+  useEffect(() => installEnterInterceptor(), [])
 
-  const hasText = text.trim() !== ''
-
-  /** 把 textarea 高度夹在 [min, max] 内自动撑高。 */
-  const autosize = (el: HTMLTextAreaElement): void => {
-    el.style.height = 'auto'
-    el.style.height = `${clampEditorHeight(el.scrollHeight)}px`
+  const toggle = (): void => {
+    const card = composerCardFromDom()
+    if (card === null) return
+    const nowBig = card.classList.toggle(BIG_CLASS)
+    setBig(nowBig)
+    if (nowBig) composerInputFromDom()?.focus()
   }
 
-  // 首次展开时从小输入框（外壳草稿优先）种入；展开后聚焦并撑高。
-  useEffect(() => {
-    if (!expanded) return
-    if (!seeded) {
-      let seed = ''
-      const getShell = propsRef.current.getShell
-      if (getShell !== undefined) {
-        try {
-          const shell = getShell(propsRef.current.sessionId)
-          if (shell !== undefined) seed = draftTextOf(shell.draftSnapshot)
-        } catch { seed = '' }
-      }
-      if (seed === '' && propsRef.current.readComposerValue !== undefined) {
-        try { seed = propsRef.current.readComposerValue() ?? '' } catch { seed = '' }
-      }
-      setText(seed)
-      setSeeded(true)
-    }
-    const el = taRef.current
-    if (el !== null) {
-      el.focus()
-      autosize(el)
-    }
-  }, [expanded, seeded])
-
-  const onChange = (event: React.ChangeEvent<HTMLTextAreaElement>): void => {
-    const value = event.target.value
-    setText(value)
-    writeDraftToShell(propsRef.current.getShell, propsRef.current.sessionId, value)
-    autosize(event.target)
-  }
-
-  const expand = (): void => { setExpanded(true) }
-
-  const editor = (
-    <div className={css.wrap} data-expand-editor="" data-collapsed="">
-      <div className={css.editorBar}>
-        <textarea
-          ref={taRef}
-          value={text}
-          onChange={onChange}
-          className={css.editor}
-          data-expand-textarea=""
-          aria-label={t('expand.editorLabel')}
-          rows={8}
-        />
-        <div className={css.actions}>
-          {notice !== null && (
-            <p key={notice.seq} className={statusNoticeClass} data-variant="error" role="alert">{notice.text}</p>
-          )}
-          <span className={css.spacer} aria-hidden="true" />
-          <button
-            type="button"
-            className={css.collapse}
-            data-expand-collapse=""
-            aria-label={t('expand.close')}
-            title={t('expand.close')}
-            onClick={() => { setExpanded(false) }}
-          >
-            <IconChevronDownOutlineRegular size={16} />
-          </button>
-          <button
-            type="button"
-            className={sendClass}
-            data-expand-send=""
-            aria-label={t('markdownTurn.send')}
-            title={t('markdownTurn.send')}
-            disabled={!hasText || pending}
-            onClick={() => { controller.submit(text) }}
-          >
-            <IconSendOutlineRegular size={20} />
-          </button>
-        </div>
-      </div>
-    </div>
+  const label = big ? t('expand.close') : t('expand.open')
+  return (
+    <button
+      type="button"
+      className={`${css.toggle} ${TOGGLE_CLASS}`}
+      data-expand-toggle=""
+      data-big={big ? '' : undefined}
+      aria-label={label}
+      title={label}
+      onClick={toggle}
+    >
+      {big ? <IconChevronDownOutlineRegular size={18} /> : <IconChevronUpOutlineRegular size={18} />}
+    </button>
   )
-
-  if (!expanded) {
-    // 收起态：一枚居中图标按钮，留在 composer overlay 座位里（薄一行，不占 composer 高度）。
-    return (
-      <div className={css.wrap} data-expand-editor="" data-collapsed="">
-        <button
-          type="button"
-          className={css.toggle}
-          data-expand-toggle=""
-          aria-label={t('expand.open')}
-          title={t('expand.open')}
-          onClick={expand}
-        >
-          <IconChevronUpOutlineRegular size={20} />
-        </button>
-      </div>
-    )
-  }
-
-  // 展开态：经 portal 挂进会话内容区（composer 之上、对话正文之后），自己占据高度，
-  // 不受宿主单行 composer 的固定高度约束——此前直接塞进 overlay 座位被 composer 压扁。
-  const target = typeof document === 'undefined' ? null : document.querySelector('[data-conversation-content]')
-  return target === null ? editor : createPortal(editor, target)
 }
 
 /** composer 座位条目宿主的最小结构类型（与本包其它注册函数一致）。 */
@@ -249,66 +214,28 @@ interface ComposerSlotHost {
   }, component: unknown): () => void
 }
 
-/** overlay 列座位里本条目的 id；只用自己的 id，不占别人的格子。 */
-export const EXPAND_EDITOR_ID = 'chat-power-expand-editor'
-
-/** overlay 里的排序：本机文件卡用 20，展开按钮用 10，画在它上面。 */
-const EXPAND_EDITOR_ORDER = 10
-
-export interface RegisterExpandEditorOptions {
-  /** 发送通道（本包 `MarkdownTurnReaders`）。 */
-  readonly readers: MarkdownTurnReaders
-  /** 取宿主 `conversation` 服务；用于读 / 写输入外壳草稿。缺省即不同步小输入框。 */
-  readonly conversationOf?: () => unknown
-  /** 绑定本包词典的翻译函数。 */
-  readonly t: RuntimeT
-}
-
-/** 从宿主 `conversation` 服务里取当前会话的输入外壳；服务缺席 / 抛错返回 undefined。 */
-function shellOf(conversationOf: RegisterExpandEditorOptions['conversationOf'], sessionId: string): InputShellFace | undefined {
-  if (conversationOf === undefined) return undefined
-  let conversation: unknown
-  try { conversation = conversationOf() } catch { return undefined }
-  const input = typeof conversation === 'object' && conversation !== null
-    ? (conversation as { input?: { shell?: (id: string) => unknown } }).input
-    : undefined
-  const shell = input !== undefined && typeof input.shell === 'function'
-    ? input.shell(sessionId)
-    : undefined
-  return typeof shell === 'object' && shell !== null ? shell as unknown as InputShellFace : undefined
-}
-
-/** 小输入框 DOM 值（外壳不可达时的兜底种子）。 */
-function readComposerValueFromDom(): string {
-  if (typeof document === 'undefined') return ''
-  const node = document.querySelector<HTMLElement>('[data-composer-input]')
-  const value = node?.getAttribute('data-value') ?? (node as HTMLTextAreaElement | null)?.value ?? ''
-  return typeof value === 'string' ? value : ''
-}
-
 /**
- * 把展开大编辑区注册进 composer 的 overlay 列座位（输入框上方）。
+ * 把箭头浮钮注册进 composer 的 overlay 列座位（输入框上方）。
  *
  * 用 overlay 列座位（而非单席 attachments）的原因与本机文件卡一致：它是会话
- * 作用域的 list 槽位、每会话必渲染，且锚点就在输入框正上方。
+ * 作用域的 list 槽位、每会话必渲染，且锚点就在 composer 卡片顶部。
  * @param slots - 座位宿主（`ctx.slots`）。
- * @param options - 发送通道 / 宿主服务 / 翻译。
+ * @param options - 绑定本包词典的翻译函数。
  * @returns 注册的清理函数。
  */
-export function registerExpandEditor(slots: ComposerSlotHost, options: RegisterExpandEditorOptions): () => void {
-  const getShell = (sessionId: string): InputShellFace | undefined => shellOf(options.conversationOf, sessionId)
+export function registerExpandEditor(slots: ComposerSlotHost, options: { readonly t: RuntimeT }): () => void {
   return slots.inject('conversation.input.overlay', () => slots.register(
     {
       name: 'conversation.input.overlay',
       id: EXPAND_EDITOR_ID,
-      order: EXPAND_EDITOR_ORDER,
+      order: 10,
       locale: NAMESPACE,
     },
     () => {
       const sessionId = currentSessionIdFromDom()
       if (sessionId === undefined) return null
-      // 按 sessionId 挂 key：换会话时组件整体重挂载，草稿 / 展开态自然复位。
-      return <ExpandEditor key={sessionId} sessionId={sessionId} t={options.t} readers={options.readers} getShell={getShell} readComposerValue={readComposerValueFromDom} />
+      // 按 sessionId 挂 key：换会话时组件整体重挂载，展开态自然复位。
+      return <ExpandEditor key={sessionId} t={options.t} />
     },
   )) as () => void
 }

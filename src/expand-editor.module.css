@@ -1,113 +1,31 @@
-/* 会话输入框「展开大编辑区」的样式。颜色全走宿主 token，与 ui-theme.ts 一致。 */
+/* 会话输入框「大编辑区」箭头浮钮的样式。颜色全走宿主 token，与 ui-theme.ts 一致。 */
 
-/* 收起态：输入框上方一条居中的图标行，占据独立高度、不与上方内容重叠。 */
-.wrap {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-/* 收起时的向上展开按钮：水平居中、只图标无文字、一整行可点击高度。 */
+/* 浮钮：注册在 composer 卡片顶部那个 0 高的绝对定位锚点里，以 top:-40px 浮在卡片
+   上沿**之外**，不压输入框文字。圆形、带描边与半透明底，悬停变主题色。 */
 .toggle {
+  position: absolute;
+  top: -40px;
+  right: 8px;
   display: grid;
   place-items: center;
-  align-self: center;
-  width: 44px;
+  width: 36px;
   height: 36px;
-  margin: 2px auto;
   padding: 0;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
+  border: 1px solid var(--dsw-alias-border-l2, rgba(127, 127, 127, 0.28));
+  border-radius: 999px;
+  background: var(--dsw-alias-bg-overlay, rgba(0, 0, 0, 0.55));
   color: var(--dsw-alias-label-secondary, inherit);
   cursor: pointer;
-  transition: background-color 100ms, color 100ms;
+  transition: background-color 100ms, color 100ms, border-color 100ms;
 }
 
 .toggle:hover {
-  background: var(--dsw-alias-interactive-bg-hover, rgba(127, 127, 127, 0.16));
-  color: var(--dsw-alias-state-business-primary, var(--dsw-alias-brand-primary, inherit));
+  background: var(--dsw-alias-interactive-bg-hover-solid, rgba(127, 127, 127, 0.16));
+  border-color: var(--dsw-alias-state-business-primary, var(--dsw-alias-brand-primary, currentColor));
+  color: var(--dsw-alias-state-business-primary, var(--dsw-alias-brand-primary, currentColor));
 }
 
 .toggle:focus-visible {
-  outline: 2px solid var(--dsw-alias-state-business-primary, var(--dsw-alias-brand-primary, currentColor));
-  outline-offset: 1px;
-}
-
-/* 展开态：经 portal 挂进会话内容区的编辑卡，自己占据高度、不压进 composer。 */
-.editorBar {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-width: 0;
-  padding: 12px 16px;
-  border: 1px solid var(--dsw-alias-border-l2, rgba(127, 127, 127, 0.2));
-  border-radius: var(--dsw-radius-panel, 12px);
-  background: var(--dsw-specific-input-major, transparent);
-}
-
-/* 多行编辑区：自动撑高、占满编辑卡宽度。 */
-.editor {
-  width: 100%;
-  min-height: 192px;
-  max-height: 480px;
-  padding: 0;
-  border: none;
-  background: transparent;
-  outline: none;
-  resize: none;
-  color: var(--dsw-alias-label-primary, inherit);
-  caret-color: var(--dsw-alias-state-business-primary, auto);
-  font: inherit;
-  line-height: 1.6;
-  overflow-y: auto;
-}
-
-.editor:focus {
-  outline: none;
-}
-
-/* 动作行：收起与发送钮推到右侧。 */
-.actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/* 展开态：多行编辑区 + 底部动作行。 */
-.actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 8px 4px 12px;
-}
-
-/* 动作行里的弹性占位，把收起与发送钮推到右侧。 */
-.spacer {
-  flex: 1;
-}
-
-/* 收起（向下）按钮：与发送钮同排左侧的弱图标钮。 */
-.collapse {
-  display: inline-grid;
-  place-items: center;
-  flex: none;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--dsw-alias-label-secondary, inherit);
-  cursor: pointer;
-}
-
-.collapse:hover {
-  background: var(--dsw-alias-interactive-bg-hover, rgba(127, 127, 127, 0.12));
-  color: var(--dsw-alias-label-primary, inherit);
-}
-
-.collapse:focus-visible {
   outline: 2px solid var(--dsw-alias-state-business-primary, var(--dsw-alias-brand-primary, currentColor));
   outline-offset: 1px;
 }
