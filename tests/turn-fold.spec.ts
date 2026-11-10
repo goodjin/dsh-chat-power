@@ -419,10 +419,15 @@ describe('git 快捷按钮的提示与编辑', () => {
   it('悬停 tooltip 展示指令内容；铅笔钮打开编辑浮层；Push 改为 Sync', () => {
     const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
     expect(source).toContain('getGitInstruction')
-    expect(source).toContain('data-chat-power-git-editor')
-    expect(source).toContain('btn.title = getGitInstruction(kind)')
+    expect(source).toContain('data-chat-power-git-tip')
+    expect(source).toContain('data-chat-power-git-tip-edit')
+    expect(source).toContain('showGitTip(bar, btn, kind)')
     expect(source).toContain("sync: '请将本地仓库与远程同步：")
-    expect(source).toContain("data-chat-power-git-btn=")
+    expect(source).toContain("data-chat-power-git-btn")
+  })
+  it('编辑态不会自动关闭（输入到一半不丢）', () => {
+    const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
+    expect(source).toContain("tip.getAttribute('data-mode') === 'edit'")
   })
   it('发送使用可编辑后的指令（index 接线）', () => {
     const index = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')

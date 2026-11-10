@@ -484,25 +484,15 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
             btn.setAttribute('type', 'button')
             btn.setAttribute('data-chat-power-git-btn', kind)
             btn.textContent = GIT_LABELS[kind]
-            // tooltip：悬停展示这条按钮会发送的指令内容。
-            btn.title = getGitInstruction(kind)
+            // 悬停出 tips：展示这条按钮会发送的指令，tips 里可直接编辑。
+            btn.addEventListener('mouseenter', () => { showGitTip(bar, btn, kind) })
+            btn.addEventListener('mouseleave', () => { scheduleGitTipHide(bar) })
             btn.addEventListener('click', event => {
               event.stopPropagation()
               options.onGitAction?.(sessionId, kind)
             })
             bar.append(btn)
           }
-          // 编辑钮：打开浮层修改各按钮会发送的指令。
-          const edit = document.createElement('button')
-          edit.setAttribute('type', 'button')
-          edit.setAttribute('data-chat-power-git-edit', '')
-          edit.title = '编辑指令'
-          edit.insertAdjacentHTML('afterbegin', PENCIL_SVG)
-          edit.addEventListener('click', event => {
-            event.stopPropagation()
-            toggleGitEditor(bar)
-          })
-          bar.append(edit)
           holder.append(bar)
         }
       }
@@ -515,53 +505,76 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     }
   }
 
-  /** 打开/关闭指令编辑浮层：三条指令各一行，保存后按钮 tooltip 同步更新。 */
-  const toggleGitEditor = (bar: HTMLElement): void => {
-    const existing = bar.querySelector('[data-chat-power-git-editor]')
-    if (existing !== null) { existing.remove(); return }
-    const editor = document.createElement('div')
-    editor.setAttribute('data-chat-power-git-editor', '')
-    for (const kind of ['commit', 'merge', 'sync'] as const) {
-      const row = document.createElement('div')
-      row.setAttribute('data-chat-power-git-row', '')
-      row.dataset['kind'] = kind
-      const label = document.createElement('span')
-      label.textContent = GIT_LABELS[kind]
-      const box = document.createElement('textarea')
-      box.value = getGitInstruction(kind)
-      row.append(label, box)
-      editor.append(row)
-    }
-    const actions = document.createElement('div')
-    actions.setAttribute('data-chat-power-git-editor-actions', '')
-    const save = document.createElement('button')
-    save.setAttribute('type', 'button')
-    save.textContent = '保存'
-    save.addEventListener('click', () => {
-      for (const row of Array.from(editor.querySelectorAll<HTMLElement>('[data-chat-power-git-row]'))) {
-        const kind = row.dataset['kind'] as GitAction
-        const box = row.querySelector('textarea')
-        if (kind === undefined || box === null) continue
-        setGitInstruction(kind, box.value)
-        const btn = bar.querySelector<HTMLElement>(`[data-chat-power-git-btn="${kind}"]`)
-        if (btn !== null) btn.title = box.value
+  const gitTipTimers = new WeakMap<HTMLElement, ReturnType<typeof setTimeout>>()
+
+  const hideGitTip = (bar: HTMLElement): void => {
+    bar.querySelector('[data-chat-power-git-tip]')?.remove()
+    const timer = gitTipTimers.get(bar)
+    if (timer !== undefined) { clearTimeout(timer); gitTipTimers.delete(bar) }
+  }
+
+  const cancelGitTipHide = (bar: HTMLElement): void => {
+    const timer = gitTipTimers.get(bar)
+    if (timer !== undefined) { clearTimeout(timer); gitTipTimers.delete(bar) }
+  }
+
+  const scheduleGitTipHide = (bar: HTMLElement): void => {
+    const tip = bar.querySelector('[data-chat-power-git-tip]')
+    // 编辑中不自动关：输入到一半的指令不能丢。
+    if (tip !== null && tip.getAttribute('data-mode') === 'edit') return
+    cancelGitTipHide(bar)
+    gitTipTimers.set(bar, setTimeout(() => { hideGitTip(bar) }, 150))
+  }
+
+  /** 悬停 tips：展示该按钮会发送的指令；tips 内的「编辑」直接改这条内容。 */
+  const showGitTip = (bar: HTMLElement, button: HTMLElement, kind: GitAction): void => {
+    hideGitTip(bar)
+    const tip = document.createElement('div')
+    tip.setAttribute('data-chat-power-git-tip', '')
+    tip.dataset['kind'] = kind
+    const render = (editing: boolean): void => {
+      tip.dataset['mode'] = editing ? 'edit' : 'view'
+      while (tip.firstChild !== null) tip.removeChild(tip.firstChild)
+      if (editing) {
+        const box = document.createElement('textarea')
+        box.value = getGitInstruction(kind)
+        tip.append(box)
+        const actions = document.createElement('div')
+        actions.setAttribute('data-chat-power-git-tip-actions', '')
+        const save = document.createElement('button')
+        save.setAttribute('type', 'button')
+        save.textContent = '保存'
+        save.addEventListener('click', () => {
+          setGitInstruction(kind, box.value)
+          button.title = box.value
+          render(false)
+        })
+        const cancel = document.createElement('button')
+        cancel.setAttribute('type', 'button')
+        cancel.textContent = '取消'
+        cancel.addEventListener('click', () => { render(false) })
+        actions.append(save, cancel)
+        tip.append(actions)
+        box.focus()
+        return
       }
-      editor.remove()
-    })
-    const cancel = document.createElement('button')
-    cancel.setAttribute('type', 'button')
-    cancel.textContent = '取消'
-    cancel.addEventListener('click', () => { editor.remove() })
-    actions.append(save, cancel)
-    editor.append(actions)
-    bar.append(editor)
-    const closeAway = (event: Event): void => {
-      const target = event.target as Element | null
-      if (target !== null && target.closest('[data-chat-power-git-editor]') !== null) return
-      document.removeEventListener('pointerdown', closeAway, true)
-      editor.remove()
+      const text = document.createElement('span')
+      text.setAttribute('data-chat-power-git-tip-text', '')
+      text.textContent = getGitInstruction(kind)
+      const edit = document.createElement('button')
+      edit.setAttribute('data-chat-power-git-tip-edit', '')
+      edit.textContent = '编辑'
+      edit.addEventListener('click', event => {
+        event.stopPropagation()
+        render(true)
+      })
+      tip.append(text, edit)
     }
-    document.addEventListener('pointerdown', closeAway, true)
+    render(false)
+    tip.addEventListener('mouseenter', () => { cancelGitTipHide(bar) })
+    tip.addEventListener('mouseleave', () => { scheduleGitTipHide(bar) })
+    tip.style.left = `${Math.max(0, button.offsetLeft - 40)}px`
+    bar.append(tip)
   }
 
   const applyCaps = (record: TurnRecord, available: number): void => {

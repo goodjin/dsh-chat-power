@@ -223,40 +223,75 @@
   color: var(--dsw-alias-label-primary, inherit);
 }
 
-/* git 按钮组：作为编辑浮层的锚点（相对定位）。 */
+/* git 按钮组：作为 tips 的锚点（相对定位）。 */
 [data-chat-power-git-actions] {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 10px;
   position: relative;
 }
 
-/* 指令编辑浮层：三条指令各一行，保存后按钮 tooltip 同步更新。 */
-[data-chat-power-git-editor] {
+[data-chat-power-git-btn] {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--dsw-alias-border-l2, rgba(127, 127, 127, 0.2));
+  border-radius: var(--dsw-radius-sm, 4px);
+  background: transparent;
+  color: var(--dsw-alias-label-secondary, inherit);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+[data-chat-power-git-btn]:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(127, 127, 127, 0.12));
+  color: var(--dsw-alias-label-primary, inherit);
+}
+
+/* 悬停 tips：展示指令内容 + 编辑入口；编辑态变为文本域 + 保存/取消。 */
+[data-chat-power-git-tip] {
   position: absolute;
   bottom: calc(100% + 8px);
-  left: 0;
   z-index: 30;
   display: flex;
   flex-direction: column;
   gap: 6px;
   width: 320px;
-  padding: 10px;
+  padding: 8px 10px;
   border: 1px solid var(--dsw-alias-border-l2, rgba(127, 127, 127, 0.2));
   border-radius: var(--dsw-radius-md, 8px);
   background: var(--dsw-alias-bg-layer-1, transparent);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+  text-align: left;
 }
 
-[data-chat-power-git-editor] [data-chat-power-git-row] {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+[data-chat-power-git-tip] [data-chat-power-git-tip-text] {
+  color: var(--dsw-alias-label-primary, inherit);
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
-[data-chat-power-git-editor] [data-chat-power-git-row] > span {
+[data-chat-power-git-tip] [data-chat-power-git-tip-edit] {
+  align-self: flex-end;
+  border: none;
+  background: transparent;
   color: var(--dsw-alias-label-secondary, inherit);
+  font: inherit;
   font-size: 11px;
+  text-decoration: underline;
+  cursor: pointer;
 }
 
-[data-chat-power-git-editor] textarea {
+[data-chat-power-git-tip] [data-chat-power-git-tip-edit]:hover {
+  color: var(--dsw-alias-label-primary, inherit);
+}
+
+[data-chat-power-git-tip] textarea {
   min-height: 44px;
   padding: 6px 8px;
   border: 1px solid var(--dsw-alias-border-l2, rgba(127, 127, 127, 0.2));
@@ -268,13 +303,13 @@
   resize: vertical;
 }
 
-[data-chat-power-git-editor] [data-chat-power-git-editor-actions] {
+[data-chat-power-git-tip] [data-chat-power-git-tip-actions] {
   display: flex;
   gap: 6px;
   justify-content: flex-end;
 }
 
-[data-chat-power-git-editor] button {
+[data-chat-power-git-tip] [data-chat-power-git-tip-actions] button {
   padding: 3px 10px;
   border: 1px solid var(--dsw-alias-border-l2, rgba(127, 127, 127, 0.2));
   border-radius: var(--dsw-radius-sm, 4px);
