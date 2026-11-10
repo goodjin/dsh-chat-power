@@ -48,6 +48,7 @@ export type ChatPowerLocaleKey =
   | 'selection.removeItem'
   | 'selection.multiAdded' | 'selection.editTitle' | 'selection.multiEditTitle'
   | 'selection.collectedCount'
+  | 'expand.label' | 'expand.open' | 'expand.close' | 'expand.editorLabel'
   | 'turnFold.label' | 'turnFold.labelWithSummary' | 'turnFold.requestLabel'
   | 'turnFold.requestExpand' | 'turnFold.requestCollapse'
   | 'turnFold.frameThinking' | 'turnFold.frameTools' | 'turnFold.frameAnswer'
@@ -146,6 +147,10 @@ export const zh: Record<ChatPowerLocaleKey, string> = {
   'selection.editTitle': '编辑选中内容',
   'selection.multiEditTitle': '编辑多选内容',
   'selection.collectedCount': '已收集 {count} 段',
+  'expand.label': '展开输入框',
+  'expand.open': '展开成大编辑区（回车换行，点发送才发送）',
+  'expand.close': '收起编辑区',
+  'expand.editorLabel': '大编辑区输入（回车换行，点发送才发送）',
   'turnFold.label': '第 {turn} 轮 · {clock}',
   'turnFold.frameThinking': '思考',
   'turnFold.frameTools': '工具调用',
@@ -264,6 +269,10 @@ export const en: Record<ChatPowerLocaleKey, string> = {
   'selection.editTitle': 'Edit selected text',
   'selection.multiEditTitle': 'Edit multi-selected text',
   'selection.collectedCount': '{count} collected',
+  'expand.label': 'Expand input',
+  'expand.open': 'Expand to a large editor (Enter newline, only Send sends)',
+  'expand.close': 'Collapse the editor',
+  'expand.editorLabel': 'Large editor input (Enter newline, only Send sends)',
   'turnFold.label': 'Turn {turn} · {clock}',
   'turnFold.frameThinking': 'Thinking',
   'turnFold.frameTools': 'Tool calls',

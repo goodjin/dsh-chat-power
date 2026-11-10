@@ -22,6 +22,7 @@ import { createMarkdownTurnReaders } from './markdown-turn-sources.ts'
 import { registerSelectionToolbar } from './selection-toolbar.tsx'
 import { startMultiSelectPanel } from './selection-actions.ts'
 import { registerConversationSurfaces } from './conversation-surfaces.tsx'
+import { registerExpandEditor } from './expand-editor.tsx'
 import { fallbackT } from './locales.ts'
 
 /** Loader 行与诊断里看到的插件名。 */
@@ -125,6 +126,21 @@ export function apply(ctx: PluginContext): void {
     log.info('selection toolbar: registered')
   } catch (error: unknown) {
     log.warn(`selection toolbar: registration failed — ${error instanceof Error ? error.message : String(error)}`)
+  }
+  try {
+    // 输入框「展开大编辑区」：composer 上方的向上展开按钮 → 多行编辑区（回车换行、
+    // 点发送才发送）。草稿与下方小输入框共享宿主输入外壳；发送走同一条队列通道。
+    const readers = createMarkdownTurnReaders(() => ctx.get('remote'))
+    const slotHost = ctx.slots as Parameters<typeof registerExpandEditor>[0]
+    const disposeExpand = registerExpandEditor(slotHost, {
+      readers,
+      conversationOf: () => ctx.get('conversation'),
+      t: fallbackT,
+    })
+    ctx.effect(() => disposeExpand, 'dsh-chat-power: expand editor')
+    log.info('expand editor: registered')
+  } catch (error: unknown) {
+    log.warn(`expand editor: registration failed — ${error instanceof Error ? error.message : String(error)}`)
   }
   try {
     // 多选收集面板：跨多次选择续存的浮动「已收集 N 段」面板，由 store 驱动。
