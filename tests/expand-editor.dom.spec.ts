@@ -45,9 +45,14 @@ function makeShell(initialText: string) {
 }
 
 let container: HTMLElement
+let content: HTMLElement
 let root: Root
 
 beforeEach(() => {
+  // 展开态经 portal 挂进会话内容区；测试里提供一个该标记的节点，让 portal 落到可查询处。
+  content = document.createElement('div')
+  content.dataset.conversationContent = ''
+  document.body.appendChild(content)
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
@@ -56,6 +61,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => { root.unmount() })
   container.remove()
+  content.remove()
 })
 
 /** 渲染 ExpandEditor 并冲刷挂载后异步。 */
@@ -65,16 +71,16 @@ const render = async (props: Parameters<typeof ExpandEditor>[0]): Promise<void> 
   })
 }
 
-/** 在当前 DOM 里点匹配选择器的第一个按钮。 */
+/** 在当前 DOM（含 portal 目标）里点匹配选择器的第一个按钮。 */
 const click = async (selector: string): Promise<void> => {
-  const el = container.querySelector<HTMLButtonElement>(selector)
+  const el = document.querySelector<HTMLButtonElement>(selector)
   if (el === null) throw new Error(`no button for ${selector}`)
   await act(async () => { el.click() })
 }
 
 /** 在 textarea 里逐字写入并冲刷 onChange。 */
 const type = async (text: string): Promise<void> => {
-  const ta = container.querySelector<HTMLTextAreaElement>('[data-expand-textarea]')
+  const ta = document.querySelector<HTMLTextAreaElement>('[data-expand-textarea]')
   if (ta === null) throw new Error('no textarea')
   await act(async () => {
     const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set
@@ -89,9 +95,9 @@ describe('ExpandEditor 收起态', () => {
   it('未展开时是一枚向上展开的按钮，没有 textarea、没有发送钮', async () => {
     const readers = makeReaders(vi.fn())
     await render({ sessionId: 's1', t: fallbackT, readers })
-    expect(container.querySelector('[data-expand-toggle]')).not.toBeNull()
-    expect(container.querySelector('[data-expand-textarea]')).toBeNull()
-    expect(container.querySelector('[data-expand-send]')).toBeNull()
+    expect(document.querySelector('[data-expand-toggle]')).not.toBeNull()
+    expect(document.querySelector('[data-expand-textarea]')).toBeNull()
+    expect(document.querySelector('[data-expand-send]')).toBeNull()
   })
 })
 
@@ -100,7 +106,15 @@ describe('ExpandEditor 展开', () => {
     const readers = makeReaders(vi.fn())
     await render({ sessionId: 's1', t: fallbackT, readers })
     await click('[data-expand-toggle]')
-    expect(container.querySelector('[data-expand-textarea]')).not.toBeNull()
+    expect(document.querySelector('[data-expand-textarea]')).not.toBeNull()
+  })
+
+  it('展开态经 portal 挂进会话内容区（不留在 composer overlay 里）', async () => {
+    const readers = makeReaders(vi.fn())
+    await render({ sessionId: 's1', t: fallbackT, readers })
+    await click('[data-expand-toggle]')
+    // textarea 落在 [data-conversation-content] 子树里，而非宿主 composer 的 overlay 座位。
+    expect(content.querySelector('[data-expand-textarea]')).not.toBeNull()
   })
 
   it('展开时从外壳草稿种入已有文本', async () => {
@@ -108,7 +122,7 @@ describe('ExpandEditor 展开', () => {
     const { shell } = makeShell('已有的草稿')
     await render({ sessionId: 's1', t: fallbackT, readers, getShell: () => shell })
     await click('[data-expand-toggle]')
-    const ta = container.querySelector<HTMLTextAreaElement>('[data-expand-textarea]')
+    const ta = document.querySelector<HTMLTextAreaElement>('[data-expand-textarea]')
     expect(ta?.value).toBe('已有的草稿')
   })
 })
@@ -120,7 +134,7 @@ describe('ExpandEditor 回车行为', () => {
     await render({ sessionId: 's1', t: fallbackT, readers })
     await click('[data-expand-toggle]')
     await type('第一行')
-    const ta = container.querySelector<HTMLTextAreaElement>('[data-expand-textarea]')
+    const ta = document.querySelector<HTMLTextAreaElement>('[data-expand-textarea]')
     await act(async () => {
       ta?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
     })
@@ -142,7 +156,7 @@ describe('ExpandEditor 发送', () => {
     expect(send).toHaveBeenCalledWith('s1', '要发的内容')
     // 成功后写回空草稿、编辑区收起。
     expect(writes[writes.length - 1]).toMatchObject({ text: '' })
-    expect(container.querySelector('[data-expand-textarea]')).toBeNull()
+    expect(document.querySelector('[data-expand-textarea]')).toBeNull()
   })
 
   it('空白时发送钮禁用；有内容后启用', async () => {
@@ -150,7 +164,7 @@ describe('ExpandEditor 发送', () => {
     const readers = makeReaders(send)
     await render({ sessionId: 's1', t: fallbackT, readers })
     await click('[data-expand-toggle]')
-    const sendBtn = () => container.querySelector<HTMLButtonElement>('[data-expand-send]')
+    const sendBtn = () => document.querySelector<HTMLButtonElement>('[data-expand-send]')
     expect(sendBtn()?.disabled).toBe(true)
     await type('有内容了')
     expect(sendBtn()?.disabled).toBe(false)
@@ -163,10 +177,10 @@ describe('ExpandEditor 发送', () => {
     await click('[data-expand-toggle]')
     await type('失败也留着')
     await click('[data-expand-send]')
-    const ta = container.querySelector<HTMLTextAreaElement>('[data-expand-textarea]')
+    const ta = document.querySelector<HTMLTextAreaElement>('[data-expand-textarea]')
     expect(ta).not.toBeNull()
     expect(ta?.value).toBe('失败也留着')
-    expect(container.querySelector('[role="alert"]')?.textContent ?? '').toContain('网络炸了')
+    expect(document.querySelector('[role="alert"]')?.textContent ?? '').toContain('网络炸了')
   })
 })
 

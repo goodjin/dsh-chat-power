@@ -18,10 +18,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { IconChevronDownOutlineRegular, IconChevronUpOutlineRegular, IconSendOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { MarkdownTurnReaders } from './markdown-turn-sources.ts'
+import { createPortal } from 'react-dom'
 import type { RuntimeT } from './locales.ts'
 import { NAMESPACE } from './locales.ts'
 import { createSendController, type SendController } from './send-actions.ts'
-import { inputClass, sendClass, statusNoticeClass } from './ui-theme.ts'
+import { sendClass, statusNoticeClass } from './ui-theme.ts'
 import css from './expand-editor.module.css'
 
 /**
@@ -170,7 +171,51 @@ export function ExpandEditor(props: ExpandEditorProps): ReactNode {
 
   const expand = (): void => { setExpanded(true) }
 
+  const editor = (
+    <div className={css.wrap} data-expand-editor="" data-collapsed="">
+      <div className={css.editorBar}>
+        <textarea
+          ref={taRef}
+          value={text}
+          onChange={onChange}
+          className={css.editor}
+          data-expand-textarea=""
+          aria-label={t('expand.editorLabel')}
+          rows={8}
+        />
+        <div className={css.actions}>
+          {notice !== null && (
+            <p key={notice.seq} className={statusNoticeClass} data-variant="error" role="alert">{notice.text}</p>
+          )}
+          <span className={css.spacer} aria-hidden="true" />
+          <button
+            type="button"
+            className={css.collapse}
+            data-expand-collapse=""
+            aria-label={t('expand.close')}
+            title={t('expand.close')}
+            onClick={() => { setExpanded(false) }}
+          >
+            <IconChevronDownOutlineRegular size={16} />
+          </button>
+          <button
+            type="button"
+            className={sendClass}
+            data-expand-send=""
+            aria-label={t('markdownTurn.send')}
+            title={t('markdownTurn.send')}
+            disabled={!hasText || pending}
+            onClick={() => { controller.submit(text) }}
+          >
+            <IconSendOutlineRegular size={20} />
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+
   if (!expanded) {
+    // 收起态：一枚居中图标按钮，留在 composer overlay 座位里（薄一行，不占 composer 高度）。
     return (
       <div className={css.wrap} data-expand-editor="" data-collapsed="">
         <button
@@ -181,52 +226,16 @@ export function ExpandEditor(props: ExpandEditorProps): ReactNode {
           title={t('expand.open')}
           onClick={expand}
         >
-          <IconChevronUpOutlineRegular size={16} />
+          <IconChevronUpOutlineRegular size={20} />
         </button>
       </div>
     )
   }
 
-  return (
-    <div className={css.wrap} data-expand-editor="">
-      <textarea
-        ref={taRef}
-        value={text}
-        onChange={onChange}
-        className={inputClass}
-        data-expand-textarea=""
-        aria-label={t('expand.editorLabel')}
-        rows={8}
-      />
-      <div className={css.actions}>
-        {notice !== null && (
-          <p key={notice.seq} className={statusNoticeClass} data-variant="error" role="alert">{notice.text}</p>
-        )}
-        <span className={css.spacer} aria-hidden="true" />
-        <button
-          type="button"
-          className={css.collapse}
-          data-expand-collapse=""
-          aria-label={t('expand.close')}
-          title={t('expand.close')}
-          onClick={() => { setExpanded(false) }}
-        >
-          <IconChevronDownOutlineRegular size={16} />
-        </button>
-        <button
-          type="button"
-          className={sendClass}
-          data-expand-send=""
-          aria-label={t('markdownTurn.send')}
-          title={t('markdownTurn.send')}
-          disabled={!hasText || pending}
-          onClick={() => { controller.submit(text) }}
-        >
-          <IconSendOutlineRegular size={16} />
-        </button>
-      </div>
-    </div>
-  )
+  // 展开态：经 portal 挂进会话内容区（composer 之上、对话正文之后），自己占据高度，
+  // 不受宿主单行 composer 的固定高度约束——此前直接塞进 overlay 座位被 composer 压扁。
+  const target = typeof document === 'undefined' ? null : document.querySelector('[data-conversation-content]')
+  return target === null ? editor : createPortal(editor, target)
 }
 
 /** composer 座位条目宿主的最小结构类型（与本包其它注册函数一致）。 */

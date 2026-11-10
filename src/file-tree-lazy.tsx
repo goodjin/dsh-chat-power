@@ -258,6 +258,21 @@ export function LazyFileTree(props: {
                   else props.onOpenFile?.(entryPath)
                 }}
               >
+                {isDirectory ? (
+                  // 树形标识：展开/收起箭头 + 文件夹图标，层级关系一眼可读。
+                  <span className={styles.caret} data-open={open || undefined} aria-hidden="true">
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  </span>
+                ) : (
+                  <span className={styles.icon} aria-hidden="true">
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M4 1.8h4.2L9.8 3.4H13c.6 0 1 .4 1 1v9c0 .6-.4 1-1 1H4c-.6 0-1-.4-1-1V2.8c0-.6.4-1 1-1Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+                  </span>
+                )}
+                {isDirectory && (
+                  <span className={styles.icon} aria-hidden="true">
+                    <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M2 4.2c0-.66.54-1.2 1.2-1.2h2.4l1.5 1.8h5.7c.66 0 1.2.54 1.2 1.2v6c0 .66-.54 1.2-1.2 1.2H3.2c-.66 0-1.2-.54-1.2-1.2V4.2Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+                  </span>
+                )}
                 <span className={styles.name}>{entry.name}</span>
                 {entry.type === 'file' && entry.size !== undefined && (
                   <span className={styles.size}>{formatSize(entry.size)}</span>

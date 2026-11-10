@@ -12,25 +12,66 @@
   display: grid;
   place-items: center;
   align-self: center;
-  width: 40px;
-  height: 32px;
+  width: 44px;
+  height: 36px;
   margin: 2px auto;
   padding: 0;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   background: transparent;
   color: var(--dsw-alias-label-secondary, inherit);
   cursor: pointer;
+  transition: background-color 100ms, color 100ms;
 }
 
 .toggle:hover {
-  background: var(--dsw-alias-interactive-bg-hover, rgba(127, 127, 127, 0.12));
-  color: var(--dsw-alias-label-primary, inherit);
+  background: var(--dsw-alias-interactive-bg-hover, rgba(127, 127, 127, 0.16));
+  color: var(--dsw-alias-state-business-primary, var(--dsw-alias-brand-primary, inherit));
 }
 
 .toggle:focus-visible {
   outline: 2px solid var(--dsw-alias-state-business-primary, var(--dsw-alias-brand-primary, currentColor));
   outline-offset: 1px;
+}
+
+/* 展开态：经 portal 挂进会话内容区的编辑卡，自己占据高度、不压进 composer。 */
+.editorBar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px 16px;
+  border: 1px solid var(--dsw-alias-border-l2, rgba(127, 127, 127, 0.2));
+  border-radius: var(--dsw-radius-panel, 12px);
+  background: var(--dsw-specific-input-major, transparent);
+}
+
+/* 多行编辑区：自动撑高、占满编辑卡宽度。 */
+.editor {
+  width: 100%;
+  min-height: 192px;
+  max-height: 480px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  outline: none;
+  resize: none;
+  color: var(--dsw-alias-label-primary, inherit);
+  caret-color: var(--dsw-alias-state-business-primary, auto);
+  font: inherit;
+  line-height: 1.6;
+  overflow-y: auto;
+}
+
+.editor:focus {
+  outline: none;
+}
+
+/* 动作行：收起与发送钮推到右侧。 */
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 /* 展开态：多行编辑区 + 底部动作行。 */
