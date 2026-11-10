@@ -93,6 +93,10 @@ export function registerConversationTools(ctx: any) {
     },
     onEdit: (sessionId, path) => openWorkspaceEditor(sessionId, path),
     subscribeChanges: listener => checkedFiles.subscribe(listener),
+    statSize: (sessionId, path) => readers.statSize(sessionId, path),
+    onBlockedOpen: (sessionId, path, sizeBytes) => {
+      toolsNotice.set(sessionId, `文件 ${path.split('/').at(-1)}（${(sizeBytes / 1048576).toFixed(1)} MB）超过预览上限，已阻止打开；请在编辑器中查看或勾选后引用。`)
+    },
   })
   // 打开（或聚焦）一个会话视图：同种类标签已开就选中，没有才新建。
   const openKind = (sessionId: string, kind: 'files' | 'browser' | 'terminal'): void => {

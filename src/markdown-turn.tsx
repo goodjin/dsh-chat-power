@@ -21,6 +21,7 @@ import { fallbackT, NAMESPACE } from './locales.ts'
 import type { RuntimeT } from './locales.ts'
 import { createSendController } from './send-actions.ts'
 import {
+  MARKDOWN_READ_CHAR_CAP,
   MARKDOWN_READ_LINE_CAP,
   isMarkdownPath,
   linkedFilePathsFromTurn,
@@ -410,6 +411,7 @@ function MarkdownDocument({ sessionId, path, readers, t, onNotify }: {
     void readMarkdownText(
       offset => readers.readPage(sessionId, path, offset, controller.signal),
       MARKDOWN_READ_LINE_CAP,
+      MARKDOWN_READ_CHAR_CAP,
     ).then(result => {
       if (!cancelled) setBody({ kind: 'ready', text: result.text, truncated: result.truncated })
     }).catch((error: unknown) => {

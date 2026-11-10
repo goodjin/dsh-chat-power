@@ -23,6 +23,12 @@ export const DECORATED_ATTR = 'data-chat-file-decorated'
 /** 会话区工具区内容容器的标记：带这个标记的容器里才有我们的行控件。 */
 export const TOOLS_SESSION_ATTR = 'data-chat-tools-session'
 
+/** 超过这个大小的文件不允许树点击打开：宿主预览渲染巨行文件会冻结窗口
+ * （2026-11-07 现场：8.8MB 单行 minified JS 一点开整个窗口卡死）。 */
+export const FILE_OPEN_MAX_BYTES = 1024 * 1024
+/** 行上的「文件过大」标记：值是被拦下的字节大小。 */
+export const TOO_BIG_ATTR = 'data-chat-file-too-big'
+
 /** 「编辑副本」的铅笔描边图标（与选区弹条同款风格，颜色随文字）。 */
 const EDIT_ICON_SVG = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M11.2 2.2a1.6 1.6 0 0 1 2.6 2.6L6 12.5l-3.5.9.9-3.5 7.8-7.7Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>'
 
@@ -55,6 +61,10 @@ export interface AugmentHandlers {
   onEdit(sessionId: string, path: string): void
   /** 订阅勾选状态变化（发送清空、跨标签改动）以回同步勾选框；可选。 */
   subscribeChanges?(listener: () => void): () => void
+  /** 异步取文件字节大小；不可知回 undefined（此时不拦截）。 */
+  statSize?(sessionId: string, path: string): Promise<number | undefined>
+  /** 大文件打开被拦截后的提示。 */
+  onBlockedOpen?(sessionId: string, path: string, sizeBytes: number): void
 }
 
 /** 行元素上的工作区相对路径（宿主写好的 data-files-path）。 */
@@ -100,6 +110,16 @@ export function decorateRow(row: ElementLike, sessionId: string, handlers: Augme
   if (open !== null) row.insertBefore(edit, open.nextSibling)
   else row.append(edit)
   row.setAttribute(DECORATED_ATTR, '')
+  // 大文件预拦截：decorate 时异步 stat，超过上限就给行打标记。点击时
+  // handleRowControl 见标记即截停，宿主预览根本不会开始渲染。
+  if (handlers.statSize !== undefined) {
+    void handlers.statSize(sessionId, path).then((size) => {
+      if (size !== undefined && size > FILE_OPEN_MAX_BYTES && row.hasAttribute(DECORATED_ATTR)) {
+        row.setAttribute(TOO_BIG_ATTR, String(size))
+        row.setAttribute(SESSION_ATTR, sessionId)
+      }
+    }).catch(() => {})
+  }
   return true
 }
 
@@ -122,6 +142,18 @@ export function handleRowControl(
     event.stopPropagation()
     event.preventDefault()
     handlers.onEdit(sessionId, path)
+    return true
+  }
+  // 大文件拦截：点在我们标记过的文件行上（且不是勾选框/编辑钮）→ 截停，
+  // 宿主的「点行打开文件」根本不执行。
+  const tooBig = target.closest(`[${TOO_BIG_ATTR}]`) as ElementLike | null
+  if (tooBig !== null) {
+    event.stopPropagation()
+    event.preventDefault()
+    const size = Number(tooBig.getAttribute(TOO_BIG_ATTR) ?? '0')
+    const path = tooBig.getAttribute('data-files-path') ?? ''
+    const sessionId = tooBig.getAttribute(SESSION_ATTR) ?? ''
+    handlers.onBlockedOpen?.(sessionId, path, size)
     return true
   }
   const check = target.closest(`[${CHECK_ATTR}]`) as ElementLike | null

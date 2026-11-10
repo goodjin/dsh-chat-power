@@ -33,6 +33,8 @@ export type MarkdownFileOpen =
 /** 阅读区向宿主要正文、改动摘要和打开方式的口子。注册时绑上，测试里换假的。 */
 export interface MarkdownTurnReaders {
   readPage(sessionId: string, path: string, offset: number, signal: AbortSignal): Promise<MarkdownTextPage>
+  /** 文件字节大小；拿不到（服务缺席/读失败）回 undefined。用于大文件拦截。 */
+  statSize(sessionId: string, path: string, signal?: AbortSignal): Promise<number | undefined>
   loadSummary(sessionId: string, seq: number, signal: AbortSignal): Promise<unknown>
   /** 在文件管理器里显示这个文件所在的文件夹。 */
   revealFile(sessionId: string, path: string): Promise<void>
@@ -63,6 +65,11 @@ export interface MarkdownTurnSources {
 
 /** 拼起来的正文超过这么多行就停下，并标明只显示了前面一部分。 */
 export const MARKDOWN_READ_LINE_CAP = 20000
+
+/** 字符数护栏：行数护栏挡不住巨行——minified JS/JSON 单行可达数 MB，一页
+ * 进 React 渲染就是主线程冻结（2026-11-07 现场：点开 8.8MB 单行文件整个
+ * 窗口卡死）。按 UTF-16 码元计数，约 2MB 文本。 */
+export const MARKDOWN_READ_CHAR_CAP = 1_000_000
 
 const MARKDOWN_EXTENSION = /\.(md|markdown)$/i
 
@@ -411,24 +418,33 @@ function isTextPage(value: unknown): value is MarkdownTextPage {
 /**
  * 按页把一篇 Markdown 读完。
  *
- * 每一页的正文不含末尾换行，页与页之间补一个换行。到达文件末尾，或累计行数
- * 到达 `capLines`，就停下。
+ * 每一页的正文不含末尾换行，页与页之间补一个换行。到达文件末尾、累计行数
+ * 到达 `capLines`、或累计字符数到达 `capBytes`，就停下。
  * @param readPage - 从 1 起的行号读一页。
  * @param capLines - 最多累计多少行。
- * @returns 拼好的正文，以及是否因为行数上限没读完。
+ * @param capBytes - 最多累计多少字符（UTF-16 码元计）。行数护栏挡不住巨行，
+ *   所以阅读视图还要按字符封顶。
+ * @returns 拼好的正文，以及是否因为上限没读完。
  */
 export async function readMarkdownText(
   readPage: (offset: number) => Promise<MarkdownTextPage>,
   capLines: number,
+  capBytes: number = Number.POSITIVE_INFINITY,
 ): Promise<{ text: string, truncated: boolean }> {
   const parts: string[] = []
   let offset = 1
   let lines = 0
+  let chars = 0
   for (;;) {
     const page = await readPage(offset)
     if (page.lines <= 0) return { text: parts.join('\n'), truncated: false }
-    parts.push(page.text)
+    let text = page.text
+    const remaining = capBytes - chars
+    if (text.length > remaining) text = text.slice(0, Math.max(remaining, 0))
+    parts.push(text)
     lines += page.lines
+    chars += text.length
+    if (chars >= capBytes) return { text: parts.join('\n'), truncated: true }
     if (page.eof || lines >= capLines) {
       return { text: parts.join('\n'), truncated: !page.eof && lines >= capLines }
     }
@@ -530,6 +546,20 @@ export function createMarkdownTurnReaders(remote: () => unknown): MarkdownTurnRe
       if (read === undefined) throw new Error('workspaceFiles.read is missing')
       const value: unknown = await read.call(files, sessionId, path, { offset }, signal)
       return textPageFromRead(value)
+    },
+    async statSize(sessionId, path, signal) {
+      const holder = remote()
+      const files = isRecord(holder) ? holder.workspaceFiles : undefined
+      const stat = isRecord(files) && typeof files.stat === 'function' ? files.stat : undefined
+      if (stat === undefined) return undefined
+      try {
+        const stated: unknown = await stat.call(files, sessionId, path, signal)
+        if (!isRecord(stated) || stated.ok !== true || !isRecord(stated.value)) return undefined
+        const size = (stated.value as { size?: unknown }).size
+        return typeof size === 'number' ? size : undefined
+      } catch {
+        return undefined
+      }
     },
     async revealFile(sessionId, path) {
       await openAt(sessionId, path, { kind: 'reveal' })
