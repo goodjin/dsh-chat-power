@@ -278,12 +278,16 @@
 
 [data-chat-power-git-tip] [data-chat-power-git-tip-edit] {
   align-self: flex-end;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
   border: none;
+  border-radius: var(--dsw-radius-sm, 4px);
   background: transparent;
   color: var(--dsw-alias-label-secondary, inherit);
-  font: inherit;
-  font-size: 11px;
-  text-decoration: underline;
   cursor: pointer;
 }
 

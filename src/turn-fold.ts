@@ -563,7 +563,8 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
       text.textContent = getGitInstruction(kind)
       const edit = document.createElement('button')
       edit.setAttribute('data-chat-power-git-tip-edit', '')
-      edit.textContent = '编辑'
+      edit.setAttribute('title', '编辑')
+      edit.insertAdjacentHTML('afterbegin', PENCIL_SVG)
       edit.addEventListener('click', event => {
         event.stopPropagation()
         render(true)
