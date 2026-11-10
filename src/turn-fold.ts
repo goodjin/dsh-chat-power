@@ -904,13 +904,20 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
         record.strip?.remove()
         record.strip = undefined
         if (record.collapsed) setCollapsed(record, false)
-        // 回答框已出现（上一轮限高标记还在）：收起请求——请求行与请求条都藏起，
-        // 回答框顶到最上，底下的点赞行与文件块才留得住（限高会给它们让位）。
-        if (record.rows.some(row => frameBoxOf(row).hasAttribute(CAPPED_ATTR)) && !record.requestCollapsed) {
+        // 回答框出现后：请求这一条不再占位——宿主请求行与我们的请求条都直接隐藏
+        // （只靠 requestCollapsed 标记有漏网：只要回答框在，就强制执行一次）。
+        const framedBox = record.rows.map(frameBoxOf).find(box => box.hasAttribute(CAPPED_ATTR))
+        if (framedBox !== undefined) {
+          for (const row of record.rows) {
+            // 只处理排在回答框前面的行（提问 / 中途引导）。
+            if ((row.compareDocumentPosition(framedBox) & Node.DOCUMENT_POSITION_FOLLOWING) === 0) continue
+            if (!row.matches(USER_ROW_SELECTOR)) continue
+            if (!row.hasAttribute(REQUEST_HIDDEN_ATTR)) pendingAlign = true
+            row.setAttribute(REQUEST_HIDDEN_ATTR, '')
+          }
           record.requestCollapsed = true
-          pendingAlign = true
+          record.requestBar?.setAttribute(REQUEST_HIDDEN_ATTR, '')
         }
-        if (record.requestCollapsed) record.requestBar?.setAttribute(REQUEST_HIDDEN_ATTR, '')
         ensureRequestBar(record)
         collapseThinking(record)
         yieldGroupHeadToThinking(record)
