@@ -167,6 +167,13 @@ export function openSelectionEdit(text: string, multi: boolean, sessionId: strin
   editSeq += 1
   editState = { text, sessionId, multi, seq: editSeq }
   for (const listener of editListeners) listener()
+  // 编辑卡挂在输入框上方的浮层座位里：编辑标签打开时输入框被隐藏、卡片会
+  // 失去锚点掉到输入框下面——广播一个事件，让工具区切回聊天、恢复输入框。
+  try {
+    window.dispatchEvent(new CustomEvent('chat-power:selection-edit-open', {
+      detail: { sessionId: sessionId ?? '' },
+    }))
+  } catch { /* 非浏览器环境忽略 */ }
 }
 
 /** 关闭编辑卡；多选来源的关闭会连多选收藏与高亮一起清掉。 */

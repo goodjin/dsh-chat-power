@@ -451,6 +451,19 @@ export function registerConversationTools(ctx: any) {
     }
   }, 'chat-power: answer link open')
   ctx.effect(() => attachFilesTreeAugment(augmentHandlers), 'chat-power: files tree augment')
+  // 选区编辑卡打开时：若正处于编辑标签（输入框隐藏 ✓），切回聊天，
+  // 让输入框恢复、选区卡锚回输入框上方（否则卡片会掉到输入框下面）。
+  ctx.effect(() => {
+    if (typeof window === 'undefined') return () => {}
+    const onOpen = (event: Event): void => {
+      const sessionId = (event as CustomEvent).detail?.sessionId
+      if (typeof sessionId !== 'string' || sessionId === '') return
+      const s = toolsState.get(sessionId)
+      if (s.tabs.some(tab => tab.id === s.active && tab.kind !== 'chat')) toolsState.activateChat(sessionId)
+    }
+    window.addEventListener('chat-power:selection-edit-open', onOpen)
+    return () => { window.removeEventListener('chat-power:selection-edit-open', onOpen) }
+  }, 'chat-power: selection edit composer restore')
   // One policy for ordinary HTTP links across the application. Explicit modifiers
   // retain browser conventions. Native browser's external button remains explicit.
   ctx.effect(() => {
