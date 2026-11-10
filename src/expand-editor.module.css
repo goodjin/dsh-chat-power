@@ -1,27 +1,25 @@
 /* 会话输入框「展开大编辑区」的样式。颜色全走宿主 token，与 ui-theme.ts 一致。 */
 
-/* 收起态：一条轻按钮行，贴在输入框上方。 */
+/* 收起态：输入框上方一条居中的图标行，占据独立高度、不与上方内容重叠。 */
 .wrap {
   display: flex;
   flex-direction: column;
   min-width: 0;
 }
 
-/* 收起时的向上展开按钮：左对齐、弱文字、hover 铺淡底。 */
+/* 收起时的向上展开按钮：水平居中、只图标无文字、一整行可点击高度。 */
 .toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  align-self: flex-start;
-  max-width: 100%;
-  padding: 4px 8px;
+  display: grid;
+  place-items: center;
+  align-self: center;
+  width: 40px;
+  height: 32px;
+  margin: 2px auto;
+  padding: 0;
   border: none;
   border-radius: 6px;
   background: transparent;
   color: var(--dsw-alias-label-secondary, inherit);
-  font: inherit;
-  font-size: 12px;
-  line-height: 16px;
   cursor: pointer;
 }
 
@@ -33,12 +31,6 @@
 .toggle:focus-visible {
   outline: 2px solid var(--dsw-alias-state-business-primary, var(--dsw-alias-brand-primary, currentColor));
   outline-offset: 1px;
-}
-
-.toggleLabel {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 /* 展开态：多行编辑区 + 底部动作行。 */

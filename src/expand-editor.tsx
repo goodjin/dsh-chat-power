@@ -182,7 +182,6 @@ export function ExpandEditor(props: ExpandEditorProps): ReactNode {
           onClick={expand}
         >
           <IconChevronUpOutlineRegular size={16} />
-          <span className={css.toggleLabel}>{t('expand.label')}</span>
         </button>
       </div>
     )
