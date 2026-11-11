@@ -247,6 +247,8 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
   let currentTurn = 0
   /** 待把当前轮顶到容器顶端（新一轮出现、或刚打开会话）。 */
   let pendingAlign = false
+  /** 切换会话后的第一次同步：落到底部一次（之后交给宿主的贴底跟随）。 */
+  let followTailOnce = false
   let records = new Map<number, TurnRecord>()
   let stopObserving: (() => void) | undefined
   let composerObserver: ResizeObserver | undefined
@@ -286,8 +288,9 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     }
     records = new Map()
     currentTurn = 0
-    // 刚打开一个会话：历史轮次同样顶到屏幕外，屏幕里只留最后一轮。
-    pendingAlign = true
+    // 刚打开一个会话：直接落到底部（流式输出继续跟随；
+    // 不再做「当前轮对齐到顶部」——它会和宿主的贴底跟随打架，停在中间）。
+    followTailOnce = true
     sessionKey = key
   }
 
@@ -945,6 +948,11 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
         collapseThinking(record)
         applyCaps(record, availableHeight(container, record))
       }
+    }
+    if (followTailOnce) {
+      followTailOnce = false
+      const scrollable = container as HTMLElement
+      if (typeof scrollable.scrollTop === 'number') scrollable.scrollTop = scrollable.scrollHeight
     }
     if (pendingAlign) {
       pendingAlign = false
