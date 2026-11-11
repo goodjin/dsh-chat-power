@@ -192,6 +192,16 @@ describe('统一编辑链路', () => {
     expect(css).toMatch(/\[data-chat-tools-tab-wrap\]\s*\[data-chat-tools-tab-close\][^{]*\{[^}]*width:\s*(16|18|20)px/)
   })
 
+  it('打开文件时：文件内容与上方（标签行）、下方（输入框）各留 10px', () => {
+    const css = read('../src/conversation-tools.module.css')
+    // 文件类标签激活时工具区带标记，样式据此给内容上下留白。
+    expect(css).toMatch(/\[data-chat-tools-file-live\][^{]*\.body[^{]*\{[^}]*padding:\s*10px 0/)
+    const tools = read('../src/conversation-tools.tsx')
+    expect(tools).toContain('data-chat-tools-file-live')
+    // 只有文件类标签（编辑标签 / 文档预览）算「打开文件」。
+    expect(tools).toMatch(/fileLive[\s\S]{0,200}kind === 'local'[\s\S]{0,200}kind === 'text'/)
+  })
+
   it('仅保存只给工作区文件的编辑：edit:// 开头的标签接写回通道，本机文件没有保存钮', () => {
     const tools = read('../src/conversation-tools.tsx')
     expect(tools).toContain('saveWorkspaceText')

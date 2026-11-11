@@ -115,6 +115,12 @@
   flex-direction: column;
 }
 
+/* 打开文件时：文件内容与上方（标签行）、下方（输入框）各留 10px，
+   不再贴着上下两边的边。 */
+[data-chat-tools-file-live] .body {
+  padding: 10px 0;
+}
+
 [data-chat-tools-session] .body > [data-compose-card] textarea[data-local-file-text] {
   flex: 1 1 auto;
   min-height: 0;

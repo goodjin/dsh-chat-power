@@ -109,7 +109,10 @@ export function registerConversationTools(ctx: any) {
     const s = useSyncExternalStore(toolsState.subscribe, () => toolsState.get(id), () => toolsState.get(id))
     const notice = useSyncExternalStore(toolsNotice.subscribe, () => toolsNotice.get(id), () => toolsNotice.get(id))
     const activeTab = s.tabs.find(t => t.id === s.active)
-    return <section className={css.tools} data-chat-tools="" aria-label="会话工具">
+    // 文件类标签（工作区文件编辑 / 文档预览）激活时：给工具区打标记，
+    // 样式据此让文件内容与上方（标签行）、下方（输入框）各留 10px。
+    const fileLive = activeTab !== undefined && (activeTab.kind === 'local' || activeTab.kind === 'text')
+    return <section className={css.tools} data-chat-tools="" data-chat-tools-file-live={fileLive ? '' : undefined} aria-label="会话工具">
       {(notice !== '') && <p role="alert" className={statusNoticeClass} data-variant="error">{notice}</p>}
       <div className={css.content} data-chat-tools-bodies="" data-chat-tools-session={id}>
         {s.tabs.map(tab => {
