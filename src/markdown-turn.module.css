@@ -140,9 +140,9 @@
   min-width: 0;
 }
 
-/* 已编辑文件：名字染成不同色，与本轮文件区分（卡片样式其余一致）。 */
+/* 已编辑文件：名字用更亮的主题色（品牌色），与本轮文件区分、醒目不灰。 */
 .bar[data-changed] .nameMain {
-  color: var(--dsw-alias-label-secondary, inherit);
+  color: var(--dsw-alias-state-business-primary, var(--dsw-alias-brand-primary, inherit));
 }
 
 /* +X -X 增删行数：加绿、删红，与官方改动卡一致。 */
@@ -160,6 +160,54 @@
 
 .deltaDel {
   color: var(--dsw-alias-state-error-primary, inherit);
+}
+
+/* 已编辑文件卡悬停看改动：浮层里渲染简版 diff（加绿删红，与官方改动卡一致）。 */
+.diffPreview {
+  min-width: 320px;
+  max-width: min(720px, 80vw);
+  max-height: 420px;
+  overflow: auto;
+  border: 1px solid var(--dsw-alias-border-l1, rgba(127, 127, 127, 0.15));
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-overlay, transparent);
+  color: var(--dsw-alias-label-primary, inherit);
+  font-size: 12px;
+}
+
+.diffBody {
+  padding: 8px 0;
+}
+
+.diffView {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.diffView > div {
+  padding: 0 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.diffAdd {
+  color: var(--dsw-alias-state-success-primary, inherit);
+  background: color-mix(in srgb, var(--dsw-alias-state-success-primary, transparent) 12%, transparent);
+}
+
+.diffDel {
+  color: var(--dsw-alias-state-error-primary, inherit);
+  background: color-mix(in srgb, var(--dsw-alias-state-error-primary, transparent) 12%, transparent);
+}
+
+.diffCtx {
+  color: var(--dsw-alias-label-secondary, inherit);
+}
+
+.diffMuted {
+  padding: 12px;
+  color: var(--dsw-alias-label-tertiary, inherit);
 }
 
 .body {

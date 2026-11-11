@@ -36,6 +36,8 @@ export interface MarkdownTurnReaders {
   /** 文件字节大小；拿不到（服务缺席/读失败）回 undefined。用于大文件拦截。 */
   statSize(sessionId: string, path: string, signal?: AbortSignal): Promise<number | undefined>
   loadSummary(sessionId: string, seq: number, signal: AbortSignal): Promise<unknown>
+  /** 读一个改动文件本轮起点→终点的对比（结构化 diff）；无服务/失败回 undefined。 */
+  loadChangesDiff(sessionId: string, seq: number, index: number, signal: AbortSignal): Promise<unknown>
   /** 在文件管理器里显示这个文件所在的文件夹。 */
   revealFile(sessionId: string, path: string): Promise<void>
   /** 主机能否把路径交给桌面。没有这个能力时文件栏不放打开按钮。 */
@@ -174,11 +176,13 @@ export function markdownPathsFromSummary(value: unknown): readonly string[] | 'i
   return paths
 }
 
-/** 改动文件（与官方改动卡同一条摘要），带增删行数，用于在本轮文件列表里标记「已编辑」。 */
+/** 改动文件（与官方改动卡同一条摘要），带增删行数与摘要内序号，用于标记「已编辑」并供悬停对比。 */
 export interface ChangedFile {
   readonly path: string
   readonly added: number
   readonly deleted: number
+  /** 在摘要 files 数组里的序号，悬停读 diff 用。 */
+  readonly index: number
 }
 
 /**
@@ -189,14 +193,15 @@ export interface ChangedFile {
 export function changedFilesFromSummary(value: unknown): ChangedFile[] {
   if (!isRecord(value) || !Array.isArray(value.files)) return []
   const out: ChangedFile[] = []
-  for (const file of value.files) {
-    if (!isRecord(file) || file.binary === true || typeof file.path !== 'string') continue
+  value.files.forEach((file, index) => {
+    if (!isRecord(file) || file.binary === true || typeof file.path !== 'string') return
     out.push({
       path: file.path,
       added: typeof file.added === 'number' && Number.isFinite(file.added) ? file.added : 0,
       deleted: typeof file.deleted === 'number' && Number.isFinite(file.deleted) ? file.deleted : 0,
+      index,
     })
-  }
+  })
   return out
 }
 
@@ -433,6 +438,17 @@ export function changesSummaryUrl(sessionId: string, seq: number): string {
   return `api/changes.summary?${new URLSearchParams({ sessionId, seq: String(seq) })}`
 }
 
+/**
+ * 官方改动对比的文档相对地址（单文件、本轮起点→终点的对比）。
+ * @param sessionId - 当前会话。
+ * @param seq - `workspace/changes` 事件序号。
+ * @param index - 文件在摘要 files 数组里的序号。
+ * @returns `api/changes.diff?...`。
+ */
+export function changesDiffUrl(sessionId: string, seq: number, index: number): string {
+  return `api/changes.diff?${new URLSearchParams({ sessionId, seq: String(seq), index: String(index) })}`
+}
+
 function isTextPage(value: unknown): value is MarkdownTextPage {
   return isRecord(value)
     && typeof value.text === 'string'
@@ -636,6 +652,11 @@ export function createMarkdownTurnReaders(remote: () => unknown): MarkdownTurnRe
     },
     async loadSummary(sessionId, seq, signal) {
       const response = await fetch(changesSummaryUrl(sessionId, seq), { signal })
+      if (!response.ok) return undefined
+      return await response.json() as unknown
+    },
+    async loadChangesDiff(sessionId, seq, index, signal) {
+      const response = await fetch(changesDiffUrl(sessionId, seq, index), { signal })
       if (!response.ok) return undefined
       return await response.json() as unknown
     },

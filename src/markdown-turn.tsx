@@ -13,7 +13,7 @@
 
 import { Fragment, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
-import { CodeBlock, FileTypeIcon, IconChevronDownOutlineRegular, IconChevronUpOutlineRegular, IconCloseOutlineRegular, IconEditOutlineRegular, IconNewChatOutlineRegular, IconSendOutlineRegular, IconWarningOutlineRegular, MarkdownText, Toast, classifyFileType, languageForPath } from '@deepseek-ai/dsh-client-ui-primitives'
+import { CodeBlock, FileTypeIcon, HoverCard, IconChevronDownOutlineRegular, IconChevronUpOutlineRegular, IconCloseOutlineRegular, IconEditOutlineRegular, IconNewChatOutlineRegular, IconSendOutlineRegular, IconWarningOutlineRegular, MarkdownText, Toast, classifyFileType, languageForPath } from '@deepseek-ai/dsh-client-ui-primitives'
 import { FileOpenSplit } from './markdown-turn-open.tsx'
 import { getFileState, getFilesOpen, setActiveFilePath, setFilesCount, subscribeActiveFilePath, subscribeFilesOpen, toggleFileEditing, toggleFileOpen } from './markdown-turn-active.ts'
 import type { MarkdownLabels } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -293,7 +293,61 @@ export function segmentWithComments(source: string, comments: readonly { id: num
   return segments
 }
 
-function MarkdownDocument({ sessionId, path, readers, t, onNotify, changed }: {
+/** 一条 diff 行（`+` 增 / `-` 删 / 空格 上下文）按首字符取色。 */
+function diffLineClass(line: string): string | undefined {
+  const mark = line.charAt(0)
+  if (mark === '+') return css.diffAdd
+  if (mark === '-') return css.diffDel
+  return css.diffCtx
+}
+
+/** 把改动对比（结构化 JSON：hunks[].lines，行首 +/<空格/-）渲染成简版 diff。 */
+function renderChangeDiff(diff: unknown, settled: boolean): ReactNode {
+  if (!settled) return <div className={css.diffMuted}>正在加载对比…</div>
+  if (diff === undefined) return <div className={css.diffMuted}>无法加载对比</div>
+  if (typeof diff !== 'object' || diff === null || Array.isArray(diff)) return <div className={css.diffMuted}>无法加载对比</div>
+  const record = diff as { kind?: unknown; hunks?: unknown }
+  if (record.kind === 'binary') return <div className={css.diffMuted}>二进制文件，无文本对比</div>
+  if (record.kind === 'oversized') return <div className={css.diffMuted}>文件过大，不展示对比</div>
+  const hunks = Array.isArray(record.hunks) ? record.hunks : []
+  const rows: ReactNode[] = []
+  hunks.forEach((hunk, hi) => {
+    if (typeof hunk !== 'object' || hunk === null) return
+    const lines = (hunk as { lines?: unknown }).lines
+    if (!Array.isArray(lines)) return
+    lines.forEach((line, li) => {
+      if (typeof line !== 'string') return
+      const text = line.slice(1)
+      rows.push(<div key={`${hi}-${li}`} className={diffLineClass(line)}>{text === '' ? ' ' : text}</div>)
+    })
+  })
+  if (rows.length === 0) return <div className={css.diffMuted}>无改动</div>
+  return <div className={css.diffView}>{rows.slice(0, 300)}</div>
+}
+
+/** 悬停读单文件本轮起点→终点对比并渲染（宿主改动卡的同款预览，本包自渲染简版）。 */
+function ChangeDiffView({ sessionId, seq, index, readers }: {
+  sessionId: string
+  seq: number
+  index: number
+  readers: MarkdownTurnReaders
+}): ReactNode {
+  const [diff, setDiff] = useState<unknown>(undefined)
+  const [settled, setSettled] = useState(false)
+  useEffect(() => {
+    const ctrl = new AbortController()
+    let cancelled = false
+    void readers.loadChangesDiff(sessionId, seq, index, ctrl.signal)
+      .then(value => { if (!cancelled) { setDiff(value); setSettled(true) } })
+      .catch(() => { if (!cancelled) setSettled(true) })
+    return () => { cancelled = true; ctrl.abort() }
+  }, [sessionId, seq, index, readers])
+  return <div className={css.diffPreview} data-changes-preview="">
+    <div className={css.diffBody}>{renderChangeDiff(diff, settled)}</div>
+  </div>
+}
+
+function MarkdownDocument({ sessionId, path, readers, t, onNotify, changed, seq }: {
   sessionId: string
   path: string
   readers: MarkdownTurnReaders
@@ -301,6 +355,8 @@ function MarkdownDocument({ sessionId, path, readers, t, onNotify, changed }: {
   onNotify?: (message: string) => void
   /** 传入则这张卡是「已编辑文件」：同款样式，只是名字染不同色并显示 +X -X。 */
   changed?: ChangedFile
+  /** 本轮 `workspace/changes` 序号；已编辑卡悬停读 diff 用。 */
+  seq?: number
 }): ReactNode {
   // 展开/编辑态存共享 store（不是本地 useState）：文档卡自己的编辑/展开
   // 按钮和这里的内联按钮改同一份，两处才能同步。按 path 取值，多个文件各自独立。
@@ -431,8 +487,7 @@ function MarkdownDocument({ sessionId, path, readers, t, onNotify, changed }: {
   const toggleLabel = t(open ? 'markdownTurn.collapseAria' : 'markdownTurn.expandAria', { name: path })
   const fileName = path.split('/').at(-1) ?? path
   const fileDir = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : ''
-  return <section className={css.document} data-markdown-path={path}>
-    <div ref={barRef} className={css.bar} data-path-bar="" data-changed={changed === undefined ? undefined : ''} {...(open ? { 'data-expanded': '' } : {})}>
+  const barEl = <div ref={barRef} className={css.bar} data-path-bar="" data-changed={changed === undefined ? undefined : ''} {...(open ? { 'data-expanded': '' } : {})}>
       <span className={css.icon} data-file-icon={classifyFileType(path)}>
         <FileTypeIcon path={path} size={16} />
       </span>
@@ -493,6 +548,10 @@ function MarkdownDocument({ sessionId, path, readers, t, onNotify, changed }: {
       <ExpandButton open={open} label={toggleLabel} onClick={toggleOpen} />
       <FileOpenSplit sessionId={sessionId} path={path} readers={readers} t={t} />
     </div>
+  return <section className={css.document} data-markdown-path={path}>
+    {changed !== undefined && seq !== undefined
+      ? <HoverCard variant="preview" openDelayMs={500} widthAnchorRef={barRef} anchor={barEl} content={<ChangeDiffView sessionId={sessionId} seq={seq} index={changed.index} readers={readers} />} />
+      : barEl}
     {open && <div
       className={css.body}
       data-markdown-body={path}
@@ -729,7 +788,7 @@ export function MarkdownTurnTail({ sessionId, turn, t, readers, onNotify }: Mark
     setListOpen(value => !value)
   }
   return <div ref={rootRef} className={css.root} data-files-block="" data-markdown-turn="" {...(folded ? { 'data-markdown-folded': '' } : {})}>
-    {shown.map(path => <MarkdownDocument key={path} sessionId={id} path={path} readers={readers} t={translate} changed={changedByPath.get(path)} {...(onNotify === undefined ? {} : { onNotify })} />)}
+    {shown.map(path => <MarkdownDocument key={path} sessionId={id} path={path} readers={readers} t={translate} changed={changedByPath.get(path)} seq={changesSeq} {...(onNotify === undefined ? {} : { onNotify })} />)}
     {paths.length > FOLDED_FILE_COUNT && <div className={css.edge}>
       <ExpandButton open={listOpen} label={listLabel} caption={listCount} onClick={toggleList} kind="more" />
     </div>}
