@@ -12,6 +12,8 @@ import {
   formatClock,
   frameKindOf,
   groupTurnsByNumber,
+  middleFoldRange,
+  MIDDLE_FOLD_THRESHOLD,
   scrollTopForTurnTop,
   summarizeTurn,
   turnStripText,
@@ -430,5 +432,33 @@ describe('git 快捷按钮的提示与编辑', () => {
     const index = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
     expect(index).toContain('getGitInstruction(action)')
     expect(index).toContain('sendToSession(sessionId, text)')
+  })
+})
+
+describe('超大 turn 中段折叠（middleFoldRange）', () => {
+  it('行数不超过阈值时不折叠', () => {
+    expect(middleFoldRange(MIDDLE_FOLD_THRESHOLD)).toEqual({ headEnd: 0, tailStart: MIDDLE_FOLD_THRESHOLD, hidden: 0 })
+    expect(middleFoldRange(10)).toEqual({ headEnd: 0, tailStart: 10, hidden: 0 })
+  })
+
+  it('超过阈值时只保留头尾，中间折起', () => {
+    // 269 步的巨型 turn：头 15 + 尾 15，中间 239 折起。
+    const range = middleFoldRange(269)
+    expect(range.headEnd).toBe(15)
+    expect(range.tailStart).toBe(254)
+    expect(range.hidden).toBe(239)
+  })
+
+  it('刚好超过阈值时头尾不重叠', () => {
+    // 51 行：头 15 + 尾 15 = 30，中间 21 折起。
+    const range = middleFoldRange(51)
+    expect(range.headEnd).toBe(15)
+    expect(range.tailStart).toBe(36)
+    expect(range.hidden).toBe(21)
+  })
+
+  it('头尾之和接近总长时中间只剩少量', () => {
+    // 32 行（turn 3 那种规模）：不折叠（低于阈值 50）。
+    expect(middleFoldRange(32).hidden).toBe(0)
   })
 })

@@ -51,6 +51,7 @@ export type ChatPowerLocaleKey =
   | 'expand.open' | 'expand.close'
   | 'turnFold.label' | 'turnFold.labelWithSummary' | 'turnFold.requestLabel'
   | 'turnFold.requestExpand' | 'turnFold.requestCollapse'
+  | 'turnFold.showMiddle' | 'turnFold.showedMiddle'
   | 'turnFold.frameThinking' | 'turnFold.frameTools' | 'turnFold.frameAnswer'
   | 'turnFold.frameError' | 'turnFold.frameRetry' | 'turnFold.frameCompaction'
   | 'turnFold.frameContext' | 'turnFold.frameLimit' | 'turnFold.frameQuestion'
@@ -162,6 +163,8 @@ export const zh: Record<ChatPowerLocaleKey, string> = {
   'turnFold.requestLabel': '你的请求 · {summary}',
   'turnFold.requestExpand': '展开请求',
   'turnFold.requestCollapse': '收起请求',
+  'turnFold.showMiddle': '显示中间 {count} 步',
+  'turnFold.showedMiddle': '已展开中间 {count} 步',
   'turnFold.labelWithSummary': '第 {turn} 轮 · {clock} · {summary}',
   'turnFold.collapseAria': '收起这一轮',
   'turnFold.expandAria': '展开这一轮',
@@ -280,6 +283,8 @@ export const en: Record<ChatPowerLocaleKey, string> = {
   'turnFold.requestLabel': 'Your request · {summary}',
   'turnFold.requestExpand': 'Expand request',
   'turnFold.requestCollapse': 'Collapse request',
+  'turnFold.showMiddle': 'Show {count} middle steps',
+  'turnFold.showedMiddle': 'Middle {count} steps expanded',
   'turnFold.labelWithSummary': 'Turn {turn} · {clock} · {summary}',
   'turnFold.collapseAria': 'Collapse this turn',
   'turnFold.expandAria': 'Expand this turn',

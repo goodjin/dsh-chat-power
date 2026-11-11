@@ -323,3 +323,36 @@
   font-size: 12px;
   cursor: pointer;
 }
+
+/* 超大 turn 中段折叠：被折起的中间行隐藏，头尾之间插一条「显示中间 N 步」占位条。 */
+[data-chat-power-middle-hidden] {
+  display: none !important;
+}
+
+/* 中段占位条：与摘要条同款视觉，可点可键盘操作。 */
+.middleBar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  margin: 2px 0;
+  border: 1px dashed var(--dsw-alias-border-l2, rgba(127, 127, 127, 0.3));
+  border-radius: var(--dsw-radius-sm, 4px);
+  color: var(--dsw-alias-label-secondary, inherit);
+  font-size: 12px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.middleBar:hover {
+  background: var(--dsw-alias-bg-layer-1, rgba(127, 127, 127, 0.06));
+}
+
+.middleBar:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary, currentColor);
+  outline-offset: -2px;
+}
+
+.middleBar [data-chat-power-turn-strip] {
+  all: unset;
+}

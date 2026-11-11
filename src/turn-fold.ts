@@ -98,6 +98,42 @@ export const REQUEST_BAR_ATTR = 'data-chat-power-request-bar'
 /** 插件给「被收起的用户请求行」加的标记。 */
 export const REQUEST_HIDDEN_ATTR = 'data-chat-power-request-collapsed'
 
+/**
+ * 超大 turn 内部步骤折叠：一个 turn 的行数超过此阈值时，只渲染头部与尾部若干行，
+ * 中间用一条「显示中间 N 步」占位条折起。
+ *
+ * 针对「单个超长 turn」（如一个会话跑了 4 小时、269 步全堆在第 1 轮）打开时卡 2-3 秒：
+ * turn 级虚拟化管不到 turn 内部，这里在 DOM 层把中段折起，打开即秒显头尾。
+ */
+export const MIDDLE_FOLD_THRESHOLD = 50
+/** 折叠后保留的头部行数（输入上下文、开场步骤）。 */
+export const MIDDLE_FOLD_HEAD = 15
+/** 折叠后保留的尾部行数（最新进展、正在输出的步骤）。 */
+export const MIDDLE_FOLD_TAIL = 15
+/** 插件给「超大 turn 中段被折起」加的行标记（CSS 据此 display:none）。 */
+export const MIDDLE_HIDDEN_ATTR = 'data-chat-power-middle-hidden'
+/** 插件插入的「显示中间 N 步」占位条标记。 */
+export const MIDDLE_BAR_ATTR = 'data-chat-power-middle-bar'
+
+/**
+ * 计算超大 turn 中段折叠的范围（纯逻辑，便于测试）。
+ *
+ * 返回 `{ headEnd, tailStart, hidden }`：保留 `[0, headEnd)` 与 `[tailStart, len)`，
+ * 隐藏 `[headEnd, tailStart)`，hidden 为被隐藏的行数。行数不超过阈值时返回
+ * `hidden: 0`（表示不折叠）。
+ *
+ * @param total - 该 turn 的总行数。
+ * @returns 折叠范围。
+ */
+export function middleFoldRange(total: number): { headEnd: number; tailStart: number; hidden: number } {
+  if (total <= MIDDLE_FOLD_THRESHOLD) {
+    return { headEnd: 0, tailStart: total, hidden: 0 }
+  }
+  const headEnd = MIDDLE_FOLD_HEAD
+  const tailStart = Math.max(headEnd, total - MIDDLE_FOLD_TAIL)
+  return { headEnd, tailStart, hidden: tailStart - headEnd }
+}
+
 /** 用户的请求行（首条用户消息、补发消息）。 */
 const USER_ROW_SELECTOR = '[data-chat-flow-kind="user"],[data-chat-flow-kind="steering"]'
 
@@ -183,6 +219,12 @@ interface TurnRecord {
   processHint?: string
   requestCollapsed: boolean
   requestSummary: string
+  /** 超大 turn 中段折叠：是否处于折起态（仅当前轮用）。 */
+  middleCollapsed: boolean
+  /** 中段占位条元素。 */
+  middleBar?: HTMLElement
+  /** 中段当前被折起的行数（0 表示未折叠 / 已全部展开）。 */
+  middleHiddenCount: number
 }
 
 /** 折叠控制器的可注入面（便于测试与宿主差异适配）。 */
@@ -281,9 +323,11 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     for (const record of records.values()) {
       record.strip?.remove()
       record.requestBar?.remove()
+      record.middleBar?.remove()
       for (const row of record.rows) {
         row.removeAttribute(COLLAPSED_ATTR)
         row.removeAttribute(REQUEST_HIDDEN_ATTR)
+        row.removeAttribute(MIDDLE_HIDDEN_ATTR)
       }
     }
     records = new Map()
@@ -300,6 +344,101 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
       if (collapsed) row.setAttribute(COLLAPSED_ATTR, '')
       else row.removeAttribute(COLLAPSED_ATTR)
     }
+  }
+
+  /**
+   * 超大 turn 中段折叠：turn 行数超阈值时，只保留头部与尾部若干行可见，
+   * 中间行用 {@link MIDDLE_HIDDEN_ATTR} 隐藏，并在头尾之间插一条「显示中间 N 步」占位条。
+   *
+   * 只对当前轮（`record.number === currentTurn`）调用——历史轮已由整轮折叠处理。
+   * 当前轮尾部可能是正在输出的步骤，折叠中段不影响尾部继续追加。
+   *
+   * @param record - 当前轮记录。
+   * @returns 是否发生了折叠（隐藏了行）。
+   */
+  const collapseMiddleSteps = (record: TurnRecord): boolean => {
+    const rows = record.rows
+    const range = middleFoldRange(rows.length)
+    if (range.hidden === 0) {
+      // 行数回到阈值内：展开中段、撤掉占位条。
+      restoreMiddle(record)
+      return false
+    }
+    // 隐藏 headEnd 到 tailStart 之间的行。
+    for (let index = range.headEnd; index < range.tailStart; index += 1) {
+      rows[index]?.setAttribute(MIDDLE_HIDDEN_ATTR, '')
+    }
+    record.middleCollapsed = true
+    record.middleHiddenCount = range.hidden
+    ensureMiddleBar(record, rows[range.headEnd - 1] ?? rows[0], range.hidden)
+    return true
+  }
+
+  /** 展开超大 turn 的中段：清掉隐藏标记、撤掉占位条。 */
+  const restoreMiddle = (record: TurnRecord): void => {
+    record.middleCollapsed = false
+    record.middleHiddenCount = 0
+    for (const row of record.rows) row.removeAttribute(MIDDLE_HIDDEN_ATTR)
+    record.middleBar?.remove()
+    record.middleBar = undefined
+  }
+
+  /**
+   * 在中段边界处插入（或更新）「显示中间 N 步」占位条。
+   *
+   * 锚点：头部最后一行之后。宿主重渲染冲掉时由调用方下一次 sync 重建。
+   * 点击占位条即展开中段（只展开一次；再折叠由 sync 按行数重新判定）。
+   */
+  const ensureMiddleBar = (record: TurnRecord, anchor: HTMLElement | undefined, hiddenCount: number): void => {
+    const parent = anchor?.parentElement
+    if (parent === undefined || parent === null || anchor === undefined) return
+    const host = parent
+    let bar = record.middleBar
+    if (bar === undefined || !bar.isConnected || bar.parentElement !== parent) {
+      bar = document.createElement('div')
+      bar.className = css.middleBar ?? ''
+      bar.setAttribute(MIDDLE_BAR_ATTR, '')
+      bar.setAttribute('role', 'button')
+      bar.setAttribute('tabindex', '0')
+      const expand = (): void => {
+        // 用户主动展开：清掉中段隐藏标记，但保留占位条（更新为「已展开」）。
+        for (const row of record.rows) row.removeAttribute(MIDDLE_HIDDEN_ATTR)
+        record.middleCollapsed = false
+        record.middleHiddenCount = 0
+        renderMiddleBar(bar!, record)
+      }
+      bar.addEventListener('click', expand)
+      bar.addEventListener('keydown', (event: KeyboardEvent) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return
+        event.preventDefault()
+        expand()
+      })
+      // 插在头部最后一行之后。
+      host.insertBefore(bar, anchor.nextSibling)
+      record.middleBar = bar
+    }
+    renderMiddleBar(bar, record)
+  }
+
+  /** 占位条文案：折起态显示「显示中间 N 步」，已展开态显示「已展开中间 N 步」。 */
+  const renderMiddleBar = (bar: HTMLElement, record: TurnRecord): void => {
+    const hidden = record.middleHiddenCount
+    bar.setAttribute('data-state', record.middleCollapsed ? 'collapsed' : 'expanded')
+    bar.setAttribute('aria-expanded', record.middleCollapsed ? 'false' : 'true')
+    const label = record.middleCollapsed
+      ? t('turnFold.showMiddle', { count: hidden })
+      : t('turnFold.showedMiddle', { count: hidden })
+    if (bar.dataset['signature'] === label) return
+    bar.dataset['signature'] = label
+    while (bar.firstChild !== null) bar.removeChild(bar.firstChild)
+    const chevron = document.createElement('span')
+    chevron.className = css.stripChevron ?? ''
+    chevron.setAttribute('aria-hidden', 'true')
+    chevron.textContent = record.middleCollapsed ? '▸' : '▾'
+    const text = document.createElement('span')
+    text.className = css.stripLabel ?? ''
+    text.textContent = label
+    bar.append(chevron, text)
   }
 
   /** 摘要条的稳定签名：内容没变就不重画，避免观察器自激。 */
@@ -877,6 +1016,8 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
           collapsed: false,
           requestCollapsed: true,
           requestSummary: '',
+          middleCollapsed: false,
+          middleHiddenCount: 0,
         })
         continue
       }
@@ -922,6 +1063,9 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
           record.requestCollapsed = true
         }
         ensureRequestBar(record)
+        // 超大 turn 中段折叠：当前轮行数超阈值时，只留头尾可见，中间折起。
+        // 在限高与折叠思考之前做，让被折起的行不参与后续测量。
+        collapseMiddleSteps(record)
         collapseThinking(record)
         yieldGroupHeadToThinking(record)
         applyCaps(record, availableHeight(container, record))
@@ -1013,10 +1157,12 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     for (const record of records.values()) {
       record.strip?.remove()
       record.requestBar?.remove()
+      record.middleBar?.remove()
       for (const row of record.rows) {
         row.removeAttribute(COLLAPSED_ATTR)
         row.removeAttribute(CAPPED_ATTR)
         row.removeAttribute(REQUEST_HIDDEN_ATTR)
+        row.removeAttribute(MIDDLE_HIDDEN_ATTR)
         row.style.removeProperty('--chat-power-cap')
       }
     }
