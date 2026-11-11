@@ -5,43 +5,17 @@
   margin: 8px 0;
 }
 
-/* 合并成单一「本轮文件」标题：把本轮文件块（data-files-group）排到宿主改动卡
-   （data-changed-files）之前，并收掉宿主卡自己的标题行——「已编辑」文件（宿主卡里的行）
-   并入本轮文件块、冠不同颜色。turnTail 是纵向 flex（宿主 tii1Sq_root，gap 16px），槽位
-   条目经 display:contents 包装平铺为其直接子项，故可用 order 重排。 */
+/* 宿主改动卡（「已编辑文件」）整卡隐藏：本轮文件列表已把改动文件并进来、同样式渲染
+   （已编辑的染不同色并显示 +X -X），宿主那张重复卡不再需要。 */
+[data-turn-tail] [data-changed-files] {
+  display: none;
+}
+
+/* 本轮文件列表排在点赞栏（MessageIconActions，order 0）之后——展开时列表在它下方。
+   turnTail 是纵向 flex、槽位条目经 display:contents 平铺为直接子项，故可用 order 重排。 */
 [data-turn-tail] [data-files-block] {
   order: 1;
   margin: 0;
-}
-
-/* 宿主改动卡（「已编辑」文件）整卡收编进本轮文件列表：藏掉它自己的按钮（标题行 +
-   多文件时的「显示全部 / 收起」折叠钮——之前没藏折叠钮，收起时会露出来捣乱），只留文件行；
-   去掉自己的卡框，让它并入本轮文件列表。单文件（无 ul）本就被本轮文件块覆盖，整卡收起。 */
-[data-turn-tail] [data-changed-files] > button {
-  display: none;
-}
-
-[data-turn-tail] [data-changed-files]:not(:has(> ul)) {
-  display: none;
-}
-
-[data-turn-tail] [data-changed-files]:has(> ul) {
-  order: 2;
-  border: none;
-  border-radius: 0;
-  background: transparent;
-  overflow: visible;
-  margin-top: -16px; /* 抵消 turnTail 的 16px 间距，贴住上一张文件卡 */
-}
-
-/* 「已编辑文件」行冠以与本轮文件不同的颜色；hover 与其它行保持一致。 */
-[data-turn-tail] [data-changed-files] ul button {
-  color: var(--dsw-alias-label-secondary, inherit);
-}
-
-/* 收起时（点赞栏入口未点开，turnTail 上没有 data-files-open），宿主改动卡也一起收起。 */
-[data-turn-tail]:not([data-files-open]) [data-changed-files] {
-  display: none;
 }
 
 /* 本机文件卡的收起标题条与文件卡头部共用这一套条/名/图标钮样式；
@@ -141,6 +115,8 @@
 }
 
 .nameMain {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   font-size: 12.5px;
   font-weight: 600;
@@ -154,6 +130,36 @@
   color: var(--dsw-alias-label-secondary, inherit);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* 文件名行：名字 + （已编辑时的）增删行数同一行。 */
+.nameTop {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* 已编辑文件：名字染成不同色，与本轮文件区分（卡片样式其余一致）。 */
+.bar[data-changed] .nameMain {
+  color: var(--dsw-alias-label-secondary, inherit);
+}
+
+/* +X -X 增删行数：加绿、删红，与官方改动卡一致。 */
+.delta {
+  flex: none;
+  display: inline-flex;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.deltaAdd {
+  color: var(--dsw-alias-state-success-primary, inherit);
+}
+
+.deltaDel {
+  color: var(--dsw-alias-state-error-primary, inherit);
 }
 
 .body {

@@ -23,6 +23,8 @@ import { createSendController } from './send-actions.ts'
 import {
   MARKDOWN_READ_CHAR_CAP,
   MARKDOWN_READ_LINE_CAP,
+  type ChangedFile,
+  changedFilesFromSummary,
   isMarkdownPath,
   linkedFilePathsFromTurn,
   markdownSources,
@@ -291,12 +293,14 @@ export function segmentWithComments(source: string, comments: readonly { id: num
   return segments
 }
 
-function MarkdownDocument({ sessionId, path, readers, t, onNotify }: {
+function MarkdownDocument({ sessionId, path, readers, t, onNotify, changed }: {
   sessionId: string
   path: string
   readers: MarkdownTurnReaders
   t: RuntimeT
   onNotify?: (message: string) => void
+  /** 传入则这张卡是「已编辑文件」：同款样式，只是名字染不同色并显示 +X -X。 */
+  changed?: ChangedFile
 }): ReactNode {
   // 展开/编辑态存共享 store（不是本地 useState）：文档卡自己的编辑/展开
   // 按钮和这里的内联按钮改同一份，两处才能同步。按 path 取值，多个文件各自独立。
@@ -428,7 +432,7 @@ function MarkdownDocument({ sessionId, path, readers, t, onNotify }: {
   const fileName = path.split('/').at(-1) ?? path
   const fileDir = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : ''
   return <section className={css.document} data-markdown-path={path}>
-    <div ref={barRef} className={css.bar} data-path-bar="" {...(open ? { 'data-expanded': '' } : {})}>
+    <div ref={barRef} className={css.bar} data-path-bar="" data-changed={changed === undefined ? undefined : ''} {...(open ? { 'data-expanded': '' } : {})}>
       <span className={css.icon} data-file-icon={classifyFileType(path)}>
         <FileTypeIcon path={path} size={16} />
       </span>
@@ -443,7 +447,15 @@ function MarkdownDocument({ sessionId, path, readers, t, onNotify }: {
           event.preventDefault()
         }}
       >
-        <span className={css.nameMain}>{fileName}</span>
+        <span className={css.nameTop}>
+          <span className={css.nameMain}>{fileName}</span>
+          {changed !== undefined && (
+            <span className={css.delta}>
+              <span className={css.deltaAdd}>+{changed.added}</span>
+              <span className={css.deltaDel}>-{changed.deleted}</span>
+            </span>
+          )}
+        </span>
         {fileDir !== '' && <span className={css.nameDir}>{fileDir}</span>}
       </span>
       {/* 编辑态：取消钮占住编辑钮的位置（同一枚图标按钮换掉图标），退出编辑
@@ -664,6 +676,9 @@ export function MarkdownTurnTail({ sessionId, turn, t, readers, onNotify }: Mark
   const translate = t ?? fallbackT
   const rootRef = useRef<HTMLDivElement>(null)
   const [extra, setExtra] = useState<SummaryExtra>([])
+  // 改动文件（含增删行数），与官方改动卡同一条摘要。用来在本轮文件列表里把「已编辑」
+  // 的文件标成不同颜色并显示 +X -X，让两种来源的文件同列表、同样式。
+  const [changedFiles, setChangedFiles] = useState<ChangedFile[]>([])
   const [listOpen, setListOpen] = useState(false)
   // 展开态与点赞栏那排的入口共享（markdown-turn-chip）：本块读态渲染列表，
   // 入口改态。默认收起——入口在点赞栏那排，本块只在展开时把列表渲染在它下方。
@@ -672,6 +687,7 @@ export function MarkdownTurnTail({ sessionId, turn, t, readers, onNotify }: Mark
   useEffect(() => {
     if (id === undefined || changesSeq === undefined) {
       setExtra(current => current.length === 0 ? current : [])
+      setChangedFiles(current => current.length === 0 ? current : [])
       return
     }
     const controller = new AbortController()
@@ -681,9 +697,12 @@ export function MarkdownTurnTail({ sessionId, turn, t, readers, onNotify }: Mark
       const parsed = markdownPathsFromSummary(value)
       const paths = parsed === 'invalid' ? [] : parsed
       setExtra(current => samePaths(current, paths) ? current : paths)
+      const changed = changedFilesFromSummary(value)
+      setChangedFiles(current => sameChanged(current, changed) ? current : changed)
     }).catch(() => {
       if (!cancelled && !controller.signal.aborted) {
         setExtra(current => current.length === 0 ? current : [])
+        setChangedFiles(current => current.length === 0 ? current : [])
       }
     })
     return () => {
@@ -693,6 +712,9 @@ export function MarkdownTurnTail({ sessionId, turn, t, readers, onNotify }: Mark
   }, [id, changesSeq, readers])
   // paths 在提前 return 之前算好（纯计算，不涉 Hooks）。
   const paths = mergeMarkdownPaths(mergeMarkdownPaths(sources?.paths ?? [], extra), linked)
+  // 路径 → 增删行数，供每个文档卡判断是否「已编辑」并显示 +X -X。
+  const changedByPath = new Map<string, ChangedFile>()
+  for (const file of changedFiles) changedByPath.set(file.path, file)
   // 把本轮文件个数写进共享 store，供点赞栏那排的入口显示「本轮文件 · N」。
   useEffect(() => { if (id !== undefined) setFilesCount(id, paths.length) }, [id, paths])
   if (id === undefined) return null
@@ -707,11 +729,15 @@ export function MarkdownTurnTail({ sessionId, turn, t, readers, onNotify }: Mark
     setListOpen(value => !value)
   }
   return <div ref={rootRef} className={css.root} data-files-block="" data-markdown-turn="" {...(folded ? { 'data-markdown-folded': '' } : {})}>
-    {shown.map(path => <MarkdownDocument key={path} sessionId={id} path={path} readers={readers} t={translate} {...(onNotify === undefined ? {} : { onNotify })} />)}
+    {shown.map(path => <MarkdownDocument key={path} sessionId={id} path={path} readers={readers} t={translate} changed={changedByPath.get(path)} {...(onNotify === undefined ? {} : { onNotify })} />)}
     {paths.length > FOLDED_FILE_COUNT && <div className={css.edge}>
       <ExpandButton open={listOpen} label={listLabel} caption={listCount} onClick={toggleList} kind="more" />
     </div>}
   </div>
+}
+
+function sameChanged(left: readonly ChangedFile[], right: readonly ChangedFile[]): boolean {
+  return left.length === right.length && left.every((file, index) => file.path === right[index]?.path && file.added === right[index]?.added && file.deleted === right[index]?.deleted)
 }
 
 function samePaths(left: readonly string[], right: readonly string[]): boolean {

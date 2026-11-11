@@ -190,13 +190,12 @@ describe('输出框的固定顶栏与底部间距', () => {
   })
 })
 
-describe('底部文件区块合并', () => {
-  it('文件列表展开在点赞栏下方，收起时已编辑文件一起收起', () => {
+describe('已编辑文件并入本轮文件列表', () => {
+  it('宿主改动卡整卡隐藏，改动文件由本轮文件列表同样式渲染', () => {
     const css = readFileSync(new URL('../src/markdown-turn.module.css', import.meta.url), 'utf8')
     expect(css).toContain('data-changed-files')
-    expect(css).toContain('data-files-block')
-    // 收起时（turnTail 无 data-files-open）宿主改动卡也收起
-    expect(css).toContain('[data-turn-tail]:not([data-files-open])')
+    // 宿主改动卡整卡 display:none，避免它样式不一致、排在折叠钮下面
+    expect(css).toMatch(/\[data-turn-tail\]\s*\[data-changed-files\]\s*\{\s*display:\s*none/)
   })
   it('点赞栏那排的入口带标记，供样式联动', () => {
     const source = readFileSync(new URL('../src/markdown-turn-chip.tsx', import.meta.url), 'utf8')

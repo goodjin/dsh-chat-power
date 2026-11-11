@@ -174,6 +174,32 @@ export function markdownPathsFromSummary(value: unknown): readonly string[] | 'i
   return paths
 }
 
+/** 改动文件（与官方改动卡同一条摘要），带增删行数，用于在本轮文件列表里标记「已编辑」。 */
+export interface ChangedFile {
+  readonly path: string
+  readonly added: number
+  readonly deleted: number
+}
+
+/**
+ * 从改动摘要里取改动文件及其增删行数（和官方卡片的 files 同源）。跳过二进制。
+ * 摘要不是 `{ files: [] }` 时返回空数组。
+ * @param value - `api/changes.summary` 的 JSON。
+ */
+export function changedFilesFromSummary(value: unknown): ChangedFile[] {
+  if (!isRecord(value) || !Array.isArray(value.files)) return []
+  const out: ChangedFile[] = []
+  for (const file of value.files) {
+    if (!isRecord(file) || file.binary === true || typeof file.path !== 'string') continue
+    out.push({
+      path: file.path,
+      added: typeof file.added === 'number' && Number.isFinite(file.added) ? file.added : 0,
+      deleted: typeof file.deleted === 'number' && Number.isFinite(file.deleted) ? file.deleted : 0,
+    })
+  }
+  return out
+}
+
 /**
  * 把摘要里新出现的路径接在已有路径后面，同一路径只留第一次。
  * @param base - 产出和交付里已经挑出的路径。
