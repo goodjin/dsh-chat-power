@@ -7,7 +7,8 @@
  * （`[data-conversation-tabs]`，role=tablist）里补挂自己的标签：
  *
  * - 会话视图（文件 / 浏览器 / 终端）与打开的文件标签排在宿主标签之后；
- * - 文件标签带关闭钮（退出编辑 = 丢弃草稿，由调用方路由）；
+ * - 文件标签是一个整体：标题与关闭钮同处一个框里（Chrome 风格）；关闭 = 退出
+ *   编辑（丢弃草稿，由调用方路由）；
  * - 有工具标签激活时给宿主行做 `data-chat-tools-live` 标记（样式据此把宿主
  *   自己的标签压成未选中，避免一行里出现两个高亮）；
  * - 宿主行缺席（未开开发者工具时没有轨迹行、标签行整行不渲染）就在会话
@@ -22,6 +23,8 @@
 export const GROUP_ATTR = 'data-chat-tools-group'
 /** 单个工具标签标记（我们的）。 */
 export const TAB_ATTR = 'data-chat-tools-tab'
+/** 文件标签的外壳：标题 + 关闭钮同处一个框里（Chrome 标签那样是一个整体）。 */
+export const TAB_WRAP_ATTR = 'data-chat-tools-tab-wrap'
 /** 标签上的工具标签 id（toolsState 里的 tab.id）。 */
 export const TAB_ID_ATTR = 'data-chat-tools-tab-id'
 /** 标签上的工具种类（kind 启动器才有）。 */
@@ -202,7 +205,8 @@ export function syncSessionToolsRow(root: RowElementLike, doc: RowDocumentLike, 
   // 打满且饿死定时器与调试器。签名比对必须先于**任何** DOM 写（setAttribute
   // 即使写同值也会产生变异记录）：快照没变、行没换、子节点齐全就原样返回。
   const sig = signatureOf(snapshot)
-  const expectedChildren = 3 + snapshot.tabs.filter(tab => !['chat', 'files', 'browser', 'terminal'].includes(tab.kind)).length * 2
+  // 组内子节点：三个种类入口各一枚 + 每个文件标签一个外壳（标题与关闭钮同框）。
+  const expectedChildren = 3 + snapshot.tabs.filter(tab => !['chat', 'files', 'browser', 'terminal'].includes(tab.kind)).length
   const prev = lastSync.get(root)
   const groupForCheck = row.querySelector(`[${GROUP_ATTR}]`)
   if (prev !== undefined && prev.sig === sig && prev.row === row && groupForCheck !== null && (groupForCheck.children?.length ?? -1) === expectedChildren) return row
@@ -250,6 +254,12 @@ export function syncSessionToolsRow(root: RowElementLike, doc: RowDocumentLike, 
   }
   for (const tab of snapshot.tabs) {
     if (tab.kind === 'chat' || tab.kind === 'files' || tab.kind === 'browser' || tab.kind === 'terminal') continue
+    // 文件标签 = 一个框：标题按钮与关闭钮同处框内，视觉上是一个整体
+    // （Chrome 标签那样）。关闭钮是标题按钮的兄弟节点，不嵌套在按钮里
+    // （按钮里再套按钮不是合法 HTML），靠事件委托区分点击落点。
+    const wrap = doc.createElement('span')
+    wrap.setAttribute(TAB_WRAP_ATTR, '')
+    if (isActive(snapshot, tab)) wrap.setAttribute('data-chat-tools-tab-active', '')
     const button = doc.createElement('button')
     button.setAttribute('type', 'button')
     button.setAttribute('role', 'tab')
@@ -258,16 +268,15 @@ export function syncSessionToolsRow(root: RowElementLike, doc: RowDocumentLike, 
     button.setAttribute('aria-selected', isActive(snapshot, tab) ? 'true' : 'false')
     button.setAttribute('title', tab.title)
     button.append(doc.createTextNode(tab.title))
-    if (isActive(snapshot, tab)) button.setAttribute('data-chat-tools-tab-active', '')
-    else button.removeAttribute('data-chat-tools-tab-active')
-    render(button)
+    wrap.append(button)
     const close = doc.createElement('button')
     close.setAttribute('type', 'button')
     close.setAttribute(TAB_CLOSE_ATTR, '')
     close.setAttribute(TAB_ID_ATTR, tab.id)
     close.setAttribute('aria-label', tab.title)
     close.append(doc.createTextNode('×'))
-    render(close)
+    wrap.append(close)
+    render(wrap)
   }
   if (ownsChatButton) row.setAttribute('data-chat-tools-owns-chat', '')
   else row.removeAttribute('data-chat-tools-owns-chat')

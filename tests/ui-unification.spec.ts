@@ -180,13 +180,16 @@ describe('统一编辑链路', () => {
     expect(read('../src/conversation-tools.tsx')).toContain("name: 'conversation.session.header.actions'")
   })
 
-  it('工具标签 Chrome 风格：框线分隔、当前标签突出、关闭钮有热区、过多时横向滚动', () => {
+  it('工具标签 Chrome 风格：框线分隔、当前标签突出、关闭钮在标签框内、过多时横向滚动', () => {
     const css = read('../src/conversation-tools.module.css')
     expect(css).toMatch(/\[data-chat-tools-tab\][^{]*\{[^}]*border/)
     expect(css).toMatch(/\[data-chat-tools-tab-active\][^{]*\{[^}]*border/)
     expect(css).toMatch(/\[data-chat-tools-tab-close\][^{]*\{[^}]*width:\s*(24|28)px/)
     expect(css).toMatch(/\[data-chat-tools-group\][^{]*\{[^}]*overflow-x:\s*auto/)
     expect(css).toMatch(/\[data-chat-tools-live\][^{]*\{[^}]*opacity/)
+    // 关闭钮在标签框里：外壳（标题 + ×）自带框线，框内的关闭钮是一枚小圆钮。
+    expect(css).toMatch(/\[data-chat-tools-tab-wrap\][^{]*\{[^}]*border/)
+    expect(css).toMatch(/\[data-chat-tools-tab-wrap\]\s*\[data-chat-tools-tab-close\][^{]*\{[^}]*width:\s*(16|18|20)px/)
   })
 
   it('仅保存只给工作区文件的编辑：edit:// 开头的标签接写回通道，本机文件没有保存钮', () => {

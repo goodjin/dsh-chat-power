@@ -17,6 +17,7 @@ import {
   TAB_CLOSE_ATTR,
   TAB_ID_ATTR,
   TAB_KIND_ATTR,
+  TAB_WRAP_ATTR,
   handleToolsRowClick,
   syncSessionToolsRow,
   type RowElementLike,
@@ -185,6 +186,22 @@ describe('syncSessionToolsRow（同步）', () => {
     const tabs = group!.querySelectorAll(`[${TAB_ATTR}]`)
     expect(tabs).toHaveLength(4)
     expect(group!.querySelectorAll(`[${TAB_CLOSE_ATTR}]`)).toHaveLength(1)
+  })
+
+  it('文件标签是一个整体：关闭钮在标签框里（标题与 × 同处一个外壳）', () => {
+    const root = content('s1', true)
+    const h = handlers(() => snapshotOf([{ id: 't1', kind: 'local', title: 'a.md' }], 't1'))
+    const row = syncSessionToolsRow(root, fakeDoc(), h.value, {})
+    const group = row!.querySelector(`[${GROUP_ATTR}]`)!
+    const wraps = Array.from(group.querySelectorAll(`[${TAB_WRAP_ATTR}]`))
+    expect(wraps).toHaveLength(1)
+    const wrap = wraps[0]!
+    // 框里既有标题按钮，也有关闭钮——视觉上是一个整体（Chrome 那样）。
+    expect(wrap.querySelector(`[${TAB_ATTR}]`)).not.toBeNull()
+    expect(wrap.querySelector(`[${TAB_CLOSE_ATTR}]`)).not.toBeNull()
+    // 当前标签的高亮挂在外壳上（框高亮，标题按钮不单独高亮）。
+    expect(wrap.getAttribute('data-chat-tools-tab-active')).toBe('')
+    expect(wrap.querySelector(`[${TAB_ATTR}]`)!.hasAttribute('data-chat-tools-tab-active')).toBe(false)
   })
 
   it('宿主行缺席：自建行带「对话」标签（图标 + 文字），排在工具标签组之前', () => {
