@@ -43,31 +43,34 @@
   font-size: 11px;
 }
 
-/* 底部「已编辑文件」（宿主卡片）与「本轮文件」合成一块：
-   收起时只留宿主那张标题行（增删行数与悬停预览仍在上面），点一下两边的内容一起出来。 */
-body:has([data-files-toggle][aria-expanded='false']) [data-changed-files] > *:not(:first-child) {
-  display: none;
+/* 底部「已编辑文件」（宿主改动卡 data-changed-files）与「本轮文件」（data-files-group）
+   合成一整块：宿主卡在前、本轮文件条紧随其后，去掉两者之间的接缝（宿主卡底圆角、
+   本轮文件条的顶边框与顶圆角、间距），看起来像同一张卡。宿主卡自带的增删行数、
+   点击进 review、悬停 diff 预览全部保留。 */
+body:has([data-changed-files]:has(+ [data-files-group])) [data-changed-files] {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
 }
 
-/* 宿主卡片在场时，本轮文件这一行沿用它的边框与圆角，视觉上是一整块。 */
+/* 本轮文件的折叠条去掉顶边框与顶圆角，紧接宿主卡下沿，二者连成一张卡。 */
 body:has([data-changed-files]) [data-files-group] {
   margin-top: -1px;
 }
-
-/* 反过来（宿主卡片在本轮文件之后）也合成一块。 */
-body:has([data-files-group] + [data-changed-files]) [data-changed-files] {
-  border-top-left-radius: 0;
-  border-top-right-radius: 0;
-}
-
 body:has([data-changed-files]) [data-files-group] .groupToggle {
+  border-top: none;
   border-top-left-radius: 0;
   border-top-right-radius: 0;
   background: transparent;
 }
 
-body:has([data-changed-files]) [data-files-group] .groupToggle:hover {
-  background: var(--dsw-alias-interactive-bg-hover, rgba(127, 127, 127, 0.1));
+/* 「已编辑文件」（宿主卡里的行）冠以与本轮文件不同的颜色，便于区分；hover 与其它行一致。 */
+body:has([data-changed-files]) [data-changed-files] ul button {
+  color: var(--dsw-alias-label-secondary, inherit);
+}
+
+/* 收起本轮文件时，宿主卡只留标题行（增删行数与悬停预览仍在），点一下两边内容一起出来。 */
+body:has([data-files-toggle][aria-expanded='false']) [data-changed-files] > *:not(:first-child) {
+  display: none;
 }
 
 .groupTitle {
