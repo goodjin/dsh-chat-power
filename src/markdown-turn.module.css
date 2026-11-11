@@ -43,33 +43,37 @@
   font-size: 11px;
 }
 
-/* 底部「已编辑文件」（宿主改动卡 data-changed-files）与「本轮文件」（data-files-group）
-   合成一整块：宿主卡在前、本轮文件条紧随其后，去掉两者之间的接缝（宿主卡底圆角、
-   本轮文件条的顶边框与顶圆角、间距），看起来像同一张卡。宿主卡自带的增删行数、
-   点击进 review、悬停 diff 预览全部保留。 */
-body:has([data-changed-files]:has(+ [data-files-group])) [data-changed-files] {
-  border-bottom-left-radius: 0;
-  border-bottom-right-radius: 0;
+/* 合并成单一「本轮文件」标题：把本轮文件块（data-files-group）排到宿主改动卡
+   （data-changed-files）之前，并收掉宿主卡自己的标题行——「已编辑」文件（宿主卡里的行）
+   并入本轮文件块、冠不同颜色。turnTail 是纵向 flex（宿主 tii1Sq_root，gap 16px），槽位
+   条目经 display:contents 包装平铺为其直接子项，故可用 order 重排。 */
+[data-turn-tail] [data-files-group] {
+  order: -1;
+  margin: 0;
 }
 
-/* 本轮文件的折叠条去掉顶边框与顶圆角，紧接宿主卡下沿，二者连成一张卡。 */
-body:has([data-changed-files]) [data-files-group] {
-  margin-top: -1px;
+/* 宿主改动卡：多文件时藏掉它自己的标题行（增删统计、点击进 review、悬停预览随它收起），
+   只留文件行；单文件（无 ul）本就是文件本身，原样保留。 */
+[data-turn-tail] [data-changed-files]:has(> ul) > :first-child {
+  display: none;
 }
-body:has([data-changed-files]) [data-files-group] .groupToggle {
-  border-top: none;
-  border-top-left-radius: 0;
-  border-top-right-radius: 0;
+
+/* 宿主改动卡去掉自己的卡框（边框 / 圆角 / 底色 / 间距），让「已编辑」文件行并入本轮文件块。 */
+[data-turn-tail] [data-changed-files]:has(> ul) {
+  border: none;
+  border-radius: 0;
   background: transparent;
+  overflow: visible;
+  margin-top: -16px; /* 抵消 turnTail 的 16px 间距，贴住上一张文件卡 */
 }
 
-/* 「已编辑文件」（宿主卡里的行）冠以与本轮文件不同的颜色，便于区分；hover 与其它行一致。 */
-body:has([data-changed-files]) [data-changed-files] ul button {
+/* 「已编辑文件」行冠以与本轮文件不同的颜色；hover 与其它行保持一致。 */
+[data-turn-tail] [data-changed-files] ul button {
   color: var(--dsw-alias-label-secondary, inherit);
 }
 
-/* 收起本轮文件时，宿主卡只留标题行（增删行数与悬停预览仍在），点一下两边内容一起出来。 */
-body:has([data-files-toggle][aria-expanded='false']) [data-changed-files] > *:not(:first-child) {
+/* 收起本轮文件时，已编辑文件也一起收起，只留「本轮文件」一个标题。 */
+body:has([data-files-toggle][aria-expanded='false']) [data-changed-files] {
   display: none;
 }
 
