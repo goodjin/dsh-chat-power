@@ -289,8 +289,8 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
   let currentTurn = 0
   /** 待把当前轮顶到容器顶端（新一轮出现、或刚打开会话）。 */
   let pendingAlign = false
-  /** 切换会话后的第一次同步：落到底部一次（之后交给宿主的贴底跟随）。 */
-  let followTailOnce = false
+  /** 切换到的会话（其输出期间持续落底跟随；undefined = 不跟随）。 */
+  let followTailSession: string | undefined = undefined
   let records = new Map<number, TurnRecord>()
   let stopObserving: (() => void) | undefined
   let composerObserver: ResizeObserver | undefined
@@ -332,9 +332,10 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     }
     records = new Map()
     currentTurn = 0
-    // 刚打开一个会话：直接落到底部（流式输出继续跟随；
-    // 不再做「当前轮对齐到顶部」——它会和宿主的贴底跟随打架，停在中间）。
-    followTailOnce = true
+    // 刚打开一个会话：若它还在输出中，后续每次同步都落到底部（自动跟随 ✓），
+    // 直到输出结束才停止跟随。不再做「当前轮对齐到顶部」——它和宿主的贴底
+    // 跟随打架，停在中间。
+    followTailSession = key
     sessionKey = key
   }
 
@@ -1087,10 +1088,13 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
         applyCaps(record, availableHeight(container, record))
       }
     }
-    if (followTailOnce) {
-      followTailOnce = false
+    if (followTailSession === key && isLiveOutput()) {
+      // 输出中：每次同步都落到底部（流式内容持续增长，保持跟随 ✓）。
       const scrollable = container as HTMLElement
       if (typeof scrollable.scrollTop === 'number') scrollable.scrollTop = scrollable.scrollHeight
+    } else if (followTailSession === key && !isLiveOutput()) {
+      // 该会话输出已结束：停止跟随（宿主恢复浏览位置）。
+      followTailSession = undefined
     }
     if (pendingAlign) {
       pendingAlign = false
