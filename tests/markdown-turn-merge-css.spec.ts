@@ -16,8 +16,12 @@ describe('本轮文件 / 已编辑文件 排布', () => {
     expect(css).toMatch(/\[data-turn-tail\][^{]*\[data-changed-files\]:has\(> ul\)[^}]*\{[^}]*order:\s*2/)
   })
 
-  it('收掉宿主改动卡自己的标题行（多文件留文件行，单文件保留）', () => {
-    expect(css).toMatch(/\[data-changed-files\]:has\(> ul\) > :first-child\s*\{\s*display:\s*none/)
+  it('藏掉宿主改动卡自己的按钮（标题行 + 折叠钮），只留文件行', () => {
+    expect(css).toMatch(/\[data-turn-tail\]\s*\[data-changed-files\] > button\s*\{\s*display:\s*none/)
+  })
+
+  it('单文件改动卡（无文件行）整卡收起，避免空壳', () => {
+    expect(css).toMatch(/\[data-turn-tail\]\s*\[data-changed-files\]:not\(:has\(> ul\)\)\s*\{\s*display:\s*none/)
   })
 
   it('已编辑文件行冠不同颜色，与本轮文件区分', () => {

@@ -1,20 +1,23 @@
 /* 「本轮文件」入口（点赞栏那排）的样式。颜色全走宿主 token。 */
 
-/* 外观：和点赞栏那排其它动作按钮同款——透明底、小字号、hover 铺淡底。 */
+/* 外观：和点赞栏那排的「token 用量」钮同款字号/颜色（13px、次要文字色），
+   左留一点额外间距，别和前面的用量挤在一起。 */
 .chip {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   box-sizing: border-box;
   height: 28px;
+  margin-left: 8px;
   padding: 0 8px;
   border: none;
   border-radius: 6px;
   background: transparent;
   color: var(--dsw-alias-label-secondary, inherit);
   font: inherit;
-  font-size: 12px;
-  line-height: 1;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 20px;
   white-space: nowrap;
   cursor: pointer;
 }
