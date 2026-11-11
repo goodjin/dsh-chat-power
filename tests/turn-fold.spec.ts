@@ -393,12 +393,10 @@ describe('会话区排布', () => {
     const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
     expect(source).toContain('belowFrameHeight')
   })
-  it('点赞行被认出来，并挪进回答卡的标题栏', () => {
+  it('点赞行被认出来并留在原位（不再挪进标题栏——本轮文件入口靠它展开）', () => {
     const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
     expect(source).toContain('data-chat-power-feedback')
-    expect(source).toContain('header.append(holder)')
-    const css = readFileSync(new URL('../src/turn-fold.module.css', import.meta.url), 'utf8')
-    expect(css).toContain('[data-answer-header] [data-chat-power-feedback]')
+    expect(source).not.toContain('header.append(holder)')
   })
 })
 

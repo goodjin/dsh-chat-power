@@ -501,12 +501,6 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
           holder.append(bar)
         }
       }
-      // 宿主把这排按钮画在答案**外面**（和文件块一样是独立的一行）。
-      // 要它进标题栏，就把它挪进答案卡的标题栏里——只挪这一处稳定的元素，
-      // 每次同步都校正一次：宿主重绘后会自动归位。
-      const header = row.querySelector('[data-answer-header]')
-      if (header === null) continue
-      if (holder.parentElement !== header) header.append(holder)
     }
   }
 
