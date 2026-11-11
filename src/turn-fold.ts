@@ -333,6 +333,8 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
       strip = document.createElement('div')
       strip.className = css.strip ?? ''
       strip.setAttribute(STRIP_ATTR, '')
+      // 自报状态：摘要条首次插入（看不到折叠效果时的取证入口）。
+      console.info(`[chat-power] turn fold: 摘要条插入（轮 ${record.number}，行数 ${record.rows.length}）`)
       strip.setAttribute('data-chat-power-turn', String(record.number))
       // 整条横条就是开关：点击即折叠/展开（键盘 Enter / 空格同样可用）。
       strip.addEventListener('click', () => {
@@ -889,6 +891,9 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     }
     const maxTurn = groups.reduce((max, group) => Math.max(max, group.number), 0)
     if (maxTurn > currentTurn) {
+      const collapsingNumbers = [...records.values()]
+        .filter(record => record.number < maxTurn)
+        .map(record => `${record.number}(${record.rows.length}行)`)
       currentTurn = maxTurn
       // 新一轮开始：此前的轮次折叠成摘要条，只有当前轮留在主屏。
       for (const record of records.values()) {
@@ -896,6 +901,8 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
       }
       // 历史轮次被顶到屏幕外，屏幕里只剩当前轮。
       pendingAlign = true
+      // 自报状态：折叠链路的唯一现场线索（无 DOM 访问时的取证入口）。
+      console.info(`[chat-power] turn fold: 当前轮 → ${maxTurn}；折叠 ${collapsingNumbers.length} 轮 [${collapsingNumbers.join('、')}]；总行数 ${rows.length}`)
     }
     for (const record of records.values()) {
       const firstRow = record.rows[0]
