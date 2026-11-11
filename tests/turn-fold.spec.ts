@@ -191,17 +191,16 @@ describe('输出框的固定顶栏与底部间距', () => {
 })
 
 describe('底部文件区块合并', () => {
-  it('已编辑文件与本轮文件合成一块，默认收起', () => {
+  it('文件列表展开在点赞栏下方，收起时已编辑文件一起收起', () => {
     const css = readFileSync(new URL('../src/markdown-turn.module.css', import.meta.url), 'utf8')
-    // 宿主的「已编辑文件」卡片在收起时只留标题行（增删行数与悬停预览仍在标题上）
     expect(css).toContain('data-changed-files')
-    expect(css).toContain('aria-expanded')
-    // 本轮文件列表沿用宿主卡片的边框，视觉上是一块
-    expect(css).toContain('data-files-group')
+    expect(css).toContain('data-files-block')
+    // 收起时（turnTail 无 data-files-open）宿主改动卡也收起
+    expect(css).toContain('[data-turn-tail]:not([data-files-open])')
   })
-  it('本轮文件的折叠钮带标记，供样式联动', () => {
-    const source = readFileSync(new URL('../src/markdown-turn.tsx', import.meta.url), 'utf8')
-    expect(source).toContain('data-files-toggle')
+  it('点赞栏那排的入口带标记，供样式联动', () => {
+    const source = readFileSync(new URL('../src/markdown-turn-chip.tsx', import.meta.url), 'utf8')
+    expect(source).toContain('data-files-chip')
     expect(source).toContain('aria-expanded')
   })
 })
@@ -377,11 +376,12 @@ describe('折叠条', () => {
     expect(source).toContain('data-answer-body')
   })
 
-  it('改动文件列表默认折成一块，可点开与收起', () => {
+  it('本轮文件列表读共享展开态（入口在点赞栏那排）', () => {
     const source = readFileSync(new URL('../src/markdown-turn.tsx', import.meta.url), 'utf8')
-    expect(source).toContain('filesOpen')
-    expect(source).toContain('markdownTurn.filesToggle')
-    expect(source).toContain('markdownTurn.filesCollapse')
+    expect(source).toContain('getFilesOpen')
+    const chip = readFileSync(new URL('../src/markdown-turn-chip.tsx', import.meta.url), 'utf8')
+    expect(chip).toContain('setFilesOpen')
+    expect(chip).toContain('markdownTurn.filesGroup')
   })
 })
 

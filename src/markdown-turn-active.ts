@@ -78,3 +78,41 @@ export function toggleFileEditing(path: string): void {
 function emit(): void {
   for (const listener of listeners) listener()
 }
+
+/**
+ * 「本轮文件」是否展开（入口在点赞栏那排，列表在其下方；两处共享这一态）。
+ * 按 sessionId 存，换会话自然复位。与上面的 activePath / fileStates 共用同一监听集。
+ */
+const filesOpenBySession = new Map<string, boolean>()
+
+/** 某会话的本轮文件是否展开；没设置过返回 false。 */
+export function getFilesOpen(sessionId: string): boolean {
+  return filesOpenBySession.get(sessionId) ?? false
+}
+
+/** 设置某会话的展开态；值不变不通知。 */
+export function setFilesOpen(sessionId: string, open: boolean): void {
+  if (getFilesOpen(sessionId) === open) return
+  filesOpenBySession.set(sessionId, open)
+  emit()
+}
+
+/** 订阅展开态变化（与 activePath 共用监听集，任一处变化都会回调）。返回退订函数。 */
+export function subscribeFilesOpen(listener: () => void): () => void {
+  listeners.add(listener)
+  return () => { listeners.delete(listener) }
+}
+
+/** 某会话「本轮文件」的个数（入口在点赞栏那排显示）；没设置过返回 0。 */
+const filesCountBySession = new Map<string, number>()
+
+export function getFilesCount(sessionId: string): number {
+  return filesCountBySession.get(sessionId) ?? 0
+}
+
+/** 设置某会话的本轮文件个数；值不变不通知。 */
+export function setFilesCount(sessionId: string, count: number): void {
+  if (getFilesCount(sessionId) === count) return
+  filesCountBySession.set(sessionId, count)
+  emit()
+}

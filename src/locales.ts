@@ -35,7 +35,7 @@ export type ChatPowerLocaleKey =
   | 'markdownTurn.commentRemove' | 'markdownTurn.composePlaceholder' | 'markdownTurn.sendFailed'
   | 'markdownTurn.newSession' | 'markdownTurn.newSessionPromptHeader' | 'markdownTurn.newSessionFailed'
   | 'markdownTurn.copyFailed' | 'markdownTurn.filesAll' | 'markdownTurn.filesAllAria'
-  | 'markdownTurn.filesGroup' | 'markdownTurn.filesToggle' | 'markdownTurn.filesCollapse'
+  | 'markdownTurn.filesGroup'
   | 'markdownTurn.commentsPending' | 'markdownTurn.sending'
   | 'markdownTurn.filesCollapseAria' | 'markdownTurn.openFile'
   | 'markdownTurn.localFileHeader' | 'markdownTurn.localFileTooLarge'
@@ -120,8 +120,6 @@ export const zh: Record<ChatPowerLocaleKey, string> = {
   'markdownTurn.filesAll': '全部 {count} 个文件',
   'markdownTurn.filesAllAria': '展开全部 {count} 个文件',
   'markdownTurn.filesGroup': '本轮文件 · {count}',
-  'markdownTurn.filesToggle': '展开改动文件列表',
-  'markdownTurn.filesCollapse': '收起改动文件列表',
   'markdownTurn.commentsPending': '待发送批注 · {count}',
   'markdownTurn.sending': '发送中…',
   'markdownTurn.filesCollapseAria': '收起文件列表',
@@ -240,8 +238,6 @@ export const en: Record<ChatPowerLocaleKey, string> = {
   'markdownTurn.filesAll': 'All {count} files',
   'markdownTurn.filesAllAria': 'Show all {count} files',
   'markdownTurn.filesGroup': 'Files in this turn · {count}',
-  'markdownTurn.filesToggle': 'Expand changed files',
-  'markdownTurn.filesCollapse': 'Collapse changed files',
   'markdownTurn.commentsPending': 'Pending comments · {count}',
   'markdownTurn.sending': 'Sending…',
   'markdownTurn.filesCollapseAria': 'Collapse the file list',

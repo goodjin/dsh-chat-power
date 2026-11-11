@@ -1,0 +1,36 @@
+/* 「本轮文件」入口（点赞栏那排）的样式。颜色全走宿主 token。 */
+
+/* 外观：和点赞栏那排其它动作按钮同款——透明底、小字号、hover 铺淡底。 */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  box-sizing: border-box;
+  height: 28px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary, inherit);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.chip:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(127, 127, 127, 0.1));
+  color: var(--dsw-alias-label-primary, inherit);
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary, var(--dsw-alias-brand-primary, currentColor));
+  outline-offset: 1px;
+}
+
+/* 顶到点赞栏那排的末尾（在复制 / 点赞 / 分支之后）。属性选择器不被 CSS module 哈希，
+   故能命中宿主那排的 flex 布局；order 比宿主按钮大即可排到最后。 */
+[data-files-chip] {
+  order: 10;
+}

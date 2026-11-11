@@ -34,6 +34,7 @@ import { ToolsFrame } from './tools-frame.tsx'
 import { createMarkdownTurnReaders } from './markdown-turn-sources.ts'
 import type { MarkdownTurnReaders } from './markdown-turn-sources.ts'
 import { registerMarkdownTurn } from './markdown-turn.tsx'
+import { registerExpandFilesChip } from './markdown-turn-chip.tsx'
 import { registerLocalFileComposer } from './local-file.tsx'
 import { registerSelectionEditComposer } from './selection-edit-card.tsx'
 import { sessionKeyAccessorsOf } from './selection-actions.ts'
@@ -337,6 +338,13 @@ export function registerConversationSurfaces(ctx: Surface): void {
     registerMarkdownTurn(slots as unknown as Parameters<typeof registerMarkdownTurn>[0], readers)
   } catch (error) {
     if (typeof console !== 'undefined') console.warn(`[dsh-chat-power] markdown turn: registration failed — ${error instanceof Error ? error.message : String(error)}`)
+  }
+
+  // 「本轮文件」入口：注册进点赞栏那排（assistant-actions 插槽），点开展开下方的文件列表。
+  try {
+    registerExpandFilesChip(slots as unknown as Parameters<typeof registerExpandFilesChip>[0], { t: dshT })
+  } catch (error) {
+    if (typeof console !== 'undefined') console.warn(`[dsh-chat-power] expand files chip: registration failed — ${error instanceof Error ? error.message : String(error)}`)
   }
 
   // 本机文件卡：composer 上方的 overlay 座位，入口在会话头部（会话 ID 左侧）。

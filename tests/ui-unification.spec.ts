@@ -225,10 +225,11 @@ describe('文件卡片与选区统一', () => {
     expect(source).toMatch(/onSuccess[\s\S]{0,120}setComments\(\[\]\)/)
   })
 
-  it('文件组有「本轮文件 · n」标题，文件行主名 + 目录辅助行', () => {
-    const source = read('../src/markdown-turn.tsx')
-    expect(source).toContain('markdownTurn.filesGroup')
-    expect(source).toContain('nameDir')
+  it('「本轮文件 · n」入口在点赞栏那排，文件行主名 + 目录辅助行', () => {
+    const chip = read('../src/markdown-turn-chip.tsx')
+    expect(chip).toContain('markdownTurn.filesGroup')
+    const turn = read('../src/markdown-turn.tsx')
+    expect(turn).toContain('nameDir')
     const locale = read('../src/locales.ts')
     expect(locale).toContain("'markdownTurn.filesGroup'")
     expect(locale).toContain("'markdownTurn.commentsPending'")

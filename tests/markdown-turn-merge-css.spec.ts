@@ -2,14 +2,18 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 /**
- * 「已编辑文件」（宿主改动卡 data-changed-files）与「本轮文件」（data-files-group）
- * 合并成单一标题的样式契约。纯 CSS 串断言，防回归；实际观感以界面为准。
+ * 「本轮文件」入口在点赞栏那排、文件列表展开在点赞栏下方的样式契约。纯 CSS 串断言，
+ * 防回归；实际观感以界面为准。
  */
 const css = readFileSync(new URL('../src/markdown-turn.module.css', import.meta.url).pathname, 'utf8')
 
-describe('本轮文件 / 已编辑文件合并', () => {
-  it('把本轮文件块排到宿主改动卡之前（单一标题在顶）', () => {
-    expect(css).toMatch(/\[data-turn-tail\][^{]*\[data-files-group\][^{]*\{[^}]*order:\s*-1/)
+describe('本轮文件 / 已编辑文件 排布', () => {
+  it('本轮文件块排到点赞栏（MessageIconActions）之后', () => {
+    expect(css).toMatch(/\[data-turn-tail\][^{]*\[data-files-block\][^{]*\{[^}]*order:\s*1/)
+  })
+
+  it('宿主改动卡（已编辑文件）排在本轮文件块之后、同样在点赞栏下方', () => {
+    expect(css).toMatch(/\[data-turn-tail\][^{]*\[data-changed-files\]:has\(> ul\)[^}]*\{[^}]*order:\s*2/)
   })
 
   it('收掉宿主改动卡自己的标题行（多文件留文件行，单文件保留）', () => {
@@ -20,7 +24,7 @@ describe('本轮文件 / 已编辑文件合并', () => {
     expect(css).toMatch(/\[data-changed-files\] ul button\s*\{\s*color:\s*var\(--dsw-alias-label-secondary/)
   })
 
-  it('收起本轮文件时已编辑文件一起收起', () => {
-    expect(css).toMatch(/body:has\(\[data-files-toggle\]\[aria-expanded='false'\]\) \[data-changed-files\]\s*\{\s*display:\s*none/)
+  it('收起时（turnTail 无 data-files-open）已编辑文件一起收起', () => {
+    expect(css).toMatch(/\[data-turn-tail\]:not\(\[data-files-open\]\) \[data-changed-files\]\s*\{\s*display:\s*none/)
   })
 })

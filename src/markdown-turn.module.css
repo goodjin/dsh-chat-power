@@ -5,50 +5,12 @@
   margin: 8px 0;
 }
 
-/* 文件组标题：「本轮文件 · n」。 */
-.groupHead {
-  display: flex;
-  align-items: center;
-  padding: 0 2px;
-}
-
-/* 改动文件列表的折叠条：整条可点，展开/收起文件卡。 */
-.groupToggle {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-  padding: 4px 6px;
-  border: 1px solid var(--dsw-alias-border-l1, rgba(127, 127, 127, 0.15));
-  border-radius: 6px;
-  background: var(--dsw-alias-interactive-bg-hover, rgba(127, 127, 127, 0.06));
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.groupToggle:hover {
-  background: var(--dsw-alias-interactive-bg-hover, rgba(127, 127, 127, 0.1));
-}
-
-.groupToggle:focus-visible {
-  outline: 2px solid var(--dsw-alias-state-business-primary, var(--dsw-alias-brand-primary, currentColor));
-  outline-offset: 1px;
-}
-
-.groupChevron {
-  flex: none;
-  color: var(--dsw-alias-label-tertiary, inherit);
-  font-size: 11px;
-}
-
 /* 合并成单一「本轮文件」标题：把本轮文件块（data-files-group）排到宿主改动卡
    （data-changed-files）之前，并收掉宿主卡自己的标题行——「已编辑」文件（宿主卡里的行）
    并入本轮文件块、冠不同颜色。turnTail 是纵向 flex（宿主 tii1Sq_root，gap 16px），槽位
    条目经 display:contents 包装平铺为其直接子项，故可用 order 重排。 */
-[data-turn-tail] [data-files-group] {
-  order: -1;
+[data-turn-tail] [data-files-block] {
+  order: 1;
   margin: 0;
 }
 
@@ -60,6 +22,7 @@
 
 /* 宿主改动卡去掉自己的卡框（边框 / 圆角 / 底色 / 间距），让「已编辑」文件行并入本轮文件块。 */
 [data-turn-tail] [data-changed-files]:has(> ul) {
+  order: 2;
   border: none;
   border-radius: 0;
   background: transparent;
@@ -72,15 +35,9 @@
   color: var(--dsw-alias-label-secondary, inherit);
 }
 
-/* 收起本轮文件时，已编辑文件也一起收起，只留「本轮文件」一个标题。 */
-body:has([data-files-toggle][aria-expanded='false']) [data-changed-files] {
+/* 收起时（点赞栏入口未点开，turnTail 上没有 data-files-open），宿主改动卡也一起收起。 */
+[data-turn-tail]:not([data-files-open]) [data-changed-files] {
   display: none;
-}
-
-.groupTitle {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--dsw-alias-label-secondary, inherit);
 }
 
 /* 本机文件卡的收起标题条与文件卡头部共用这一套条/名/图标钮样式；
