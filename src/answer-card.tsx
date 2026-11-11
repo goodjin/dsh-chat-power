@@ -19,7 +19,8 @@ import {
   Toast,
   Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { MarkdownTurnReaders } from './markdown-turn-sources.ts'
+import { linkedFilePathsFromText, type MarkdownTurnReaders } from './markdown-turn-sources.ts'
+import { answerFileLinksAttr, ANSWER_FILE_LINKS_ATTR } from './answer-file-links.ts'
 import { ComposeCard } from './compose-card.tsx'
 import { copyTextToClipboard, createSendController } from './send-actions.ts'
 import { inputClass, statusNoticeClass, uiButtonClass } from './ui-theme.ts'
@@ -31,6 +32,26 @@ function answerText(blocks: readonly { readonly kind: string; readonly text?: st
     .filter(block => (block.kind === 'text' || block.kind === 'reasoning') && (block.text?.trim() ?? '') !== '')
     .map(block => block.text ?? '')
     .join('\n\n')
+}
+
+/**
+ * 回答正文里的文件链接清单（宿主会把这些相对路径渲染成文件链接按钮）。
+ *
+ * 代码块 / 行内代码里的不算（宿主也不把它们渲染成链接），图片不算
+ * （宿主给图片走预览），同一路径只留一次。拦截层靠这份清单认按钮。
+ */
+function answerFileLinks(blocks: readonly { readonly kind: string; readonly text?: string }[]): readonly string[] {
+  const paths: string[] = []
+  const seen = new Set<string>()
+  for (const block of blocks) {
+    if (block.kind !== 'text' && block.kind !== 'reasoning') continue
+    for (const path of linkedFilePathsFromText(block.text ?? '')) {
+      if (seen.has(path)) continue
+      seen.add(path)
+      paths.push(path)
+    }
+  }
+  return paths
 }
 
 /** 新建会话时，给内容加一句「来自结果框」的前缀，便于助手识别出处。 */
@@ -107,6 +128,8 @@ export function AnswerCard(props: {
     })
   }
   const editValue = draft ?? text
+  // 正文里的文件链接清单：写进 DOM，拦截层据此认出宿主渲染的文件链接按钮。
+  const fileLinks = useMemo(() => answerFileLinks(props.blocks), [props.blocks])
 
   return (
     <div data-acp-answer-card>
@@ -171,7 +194,11 @@ export function AnswerCard(props: {
               )}
             </div>
           </div>
-          <div className={styles.answerCardBody} data-answer-body="">{props.children}</div>
+          <div
+            className={styles.answerCardBody}
+            data-answer-body=""
+            {...{ [ANSWER_FILE_LINKS_ATTR]: fileLinks.length > 0 ? answerFileLinksAttr(fileLinks) : undefined }}
+          >{props.children}</div>
         </div>
       )}
       {toast !== null && <Toast

@@ -15,6 +15,8 @@ import { saveWorkspaceText } from './workspace-save.ts'
 import { startSendWatch, USER_NODE_SELECTOR } from './send-watch.ts'
 import { LOCAL_FILE_ACCEPT, LOCAL_FILE_MAX_BYTES, LocalFileComposerCard } from './local-file.tsx'
 import { createMarkdownTurnReaders } from './markdown-turn-sources.ts'
+import { answerFileLinkPathAt } from './answer-file-links.ts'
+import { sessionFileAddressOf } from './file-address.ts'
 import { fallbackT } from './locales.ts'
 import { readDefaultLinkOpenMode, writeDefaultLinkOpenMode, openInBrowser } from './link-open.ts'
 import { statusNoticeClass } from './ui-theme.ts'
@@ -79,6 +81,16 @@ export function registerConversationTools(ctx: any) {
     }, error => {
       toolsNotice.set(sessionId, `读取失败：${String(error)}`)
     })
+  }
+  // 回答块文件链接的落点：先开**文档预览**标签（text）——与右侧栏的文档预览同一份
+  // 渲染，只是落点换到会话区；私有预览起不来（资源服务缺席等）再退回编辑标签（local）。
+  const openAnswerFile = (sessionId: string, path: string): void => {
+    try {
+      adapter.openResource(sessionId, sessionFileAddressOf(sessionId, path))
+    } catch (error) {
+      console.warn(`[chat-power] 回答文件链接：文档预览打不开，退回编辑标签——${String(error)}`)
+      openWorkspaceEditor(sessionId, path)
+    }
   }
   // 行控件按会话走：会话 ID 写在控件上，点击时不用再猜是哪个会话。
   const augmentHandlers = (): AugmentHandlers => ({
@@ -390,9 +402,12 @@ export function registerConversationTools(ctx: any) {
   // 文件树行控件：宿主 0.2.2 起不能再包宿主面板，改为在渲染出来的树上补控件。
   // 「提示词」视图：查看/编辑当前会话的系统提示词（router/worker 可编辑，普通会话只读）。
   ctx.effect(() => registerPromptView(ctx), 'chat-power: prompt view')
-  // 回答块里的文档链接（含 CSV 等文档卡片）：改为在会话区打开，不再跳右侧栏。
-  // 宿主的文档卡片不一定是 <a>：地址可能放在任意层的属性里——从点击处向上
-  // 逐层扫属性，命中文件资源地址即在会话区打开。
+  // 回答块里的文档链接：改为在会话区打开，不再跳右侧栏。宿主有**两种**渲染形态：
+  // 1. markdown 相对文件链接渲染成 `<button type="button" title="{路径}">`——不是 <a>，
+  //    也没有任何资源地址属性（三次旧修复都栽在只认 <a> / 地址属性上）。认领靠
+  //    「按钮 title 命中回答卡写进 data-answer-file-links 的链接清单」（answer-file-links.ts）；
+  // 2. 文档卡片（CSV 等）不一定带 href：地址可能放在任意层的属性里——从点击处向上
+  //    逐层扫属性，命中文件资源地址即认领。
   ctx.effect(() => {
     if (typeof document === 'undefined') return () => {}
     const pathFrom = (value: string): string => {
@@ -420,6 +435,22 @@ export function registerConversationTools(ctx: any) {
       const target = event.target as Element | null
       if (target === null || typeof target.closest !== 'function') return
       if (target.closest('[data-chat-power-frame-box]') === null) return
+      // 形态一：宿主的文件链接按钮（回答块）。认领后不再走属性扫描——
+      // 按钮自身的属性不该被当成文档卡片的地址。
+      const answered = answerFileLinkPathAt(target)
+      if (answered !== undefined) {
+        const answerSession = target.closest('[data-conversation-session]')?.getAttribute('data-conversation-session') ?? ''
+        if (answerSession === '') return
+        event.preventDefault()
+        event.stopPropagation()
+        const answerKey = answerSession + '|' + answered
+        const now = Date.now()
+        if (answerKey === lastKey && now - lastAt < 800) return
+        lastAt = now
+        lastKey = answerKey
+        openAnswerFile(answerSession, answered)
+        return
+      }
       let node: Element | null = target
       let path: string | undefined
       while (node !== null) {
@@ -443,7 +474,7 @@ export function registerConversationTools(ctx: any) {
       if (key === lastKey && now - lastAt < 800) return
       lastAt = now
       lastKey = key
-      openWorkspaceEditor(sessionId, path)
+      openAnswerFile(sessionId, path)
     }
     // 捕获阶段、pointerdown 与 click 都拦：宿主可能绑在任意一处。
     document.addEventListener('pointerdown', onOpen, true)
