@@ -179,6 +179,23 @@ export function ExpandEditor(props: { readonly t: RuntimeT }): ReactNode {
   // 装上回车拦截：仅在大编辑区状态改写回车，普通小框回车的宿主行为原样保留。
   useEffect(() => installEnterInterceptor(), [])
 
+  // 请求发出即收起：宿主 composer 发送后会清空输入框。观察到输入框由有内容变空
+  // （且当前仍是撑大态）就收起——大编辑区发完一轮自然让位给小框；hero 阶段本就靠
+  // 阶段切换收起，不落标记类，这里只处理用户点箭头撑大的那一种。
+  useEffect(() => {
+    const input = composerInputFromDom()
+    if (input === null) return
+    const observer = new MutationObserver(() => {
+      const card = composerCardFromDom()
+      if (card !== null && card.classList.contains(BIG_CLASS) && (input.textContent ?? '') === '') {
+        card.classList.remove(BIG_CLASS)
+        setBig(false)
+      }
+    })
+    observer.observe(input, { childList: true, characterData: true, subtree: true })
+    return () => observer.disconnect()
+  }, [])
+
   const toggle = (): void => {
     const card = composerCardFromDom()
     if (card === null) return

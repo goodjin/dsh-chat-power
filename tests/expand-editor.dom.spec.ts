@@ -100,6 +100,17 @@ describe('ExpandEditor 撑高 / 收起', () => {
     await render()
     await expect(toggle()).resolves.toBeUndefined()
   })
+
+  it('请求发出（输入框被清空）即自动收起', async () => {
+    await render()
+    await toggle()
+    expect(card.classList.contains(BIG_CLASS)).toBe(true)
+    // 模拟宿主发送后清空输入框：先有内容，再清空——清空这一下触发收起。
+    await act(async () => { input.textContent = '要发的内容' })
+    await act(async () => { input.textContent = '' })
+    expect(card.classList.contains(BIG_CLASS)).toBe(false)
+    expect(document.querySelector('[data-expand-toggle]')?.hasAttribute('data-big')).toBe(false)
+  })
 })
 
 describe('ExpandEditor 回车改写', () => {
