@@ -47,8 +47,13 @@
 /* 工具标签激活时：把宿主自己的标签（对话 / 轨迹）压暗，一行只突出一个。 */
 [data-conversation-tabs][data-chat-tools-live] button[role=tab]:not([data-chat-tools-tab]) { opacity:.55; }
 
-/* 自建行：宿主标签行缺席时顶上，高度与宿主标签行一致。 */
-[data-chat-tools-row] { display:flex; align-items:center; gap:2px; flex:none; min-height:36px; padding:2px 12px; overflow:hidden; }
+/* 自建行：宿主标签行缺席时顶上，高度与宿主标签行一致。
+   position/z-index：自建行落在会话内容区里，而宿主在同一区域放了一根
+   「调整会话列宽」的拖拽把手（cursor: col-resize，竖直贯穿整列，z-index:0）。
+   把手正好压在这一行上——鼠标移到「浏览器」标签的文字上时指针变成
+   左右箭头加一竖，点击被把手吃掉，标签点不动。这里把自建行抬到把手之上：
+   标签可点可拖，把手仍能在下面整段拖动。 */
+[data-chat-tools-row] { display:flex; align-items:center; gap:2px; flex:none; min-height:36px; padding:2px 12px; overflow:hidden; position:relative; z-index:1; }
 [data-chat-tools-row] [data-chat-tools-chat-button] { display:inline-flex; align-items:center; padding:3px 10px; border:1px solid transparent; border-radius:6px; background:transparent; color:var(--dsw-alias-label-secondary,inherit); font:inherit; font-size:12px; cursor:pointer; }
 [data-chat-tools-row] [data-chat-tools-chat-button][aria-selected=true] { border-color:var(--dsw-alias-border-l2,rgba(127,127,127,.2)); background:var(--dsw-alias-interactive-bg-hover,rgba(127,127,127,.16)); color:var(--dsw-alias-label-primary,inherit); }
 

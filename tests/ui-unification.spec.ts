@@ -192,6 +192,12 @@ describe('统一编辑链路', () => {
     expect(css).toMatch(/\[data-chat-tools-tab-wrap\]\s*\[data-chat-tools-tab-close\][^{]*\{[^}]*width:\s*(16|18|20)px/)
   })
 
+  it('自建标签行不被宿主的「调整会话列宽」把手压住（把手会让指针变成左右箭头、并吃掉点击）', () => {
+    const css = read('../src/conversation-tools.module.css')
+    expect(css).toMatch(/\[data-chat-tools-row\][^{]*\{[^}]*position:\s*relative/)
+    expect(css).toMatch(/\[data-chat-tools-row\][^{]*\{[^}]*z-index:\s*1/)
+  })
+
   it('打开文件时：文件内容与上方（标签行）、下方（输入框）各留 10px', () => {
     const css = read('../src/conversation-tools.module.css')
     // 文件类标签激活时工具区带标记，样式据此给内容上下留白。
