@@ -904,8 +904,8 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
         record.strip?.remove()
         record.strip = undefined
         if (record.collapsed) setCollapsed(record, false)
-        // 回答框出现后：请求这一条不再占位——宿主请求行与我们的请求条都直接隐藏
-        // （只靠 requestCollapsed 标记有漏网：只要回答框在，就强制执行一次）。
+        // 回答框出现后：提问气泡隐藏，但保留「请求 · 首句」摘要条（收起态 ✓）。
+        // 摘要条占位很小，会计入限高（框上面的部分），不会再把点赞行挤出去。
         const framedBox = record.rows.map(frameBoxOf).find(box => box.hasAttribute(CAPPED_ATTR))
         if (framedBox !== undefined) {
           for (const row of record.rows) {
@@ -916,7 +916,6 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
             row.setAttribute(REQUEST_HIDDEN_ATTR, '')
           }
           record.requestCollapsed = true
-          record.requestBar?.setAttribute(REQUEST_HIDDEN_ATTR, '')
         }
         ensureRequestBar(record)
         collapseThinking(record)
