@@ -15,9 +15,11 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+import { PANEL_ID } from '../src/session-id-bar/index.ts'
 import { MARKDOWN_TAIL_ID } from '../src/markdown-turn.tsx'
 
 /** 会话头部工具行（会话作用域 list 插槽）。 */
+const SLOT = 'conversation.session.header.utilities'
 
 const BUNDLE_PATH = fileURLToPath(new URL('../lib/client.js', import.meta.url))
 
@@ -67,10 +69,12 @@ describe('lib/client.js 是页面能装的产物', () => {
       get: () => undefined,
     }
     ;(loaded?.apply as (ctx: unknown) => void)(ctx)
-    // 文件阅读区注入轮次尾座位（会话 ID 条已移除：会话列表右键可查）。
+    // 会话 ID 条注入头部工具排；文件阅读区注入轮次尾座位。
+    expect(injected).toContain(SLOT)
     expect(injected).toContain('conversation.chat.turnTail')
-    // 文件阅读区注册了；答案卡片包住了 assistant-step 渲染位。
+    // 会话 ID 条、文件阅读区都注册了；答案卡片包住了 assistant-step 渲染位。
     const registeredIds = registered.map(options => options.id)
+    expect(registeredIds).toContain(PANEL_ID)
     expect(registeredIds).toContain(MARKDOWN_TAIL_ID)
     expect(registered.some(options => options.key === 'assistant-step')).toBe(true)
   })

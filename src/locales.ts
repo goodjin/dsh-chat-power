@@ -25,8 +25,7 @@ export type ChatPowerLocaleKey =
   | 'markdownTurn.truncated' | 'markdownTurn.collapse' | 'markdownTurn.expand'
   | 'markdownTurn.collapseAria' | 'markdownTurn.expandAria'
   | 'markdownTurn.openTitle' | 'markdownTurn.openDefault' | 'markdownTurn.openAppsError'
-  | 'markdownTurn.openMore' | 'markdownTurn.defaultOpenLink' | 'markdownTurn.linkOpenRight'
-  | 'markdownTurn.linkOpenBrowser' | 'markdownTurn.openFolder' | 'markdownTurn.openError'
+  | 'markdownTurn.openMore' | 'markdownTurn.openFolder' | 'markdownTurn.openError'
   | 'markdownTurn.revealError' | 'markdownTurn.copy' | 'markdownTurn.copied'
   | 'markdownTurn.code' | 'markdownTurn.wrap' | 'markdownTurn.unwrap'
   | 'markdownTurn.footnotes' | 'markdownTurn.send' | 'markdownTurn.sendToSession'
@@ -92,9 +91,6 @@ export const zh: Record<ChatPowerLocaleKey, string> = {
   'markdownTurn.openDefault': '{app}（默认）',
   'markdownTurn.openAppsError': '无法获取应用列表',
   'markdownTurn.openMore': '更多打开方式',
-  'markdownTurn.defaultOpenLink': '默认打开方式',
-  'markdownTurn.linkOpenRight': '内置浏览器打开',
-  'markdownTurn.linkOpenBrowser': '外部浏览器打开',
   'markdownTurn.openFolder': '打开文件夹',
   'markdownTurn.openError': '打开失败，请重试',
   'markdownTurn.revealError': '文件夹没有打开',
@@ -216,9 +212,6 @@ export const en: Record<ChatPowerLocaleKey, string> = {
   'markdownTurn.openDefault': '{app} (default)',
   'markdownTurn.openAppsError': 'Could not load applications',
   'markdownTurn.openMore': 'More ways to open',
-  'markdownTurn.defaultOpenLink': 'Default open mode',
-  'markdownTurn.linkOpenRight': 'Open in built-in browser',
-  'markdownTurn.linkOpenBrowser': 'Open in external browser',
   'markdownTurn.openFolder': 'Open folder',
   'markdownTurn.openError': 'Could not open. Try again.',
   'markdownTurn.revealError': 'The folder did not open',

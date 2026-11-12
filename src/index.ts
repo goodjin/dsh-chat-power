@@ -14,6 +14,7 @@
 
 import { registerLinkSettings } from './link-settings.tsx'
 import { registerConversationTools } from './conversation-tools.tsx'
+import { registerSessionIdBar } from './session-id-bar/index.js'
 import { startMermaidDiagrams } from './mermaid.ts'
 import { injectTablePadCss } from './table-pad.ts'
 import { injectUiThemeCss } from './ui-theme.ts'
@@ -151,6 +152,14 @@ export function apply(ctx: PluginContext): void {
     log.info('multi-select panel: started')
   } catch (error: unknown) {
     log.warn(`multi-select panel: start failed — ${error instanceof Error ? error.message : String(error)}`)
+  }
+  try {
+    // 注册会话 ID 条（需要 slots）
+    const slotHost = ctx.slots as Parameters<typeof registerSessionIdBar>[0]
+    registerSessionIdBar(slotHost)
+    log.info('session id bar: registered')
+  } catch (error: unknown) {
+    log.warn(`session id bar: registration failed — ${error instanceof Error ? error.message : String(error)}`)
   }
   try {
     // Mermaid 扫 DOM 找代码块，不需要插槽；文案走 fallbackT（中文），

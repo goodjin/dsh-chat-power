@@ -82,6 +82,7 @@ DSH 会话区增强插件：与跑哪种 agent 无关的会话区功能都归这
 | 会话区标签工作台 | `shell.overlay` 管理生命周期，React portal 插入会话正文的正常布局（条带在会话内容之前） |
 | 文件树行控件 | 私有座位 `chat-power.tools.sidebar.right.pane.tab` 上重注册 FilesBody（优先级 -10），DOM 覆盖层补挂控件 |
 | 短会话 ID + 复制 | `conversation.session.header.utilities`（会话作用域 list） |
+| 设置段（网页链接默认打开方式） | `settings.section`（id `chat-power`，设置对话框里的一页） |
 | 答案卡片 | 包住 `conversation.chat.node` 的 `assistant-step`（优先级 -50） |
 | 会话尾部文件卡片 | `conversation.chat.turnTail` |
 | Mermaid | DOM 级（扫已渲染的 Markdown）+ 宿主路由 `/chat-power/mermaid.js` |
