@@ -14,8 +14,6 @@ import {
   frameKindOf,
   groupTurnsByNumber,
   loadQuickMessages,
-  middleFoldRange,
-  MIDDLE_FOLD_THRESHOLD,
   panelPlacement,
   saveQuickMessages,
   scrollTopForTurnTop,
@@ -127,23 +125,6 @@ describe('历史轮次顶到屏幕外', () => {
   })
 })
 
-describe('请求条的形态', () => {
-  it('当前轮的请求条靠右显示，不用整轮折叠的横条样式', () => {
-    const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
-    expect(source).toContain('css.requestBar')
-    expect(source).not.toContain('bar.className = css.strip')
-  })
-  it('样式上：请求条靠右、宽度自适应；整轮折叠条仍是整行', () => {
-    const css = readFileSync(new URL('../src/turn-fold.module.css', import.meta.url), 'utf8')
-    const requestBar = css.slice(css.indexOf('.requestBar'), css.indexOf('.requestBar') + 600)
-    expect(requestBar).toMatch(/margin-left:\s*auto/)
-    expect(requestBar).toMatch(/width:\s*fit-content/)
-    // 整轮折叠条仍占满一行
-    const strip = css.slice(css.indexOf('.strip {'), css.indexOf('.strip {') + 400)
-    expect(strip).not.toMatch(/margin-left:\s*auto/)
-  })
-})
-
 describe('输出外框', () => {
   it('框内不出现滚动条：超出的一屏向上裁掉（历史消失，输出继续贴底）', () => {
     const css = readFileSync(new URL('../src/turn-fold.module.css', import.meta.url), 'utf8')
@@ -236,14 +217,10 @@ describe('回答框只有一层', () => {
     expect(card).toContain('data-answer-card')
     expect(card).toContain('data-chat-power-frame-box')
   })
-  it('「已完成 · 用时」搬进回答栏，只作提示、不再独占一行、也不可展开', () => {
+  it('「用时」进框标题行（turnTitleWithDuration），不再写进答案卡', () => {
     const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
-    const css = readFileSync(new URL('../src/turn-fold.module.css', import.meta.url), 'utf8')
-    expect(source).toContain('data-chat-power-hint')
-    expect(source).toContain('data-chat-power-hint-text')
-    expect(css).toContain('[data-chat-power-hint]')
-    const card = readFileSync(new URL('../src/answer-card.tsx', import.meta.url), 'utf8')
-    expect(card).toContain('data-answer-header')
+    expect(source).toContain('turnTitleWithDuration')
+    expect(source).toContain('TURN_TITLE_ATTR')
   })
 })
 
@@ -257,13 +234,10 @@ describe('提示与可用高度', () => {
     // 只取按钮里那段文字（后面跟着折叠箭头）
     expect(body).toContain("querySelector('span')")
   })
-  it('框的可用高度只扣输入框与框下面的行；上面的内容不再扣（被顶出屏幕）', () => {
+  it('最新轮框高 = 视口 − 输入框 − 余量（applyCapsToFrame 直接钉预算）', () => {
     const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
-    // 预算函数存在且被 availableHeight 使用。
-    expect(source).toContain('frameBudgetHeight')
-    expect(source).toContain('frameBudgetHeight(viewport, measureComposerHeight(container), below)')
-    // 框下面的行仍然要扣（否则框底伸到输入框下面）。
-    expect(source).toContain('belowFrameHeight')
+    expect(source).toContain('applyCapsToFrame')
+    expect(source).toContain('frameBudgetHeight(viewport, measureComposerHeight(container), 0)')
   })
 })
 
@@ -295,10 +269,7 @@ describe('思考逐行展开', () => {
 })
 
 describe('思考与框的关系', () => {
-  it('外层会话不在底部时，框里不再贴底（文字不闪）', () => {
-    const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
-    expect(source).toContain('viewAtBottom')
-    expect(source).toContain('if (atBottom && viewAtBottom)')
+  it('框内滚动接管贴底（overflow-anchor: none 保留）', () => {
     const css = readFileSync(new URL('../src/turn-fold.module.css', import.meta.url), 'utf8')
     expect(css).toContain('overflow-anchor: none')
   })
@@ -317,80 +288,6 @@ describe('思考与框的关系', () => {
     const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
     const body = source.slice(source.indexOf('const collapseThinking'), source.indexOf('const collapseThinking') + 1800)
     expect(body).toContain('data-variant="think"')
-  })
-})
-
-describe('折叠条', () => {
-  it('摘要条文本含轮次号、时刻与首句摘要', () => {
-    expect(turnStripText(3, '17:31', '把工具栏收进更多')).toBe('第 3 轮 · 17:31 · 把工具栏收进更多')
-  })
-
-  it('没有摘要时只留轮次号与时刻', () => {
-    expect(turnStripText(3, '17:31', '')).toBe('第 3 轮 · 17:31')
-  })
-
-  it('折叠只加属性、插自有元素，不改写宿主行的内容', () => {
-    const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
-    expect(source).toContain('data-chat-turn')
-    expect(source).toContain('data-chat-power-collapsed')
-    expect(source).toContain('data-chat-power-turn-strip')
-    expect(source).not.toContain('replaceChildren')
-    expect(source).not.toContain('innerHTML')
-  })
-
-  it('限高：可用高度扣掉输入框，上限以 CSS 变量给出，内容贴底跟随', () => {
-    const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
-    const css = readFileSync(new URL('../src/turn-fold.module.css', import.meta.url), 'utf8')
-    // 可用高度要扣掉输入框；上限以 CSS 变量给出，样式在 CSS 模块里。
-    expect(source).toContain('data-composer-seat')
-    expect(source).toContain('--chat-power-cap')
-    expect(source).toContain('data-chat-power-capped')
-    expect(source).toContain('scrollHeight')
-    expect(css).toContain('max-height')
-    // 框内不出滚动条：超出的一屏向上裁掉。
-    expect(css).toContain('overflow-y: hidden')
-  })
-
-  it('容器晚挂载也要能起来：轮询重试并跟随容器更换', () => {
-    const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
-    expect(source).toContain('setInterval')
-    expect(source).toContain('observedContainer')
-  })
-
-  it('插件启动处调用轮次折叠，且包在 try/catch 里（失败不拖累启动）', () => {
-    const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
-    expect(source).toContain('startTurnFold')
-    expect(source).toMatch(/try \{[\s\S]{0,400}startTurnFold/)
-    expect(source).toMatch(/catch \(error[\s\S]{0,200}turn fold/)
-  })
-
-  it('README 写明思考块折叠走宿主设置的哪两项', () => {
-    const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8')
-    expect(readme).toContain('工作步骤收起时机')
-    expect(readme).toContain('收起后显示的回复')
-  })
-
-  it('摘要条整条可点（点击即折叠/展开），不再有独立按钮', () => {
-    const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
-    const css = readFileSync(new URL('../src/turn-fold.module.css', import.meta.url), 'utf8')
-    expect(source).not.toContain('stripToggle')
-    expect(css).not.toContain('stripToggle')
-    // 折叠与展开都走同一条横条
-    expect(source).toContain('data-state')
-  })
-
-  it('限高按内容高度计算，避免越滚越小', () => {
-    const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
-    expect(source).toContain('scrollHeight')
-    expect(source).toContain('data-answer-body')
-  })
-
-  it('本轮文件列表读共享展开态（入口在点赞栏那排）', () => {
-    const source = readFileSync(new URL('../src/markdown-turn.tsx', import.meta.url), 'utf8')
-    expect(source).toContain('getFilesOpen')
-    const chip = readFileSync(new URL('../src/markdown-turn-chip.tsx', import.meta.url), 'utf8')
-    expect(chip).toContain('setFilesOpen')
-    expect(chip).toContain('markdownTurn.filesGroup')
   })
 })
 
@@ -455,34 +352,6 @@ describe('快捷信息库（纯逻辑）', () => {
   })
 })
 
-describe('超大 turn 中段折叠（middleFoldRange）', () => {
-  it('行数不超过阈值时不折叠', () => {
-    expect(middleFoldRange(MIDDLE_FOLD_THRESHOLD)).toEqual({ headEnd: 0, tailStart: MIDDLE_FOLD_THRESHOLD, hidden: 0 })
-    expect(middleFoldRange(10)).toEqual({ headEnd: 0, tailStart: 10, hidden: 0 })
-  })
-
-  it('超过阈值时只保留头尾，中间折起', () => {
-    // 269 步的巨型 turn：头 15 + 尾 15，中间 239 折起。
-    const range = middleFoldRange(269)
-    expect(range.headEnd).toBe(15)
-    expect(range.tailStart).toBe(254)
-    expect(range.hidden).toBe(239)
-  })
-
-  it('刚好超过阈值时头尾不重叠', () => {
-    // 51 行：头 15 + 尾 15 = 30，中间 21 折起。
-    const range = middleFoldRange(51)
-    expect(range.headEnd).toBe(15)
-    expect(range.tailStart).toBe(36)
-    expect(range.hidden).toBe(21)
-  })
-
-  it('头尾之和接近总长时中间只剩少量', () => {
-    // 32 行（turn 3 那种规模）：不折叠（低于阈值 50）。
-    expect(middleFoldRange(32).hidden).toBe(0)
-  })
-})
-
 describe('输出框固定高度：可用高度不再扣「上面的内容」', () => {
   it('预算 = 可视区 − 输入框 − 余量(42) − 框下小行；上面的块多高都不影响', () => {
     expect(frameBudgetHeight(800, 60, 30)).toBe(800 - 60 - 42 - 30)
@@ -542,12 +411,36 @@ describe('快捷信息面板的定位（panelPlacement）', () => {
   })
 })
 
-describe('用户滚动意图', () => {
-  it('跟随输出前先确认用户贴底；上滚即冻结阅读位置', () => {
+describe('每轮一框（turn-frame-redesign）', () => {
+  it('历史轮不再折叠成摘要条：折叠属性/摘要条机制已删除', () => {
     const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
-    expect(source).toContain('userAtBottom')
-    expect(source).toContain('followTailSession === key && isLiveOutput() && userAtBottom')
-    expect(source).toContain("addEventListener('scroll'")
-    expect(source).toContain('sessionKey = key')
+    expect(source).not.toContain('COLLAPSED_ATTR = ')
+    expect(source).not.toContain('ensureStrip')
+    expect(source).not.toContain('setCollapsed')
+    expect(source).not.toContain('STRIP_ATTR')
+  })
+
+  it('每个轮次都套框（不限当前轮）', () => {
+    const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
+    // 每轮一框：ensureTurnFrame 给每个轮次插统一框，applyTurnTab 钉 current/history 标记。
+    expect(source).toContain('ensureTurnFrame')
+    expect(source).toContain("frame.setAttribute('data-chat-power-frame'")
+  })
+
+  it('框标题行有 请求/过程/结果 三个页签，默认结果', () => {
+    const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
+    expect(source).toContain('TURN_TAB_ATTR')
+    expect(source).toContain("tab === 'request'")
+    expect(source).toContain("tab === 'process'")
+    expect(source).toContain("tab === 'result'")
+    // 默认页签：结果。
+    expect(source).toContain("tab: 'result'")
+  })
+
+  it('过程分页：50 条一页，「展示更多」加载下一页', () => {
+    const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
+    expect(source).toContain('PROCESS_PAGE_SIZE = 50')
+    expect(source).toContain('SHOW_MORE_ATTR')
+    expect(source).toContain('processShown += PROCESS_PAGE_SIZE')
   })
 })

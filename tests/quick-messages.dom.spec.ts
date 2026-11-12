@@ -17,7 +17,7 @@ import {
 } from '../src/turn-fold.ts'
 
 /** 一条答案行 + 点赞行（宿主把按钮组画在 holder 里），挂进单轮会话。 */
-function buildConversation(sessionId = 's-q'): { holder: HTMLElement; scroller: HTMLElement; sync: () => void; stop: () => void } {
+function buildConversation(sessionId = 's-q', onSendQuick?: (text: string) => void): { holder: HTMLElement; scroller: HTMLElement; sync: () => void; stop: () => void } {
   const session = document.createElement('div')
   session.setAttribute('data-conversation-session', sessionId)
   const scroller = document.createElement('div')
@@ -40,6 +40,10 @@ function buildConversation(sessionId = 's-q'): { holder: HTMLElement; scroller: 
   answerRow.appendChild(holder)
   flow.append(row, answerRow)
   scroller.appendChild(flow)
+  // 宿主结构里 composer seat 在滚动层末尾（快捷信息按钮与点赞行的新家）。
+  const seat = document.createElement('div')
+  seat.setAttribute('data-composer-seat', '')
+  scroller.appendChild(seat)
   session.appendChild(scroller)
   document.body.appendChild(session)
   Object.defineProperty(scroller, 'clientHeight', { value: 800, configurable: true })
@@ -50,10 +54,7 @@ function buildConversation(sessionId = 's-q'): { holder: HTMLElement; scroller: 
       sync = callback
       return () => {}
     },
-    onSendQuick: text => {
-      // 测试只关心文本被发出（会话号由夹具保证存在）。
-      void text
-    },
+    onSendQuick: text => { onSendQuick?.(text) },
   })
   sync?.()
   return { holder, scroller, sync: () => sync?.(), stop }
@@ -91,17 +92,7 @@ describe('快捷信息面板', () => {
 
   it('面板里有内置条目；点信息条发送并关面板', () => {
     const sent: string[] = []
-    const session = document.querySelector('[data-conversation-session]')
-    session?.setAttribute('data-conversation-session', 's-send')
-    const { stop } = buildConversation('s-send')
-    stop()
-    // 重新起一个控制器，这次捕获发送的文本。
-    const scroller = document.querySelector('[data-conversation-scroll]')!
-    const stop2 = startTurnFold({
-      root: () => scroller,
-      observe: () => () => {},
-      onSendQuick: text => { sent.push(text) },
-    })
+    const { stop } = buildConversation('s-send', text => { sent.push(text) })
     quickButtonOf()!.click()
     const panel = panelOf()!
     const items = panel.querySelectorAll('[data-chat-power-quick-row]')
@@ -110,7 +101,7 @@ describe('快捷信息面板', () => {
     expect(sent).toHaveLength(1)
     expect(sent[0]!.length).toBeGreaterThan(0)
     expect(panelOf()).toBeNull()
-    stop2()
+    stop()
   })
 
   it('点条目右侧「删除」：条目从列表移除并存回 localStorage', () => {

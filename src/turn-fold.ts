@@ -34,10 +34,6 @@ export interface TurnGroup {
 
 /** 宿主在每行上标的轮次号。 */
 export const TURN_ATTR = 'data-chat-turn'
-/** 插件给折叠中的轮次行加的标记（CSS 据此隐藏该行）。 */
-export const COLLAPSED_ATTR = 'data-chat-power-collapsed'
-/** 插件插入的摘要条 / 收起药丸的标记。 */
-export const STRIP_ATTR = 'data-chat-power-turn-strip'
 
 /**
  * 按轮次号把行分组：组内保持行序，组间保持首次出现顺序。
@@ -93,47 +89,39 @@ export const MIN_AVAILABLE_HEIGHT = 240
 /** 插件给「由我们收起的思考组」加的标记（CSS 据此只隐藏组体，组头保留）。 */
 export const GROUP_HIDDEN_ATTR = 'data-chat-power-group-hidden'
 
+/** 框内页签：请求 / 过程 / 结果。默认展示结果。 */
+export type TurnTab = 'request' | 'process' | 'result'
+
+/** 框标题行页签按钮的标记（data-tab 值为页签名）。 */
+export const TURN_TAB_ATTR = 'data-chat-power-turn-tab'
+
+/** 框标题行标记。 */
+export const TURN_HEADER_ATTR = 'data-chat-power-turn-header'
+
+/** 过程页签的分页大小：每页展示的段数（思考/工具各算一段）。 */
+export const PROCESS_PAGE_SIZE = 50
+
+/** 每轮统一输出框的标记。 */
+export const TURN_FRAME_ATTR = 'data-chat-power-turn-frame'
+/** 框标题行里轮次标题的标记。 */
+export const TURN_TITLE_ATTR = 'data-chat-power-turn-title'
+/** 框标题行里「本轮文件」按钮的标记。 */
+export const TURN_FILES_ATTR = 'data-chat-power-turn-files'
+/** 框在文件列表展开态的标记（挂在框上）。 */
+export const TURN_FILES_OPEN_ATTR = 'data-chat-power-files-open'
+/** 被当前页签隐藏的宿主行标记（CSS 据此 display:none）。 */
+export const TAB_HIDDEN_ATTR = 'data-chat-power-tab-hidden'
+/** 过程页签「展示更多」条的标记。 */
+export const SHOW_MORE_ATTR = 'data-chat-power-show-more'
+
+/** 输入框标题栏的标记（点赞行与快捷按钮的新家）。 */
+export const COMPOSER_BAR_ATTR = 'data-chat-power-composer-bar'
+
 /** 插件插入的「请求条」标记：用户请求折成一行，点一下展开。 */
 export const REQUEST_BAR_ATTR = 'data-chat-power-request-bar'
 
 /** 插件给「被收起的用户请求行」加的标记。 */
 export const REQUEST_HIDDEN_ATTR = 'data-chat-power-request-collapsed'
-
-/**
- * 超大 turn 内部步骤折叠：一个 turn 的行数超过此阈值时，只渲染头部与尾部若干行，
- * 中间用一条「显示中间 N 步」占位条折起。
- *
- * 针对「单个超长 turn」（如一个会话跑了 4 小时、269 步全堆在第 1 轮）打开时卡 2-3 秒：
- * turn 级虚拟化管不到 turn 内部，这里在 DOM 层把中段折起，打开即秒显头尾。
- */
-export const MIDDLE_FOLD_THRESHOLD = 50
-/** 折叠后保留的头部行数（输入上下文、开场步骤）。 */
-export const MIDDLE_FOLD_HEAD = 15
-/** 折叠后保留的尾部行数（最新进展、正在输出的步骤）。 */
-export const MIDDLE_FOLD_TAIL = 15
-/** 插件给「超大 turn 中段被折起」加的行标记（CSS 据此 display:none）。 */
-export const MIDDLE_HIDDEN_ATTR = 'data-chat-power-middle-hidden'
-/** 插件插入的「显示中间 N 步」占位条标记。 */
-export const MIDDLE_BAR_ATTR = 'data-chat-power-middle-bar'
-
-/**
- * 计算超大 turn 中段折叠的范围（纯逻辑，便于测试）。
- *
- * 返回 `{ headEnd, tailStart, hidden }`：保留 `[0, headEnd)` 与 `[tailStart, len)`，
- * 隐藏 `[headEnd, tailStart)`，hidden 为被隐藏的行数。行数不超过阈值时返回
- * `hidden: 0`（表示不折叠）。
- *
- * @param total - 该 turn 的总行数。
- * @returns 折叠范围。
- */
-export function middleFoldRange(total: number): { headEnd: number; tailStart: number; hidden: number } {
-  if (total <= MIDDLE_FOLD_THRESHOLD) {
-    return { headEnd: 0, tailStart: total, hidden: 0 }
-  }
-  const headEnd = MIDDLE_FOLD_HEAD
-  const tailStart = Math.max(headEnd, total - MIDDLE_FOLD_TAIL)
-  return { headEnd, tailStart, hidden: tailStart - headEnd }
-}
 
 /**
  * 用户的行：首条用户消息、补发消息（steering），以及对模型提问的回答
@@ -223,25 +211,22 @@ export function frameBudgetHeight(viewport: number, composerHeight: number, belo
 /** 心跳间隔：聊天区晚挂载或被换掉时的重试节奏。 */
 const RETRY_INTERVAL_MS = 500
 
-/** 一轮的状态：行、首见时刻、摘要、是否折叠、摘要条元素。 */
+/** 一轮的状态：行、首见时刻、框与页签。 */
 interface TurnRecord {
   number: number
   rows: HTMLElement[]
   firstSeenAt: number
   summary: string
-  collapsed: boolean
-  strip?: HTMLElement
-  requestBar?: HTMLElement
-  frameLabel?: HTMLElement
-  processHint?: string
-  requestCollapsed: boolean
-  requestSummary: string
-  /** 超大 turn 中段折叠：是否处于折起态（仅当前轮用）。 */
-  middleCollapsed: boolean
-  /** 中段占位条元素。 */
-  middleBar?: HTMLElement
-  /** 中段当前被折起的行数（0 表示未折叠 / 已全部展开）。 */
-  middleHiddenCount: number
+  /** 本轮的统一输出框（每轮一框）。 */
+  frame?: HTMLElement
+  /** 当前展示的页签：request / process / result。 */
+  tab: TurnTab
+  /** 过程页签已展开的段数（分页）。 */
+  processShown: number
+  /** 标题行元素（页签与文件按钮的宿主）。 */
+  header?: HTMLElement
+  /** 文件按钮（历史轮没有本轮文件时不存在）。 */
+  filesBtn?: HTMLElement
 }
 
 /** 折叠控制器的可注入面（便于测试与宿主差异适配）。 */
@@ -443,204 +428,20 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
 
   const resetSession = (key: string | undefined): void => {
     for (const record of records.values()) {
-      record.strip?.remove()
-      record.requestBar?.remove()
-      record.middleBar?.remove()
-      for (const row of record.rows) {
-        row.removeAttribute(COLLAPSED_ATTR)
-        row.removeAttribute(REQUEST_HIDDEN_ATTR)
-        row.removeAttribute(MIDDLE_HIDDEN_ATTR)
-      }
+      record.frame?.remove()
+      for (const row of record.rows) row.removeAttribute(REQUEST_HIDDEN_ATTR)
     }
     records = new Map()
     currentTurn = 0
     // 刚打开一个会话：若它还在输出中，后续每次同步都落到底部（自动跟随 ✓），
-    // 直到输出结束才停止跟随。不再做「当前轮对齐到顶部」——它和宿主的贴底
-    // 跟随打架，停在中间。
+    // 直到输出结束才停止跟随。
     followTailSession = key
     userAtBottom = true
     sessionKey = key
   }
 
-  const setCollapsed = (record: TurnRecord, collapsed: boolean): void => {
-    record.collapsed = collapsed
-    for (const row of record.rows) {
-      if (collapsed) row.setAttribute(COLLAPSED_ATTR, '')
-      else row.removeAttribute(COLLAPSED_ATTR)
-    }
-  }
 
-  /**
-   * 超大 turn 中段折叠：turn 行数超阈值时，只保留头部与尾部若干行可见，
-   * 中间行用 {@link MIDDLE_HIDDEN_ATTR} 隐藏，并在头尾之间插一条「显示中间 N 步」占位条。
-   *
-   * 只对当前轮（`record.number === currentTurn`）调用——历史轮已由整轮折叠处理。
-   * 当前轮尾部可能是正在输出的步骤，折叠中段不影响尾部继续追加。
-   *
-   * @param record - 当前轮记录。
-   * @returns 是否发生了折叠（隐藏了行）。
-   */
-  const collapseMiddleSteps = (record: TurnRecord): boolean => {
-    const rows = record.rows
-    const range = middleFoldRange(rows.length)
-    if (range.hidden === 0) {
-      // 行数回到阈值内：展开中段、撤掉占位条。
-      restoreMiddle(record)
-      return false
-    }
-    // 隐藏 headEnd 到 tailStart 之间的行。
-    for (let index = range.headEnd; index < range.tailStart; index += 1) {
-      rows[index]?.setAttribute(MIDDLE_HIDDEN_ATTR, '')
-    }
-    record.middleCollapsed = true
-    record.middleHiddenCount = range.hidden
-    ensureMiddleBar(record, rows[range.headEnd - 1] ?? rows[0], range.hidden)
-    return true
-  }
 
-  /** 展开超大 turn 的中段：清掉隐藏标记、撤掉占位条。 */
-  const restoreMiddle = (record: TurnRecord): void => {
-    record.middleCollapsed = false
-    record.middleHiddenCount = 0
-    for (const row of record.rows) row.removeAttribute(MIDDLE_HIDDEN_ATTR)
-    record.middleBar?.remove()
-    record.middleBar = undefined
-  }
-
-  /**
-   * 在中段边界处插入（或更新）「显示中间 N 步」占位条。
-   *
-   * 锚点：头部最后一行之后。宿主重渲染冲掉时由调用方下一次 sync 重建。
-   * 点击占位条即展开中段（只展开一次；再折叠由 sync 按行数重新判定）。
-   */
-  const ensureMiddleBar = (record: TurnRecord, anchor: HTMLElement | undefined, hiddenCount: number): void => {
-    const parent = anchor?.parentElement
-    if (parent === undefined || parent === null || anchor === undefined) return
-    const host = parent
-    let bar = record.middleBar
-    if (bar === undefined || !bar.isConnected || bar.parentElement !== parent) {
-      bar = document.createElement('div')
-      bar.className = css.middleBar ?? ''
-      bar.setAttribute(MIDDLE_BAR_ATTR, '')
-      bar.setAttribute('role', 'button')
-      bar.setAttribute('tabindex', '0')
-      const expand = (): void => {
-        // 用户主动展开：清掉中段隐藏标记，但保留占位条（更新为「已展开」）。
-        for (const row of record.rows) row.removeAttribute(MIDDLE_HIDDEN_ATTR)
-        record.middleCollapsed = false
-        record.middleHiddenCount = 0
-        renderMiddleBar(bar!, record)
-      }
-      bar.addEventListener('click', expand)
-      bar.addEventListener('keydown', (event: KeyboardEvent) => {
-        if (event.key !== 'Enter' && event.key !== ' ') return
-        event.preventDefault()
-        expand()
-      })
-      // 插在头部最后一行之后。
-      host.insertBefore(bar, anchor.nextSibling)
-      record.middleBar = bar
-    }
-    renderMiddleBar(bar, record)
-  }
-
-  /** 占位条文案：折起态显示「显示中间 N 步」，已展开态显示「已展开中间 N 步」。 */
-  const renderMiddleBar = (bar: HTMLElement, record: TurnRecord): void => {
-    const hidden = record.middleHiddenCount
-    bar.setAttribute('data-state', record.middleCollapsed ? 'collapsed' : 'expanded')
-    bar.setAttribute('aria-expanded', record.middleCollapsed ? 'false' : 'true')
-    const label = record.middleCollapsed
-      ? t('turnFold.showMiddle', { count: hidden })
-      : t('turnFold.showedMiddle', { count: hidden })
-    if (bar.dataset['signature'] === label) return
-    bar.dataset['signature'] = label
-    while (bar.firstChild !== null) bar.removeChild(bar.firstChild)
-    const chevron = document.createElement('span')
-    chevron.className = css.stripChevron ?? ''
-    chevron.setAttribute('aria-hidden', 'true')
-    chevron.textContent = record.middleCollapsed ? '▸' : '▾'
-    const text = document.createElement('span')
-    text.className = css.stripLabel ?? ''
-    text.textContent = label
-    bar.append(chevron, text)
-  }
-
-  /** 摘要条的稳定签名：内容没变就不重画，避免观察器自激。 */
-  const signatureOf = (record: TurnRecord): string =>
-    `${record.number}|${record.collapsed ? 'c' : 'e'}|${record.firstSeenAt}|${record.summary}`
-
-  const renderStrip = (strip: HTMLElement, record: TurnRecord): void => {
-    const signature = signatureOf(record)
-    if (strip.dataset['signature'] === signature) return
-    strip.dataset['signature'] = signature
-    while (strip.firstChild !== null) strip.removeChild(strip.firstChild)
-    const label = document.createElement('span')
-    label.className = css.stripLabel ?? ''
-    label.textContent = turnStripText(record.number, formatClock(record.firstSeenAt), record.summary, t)
-    const chevron = document.createElement('span')
-    chevron.className = css.stripChevron ?? ''
-    chevron.setAttribute('aria-hidden', 'true')
-    chevron.textContent = record.collapsed ? '▸' : '▾'
-    strip.append(chevron, label)
-    strip.setAttribute('data-state', record.collapsed ? 'collapsed' : 'expanded')
-    strip.setAttribute('role', 'button')
-    strip.setAttribute('tabindex', '0')
-    strip.setAttribute('aria-expanded', record.collapsed ? 'false' : 'true')
-    strip.setAttribute('aria-label', record.collapsed
-      ? `${label.textContent}（${t('turnFold.expandAria')}）`
-      : `${label.textContent}（${t('turnFold.collapseAria')}）`)
-  }
-
-  const ensureStrip = (record: TurnRecord, firstRow: HTMLElement): void => {
-    const parent = firstRow.parentElement
-    if (parent === null) return
-    let strip = record.strip
-    if (strip === undefined || !strip.isConnected || strip.parentElement !== parent) {
-      strip = document.createElement('div')
-      strip.className = css.strip ?? ''
-      strip.setAttribute(STRIP_ATTR, '')
-      // 自报状态：摘要条首次插入（看不到折叠效果时的取证入口）。
-      console.info(`[chat-power] turn fold: 摘要条插入（轮 ${record.number}，行数 ${record.rows.length}）`)
-      strip.setAttribute('data-chat-power-turn', String(record.number))
-      // 整条横条就是开关：点击即折叠/展开（键盘 Enter / 空格同样可用）。
-      strip.addEventListener('click', () => {
-        setCollapsed(record, !record.collapsed)
-        renderStrip(strip!, record)
-      })
-      strip.addEventListener('keydown', (event: KeyboardEvent) => {
-        if (event.key !== 'Enter' && event.key !== ' ') return
-        event.preventDefault()
-        setCollapsed(record, !record.collapsed)
-        renderStrip(strip!, record)
-      })
-      parent.insertBefore(strip, firstRow)
-      record.strip = strip
-    }
-    renderStrip(strip, record)
-  }
-
-  /**
-   * 可用高度：会话区可视高度减去输入框高度与余量——输出框固定占满这一块，
-   * 上面的内容被吸顶对齐顶出屏幕上方（见 {@link frameBudgetHeight}）。
-   * 会话区本身没有布局（隐藏的标签）时返回 0，表示「先别限高」。
-   */
-  const availableHeight = (container: Element, record?: TurnRecord): number => {
-    const viewport = typeof HTMLElement === 'undefined' ? 0 : (container as HTMLElement).clientHeight
-    if (viewport === 0) return 0
-    // 框**上面**的内容不再扣预算：框固定占满，上面的块被吸顶对齐顶出屏幕上方。
-    let below = 0
-    if (record !== undefined) {
-      const framed = record.rows.map(frameBoxOf).find(box => box.hasAttribute(CAPPED_ATTR))
-      if (framed !== undefined) below = belowFrameHeight(framed, container)
-    }
-    return frameBudgetHeight(viewport, measureComposerHeight(container), below)
-  }
-
-  /**
-   * 给这一轮的行分摊高度上限：超出的部分按比例分下去，该行内部滚动。
-   * 高度取**内容高度**（scrollHeight）——用盒子高度会把已被限高的行越量越小。
-   * 内容增长时若该行原本贴着底部，就继续贴底（用户手动上滚后不再抢滚动）。
-   */
   /**
    * 是否还在流式输出。
    *
@@ -707,22 +508,33 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
    * 宿主把它们画在答案下面；我们只做标记（按 `aria-pressed` 认，不看文案），
    * 位置交给 CSS。
    */
-  const markFeedbackRow = (record: TurnRecord): void => {
-    for (const row of record.rows) {
-      // 只认答案框**外面**的点赞/点踩钮（代码块工具栏的换行开关也带
-      // aria-pressed，且在框内——不能误认，否则整个工具栏会被搬进标题栏）。
-      const like = Array.from(row.querySelectorAll('button[aria-pressed]'))
-        .filter(button => button.closest('[data-chat-power-frame-box]') === null)
-        .at(-1)
-      if (like === undefined) continue
+  /**
+   * 输入框标题栏：在 composer 座位顶部插一条插件自己的栏，把宿主画在消息底部
+   * 的点赞行搬进去（不再占会话区的地方），快捷信息按钮也放这里。
+   * 搬运是「移动引用」：holder 还是宿主的元素，只是换了父级；宿主重渲染会
+   * 重建点赞行，观察器会再次把它搬回来。
+   */
+  const ensureComposerBar = (container: Element): void => {
+    const seat = container.querySelector('[data-composer-seat]')
+    if (seat === null) return
+    let bar = seat.querySelector(`[${COMPOSER_BAR_ATTR}]`)
+    if (bar === null) {
+      bar = document.createElement('div')
+      bar.setAttribute(COMPOSER_BAR_ATTR, '')
+      bar.setAttribute('data-chat-power-frame-header', '')
+      // 快捷信息按钮（会话号从会话根节点取）。
+      const sessionId = container.closest('[data-conversation-session]')?.getAttribute('data-conversation-session') ?? ''
+      if (sessionId !== '') bar.append(buildQuickButton(sessionId))
+      seat.insertBefore(bar, seat.firstChild)
+    }
+    // 宿主的点赞行（答案框外的 aria-pressed 按钮排）搬进标题栏。
+    for (const like of Array.from(container.querySelectorAll('button[aria-pressed]'))) {
+      if (like.closest('[data-chat-power-frame-box]') !== null) continue
       const holder = like.parentElement
-      if (holder === null) continue
+      if (holder === null || holder.parentElement === bar) continue
+      if (holder.hasAttribute(COMPOSER_BAR_ATTR) || holder.closest(`[${COMPOSER_BAR_ATTR}]`) !== null) continue
       holder.setAttribute('data-chat-power-feedback', '')
-      // 快捷信息按钮：点开快捷信息列表面板（点击信息条即发送到当前会话）。
-      if (holder.querySelector(`[${QUICK_BTN_ATTR}]`) === null) {
-        const sessionId = row.closest('[data-conversation-session]')?.getAttribute('data-conversation-session') ?? ''
-        if (sessionId !== '') holder.append(buildQuickButton(sessionId))
-      }
+      bar.append(holder)
     }
   }
 
@@ -948,57 +760,23 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     document.addEventListener('click', onDocumentClick, true)
   }
 
-  const applyCaps = (record: TurnRecord, available: number): void => {
-    if (available <= 0) {
-      clearCaps(record)
-      return
-    }
-    const heights = record.rows.map(row => {
-      const content = row.scrollHeight
-      return content > 0 ? content : row.getBoundingClientRect().height
-    })
-    let tallest = -1
-    heights.forEach((height, index) => {
-      if (height <= 0) return
-      if (tallest === -1 || height > (heights[tallest] ?? 0)) tallest = index
-    })
-    // 选哪一行来套框：有答案卡时以答案那行为准（回答才是主角），
-    // 否则取最高的一行（思考 / 工具调用阶段）。
-    const answerIndex = record.rows.findIndex(row => row.querySelector('[data-answer-body]') !== null)
-    const framed = answerIndex >= 0 ? answerIndex : tallest
-    record.rows.forEach((row, index) => {
-      const height = heights[index] ?? 0
-      // 框本体是我们的元素（回答卡 / 思考帧）；没有就退回宿主行。
-      const box = frameBoxOf(row)
-      if (index !== framed) {
-        box.removeAttribute(CAPPED_ATTR)
-        box.style.removeProperty('--chat-power-cap')
-        box.style.removeProperty('--chat-power-floor')
-        return
-      }
-      // 输出框：至少占满一屏，超出的部分向上裁掉（不出现滚动条，历史直接消失）。
-      box.style.setProperty('--chat-power-floor', `${Math.floor(available)}px`)
-      box.setAttribute(CAPPED_ATTR, '')
-      // 标出这是不是当前轮的框：历史轮不再显示吸顶的「回答」标题。
-      box.setAttribute('data-chat-power-frame', record.number === currentTurn ? 'current' : 'history')
-      // 还在流式输出：裁切、不出滚动条；回答完成：允许在框内滚动（出滚动条）。
-      box.setAttribute('data-chat-power-scroll', isLiveOutput() ? 'clip' : 'auto')
-      // 上限：框内最多一屏（内容超出就裁掉，不出滚动条）。
-      const cap = Math.min(height, available)
-      if (cap >= height) {
-        box.style.removeProperty('--chat-power-cap')
-        return
-      }
-      // 贴着底部才跟着长；用户手动上滚过就不再抢滚动。
-      const atBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 4
-      // 外层会话也停在最底部才贴底：用户往上翻看历史时，框里的字也要停住，
-      // 否则它一边被推到上面、一边还在往下写，看着就是闪。
-      const container = observedContainer
-      const viewAtBottom = container === undefined
-        || container.scrollTop + container.clientHeight >= container.scrollHeight - 4
-      box.style.setProperty('--chat-power-cap', `${Math.floor(cap)}px`)
-      if (atBottom && viewAtBottom) box.scrollTop = box.scrollHeight
-    })
+  /**
+   * 给这一轮的统一框限高：最新轮 = 视口 − 输入框 − 余量 − 框下小行；
+   * 历史轮 = 同款高度（也是一屏）。框内滚动查看全部内容，框高不变。
+   */
+  const applyCapsToFrame = (record: TurnRecord, container: Element): void => {
+    const frame = record.frame
+    if (frame === undefined || !frame.isConnected) return
+    const viewport = (container as HTMLElement).clientHeight
+    if (viewport <= 0) return
+    const available = frameBudgetHeight(viewport, measureComposerHeight(container), 0)
+    if (available <= 0) return
+    // 框高度固定：min/max 都钉在预算上（底边拖拽把手仍可通过 --chat-power-resize 覆盖）。
+    frame.style.setProperty('--chat-power-floor', `${Math.floor(available)}px`)
+    frame.setAttribute(CAPPED_ATTR, '')
+    // 最新轮还在流式输出：裁切；其余（历史轮/已完成）：框内滚动。
+    const streaming = record.number === currentTurn && isLiveOutput()
+    frame.setAttribute('data-chat-power-scroll', streaming ? 'clip' : 'auto')
   }
 
   /**
@@ -1041,35 +819,201 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     return undefined
   }
 
-  /** 把提示文字放进回答栏（答案卡的头）；没有卡片时退回框顶那行文案。 */
-  const applyProcessHint = (record: TurnRecord, hint: string | undefined): void => {
-    let header: Element | undefined
-    for (const row of record.rows) {
-      const found = row.querySelector('[data-answer-title]')
-      if (found !== null) {
-        header = found
-        break
-      }
-    }
-    if (header !== undefined) {
-      if (hint === undefined) header.removeAttribute('data-chat-power-hint-text')
-      else header.setAttribute('data-chat-power-hint-text', hint)
-      return
-    }
-    record.processHint = hint
-  }
 
   /** 在输出框上方插入（或更新）左上角文案；框不在了就撤掉。 */
 
 
-  /** 收起折叠态的行不需要限高（它们不可见），清掉之前的限高痕迹。 */
-  const clearCaps = (record: TurnRecord): void => {
-    for (const row of record.rows) {
-      const box = frameBoxOf(row)
-      box.removeAttribute(CAPPED_ATTR)
-      box.style.removeProperty('--chat-power-cap')
-      box.style.removeProperty('--chat-power-floor')
+
+  /**
+   * 每轮一框：把这一轮的所有宿主行收进一个统一输出框。
+   *
+   * 实现方式：给该轮第一行**前面**插一个插件自己的框元素（`display: contents`
+   * 包不住宿主行——宿主行是插件的兄弟节点，所以框只做「头部 + 视觉容器」，
+   * 行本身留在原位，靠 CSS 把框与行并成一个视觉整体是不现实的）。
+   * 取舍：框元素只承载**标题行 + 页签 + 内容视图**，宿主行按页签显示/隐藏
+   * （结果=答案行可见、其余藏；请求=用户行可见；过程=思考/工具行分页可见）。
+   * 框（含标题）插在该轮第一行前，行都跟在框后面。
+   */
+  const ensureTurnFrame = (record: TurnRecord, container: Element): void => {
+    const firstRow = record.rows[0]
+    if (firstRow === undefined) return
+    const parent = firstRow.parentElement
+    if (parent === null) return
+    let frame = record.frame
+    if (frame === undefined || !frame.isConnected || frame.parentElement !== parent) {
+      frame?.remove()
+      frame = document.createElement('div')
+      frame.setAttribute(TURN_FRAME_ATTR, '')
+      frame.setAttribute('data-chat-power-frame-box', '')
+      frame.setAttribute('data-chat-power-kind', 'turn')
+      parent.insertBefore(frame, firstRow)
+      record.frame = frame
+      console.info(`[chat-power] turn frame: 轮 ${record.number} 框已插入（行数 ${record.rows.length}）`)
     }
+    frame.dataset['turn'] = String(record.number)
+    applyCapsToFrame(record, container)
+  }
+
+  /**
+   * 标题行：第 N 轮 · 用时 + 页签三枚（请求/过程/结果，默认结果）+ 文件按钮。
+   * 挂在框元素里；宿主重渲染冲掉后由观察器补回。
+   */
+  const ensureTurnHeader = (record: TurnRecord): void => {
+    const frame = record.frame
+    if (frame === undefined) return
+    let header = record.header
+    if (header === undefined || !header.isConnected || header.parentElement !== frame) {
+      header?.remove()
+      header = document.createElement('div')
+      header.setAttribute(TURN_HEADER_ATTR, '')
+      header.setAttribute('data-chat-power-frame-header', '')
+      // 标题文案：第 N 轮 · 用时（宿主过程组的提示文字，没有就只显轮次）。
+      const title = document.createElement('span')
+      title.setAttribute(TURN_TITLE_ATTR, '')
+      header.append(title)
+      // 页签三枚。
+      for (const tab of ['request', 'process', 'result'] as const) {
+        const tabBtn = document.createElement('button')
+        tabBtn.setAttribute('type', 'button')
+        tabBtn.setAttribute(TURN_TAB_ATTR, '')
+        tabBtn.dataset['tab'] = tab
+        tabBtn.textContent = tabLabelOf(tab)
+        tabBtn.addEventListener('click', event => {
+          event.stopPropagation()
+          record.tab = tab
+          applyTurnTab(record)
+        })
+        header.append(tabBtn)
+      }
+      // 文件按钮：只在最新轮放（历史轮的文件列表不一定进历史记录）。
+      if (record.number === currentTurn) {
+        const filesBtn = document.createElement('button')
+        filesBtn.setAttribute('type', 'button')
+        filesBtn.setAttribute(TURN_FILES_ATTR, '')
+        filesBtn.textContent = t('turnFold.filesTab')
+        filesBtn.addEventListener('click', event => {
+          event.stopPropagation()
+          const frameEl = record.frame
+          if (frameEl === undefined) return
+          const open = frameEl.hasAttribute(TURN_FILES_OPEN_ATTR)
+          if (open) frameEl.removeAttribute(TURN_FILES_OPEN_ATTR)
+          else frameEl.setAttribute(TURN_FILES_OPEN_ATTR, '')
+          applyTurnTab(record)
+        })
+        header.append(filesBtn)
+        record.filesBtn = filesBtn
+      }
+      frame.prepend(header)
+      record.header = header
+    }
+    // 标题文案每次同步刷新（用时随输出更新）。
+    const title = header.querySelector(`[${TURN_TITLE_ATTR}]`)
+    const hint = captureProcessHint(record)
+    if (title !== null) {
+      const text = hint !== undefined
+        ? t('turnFold.turnTitleWithDuration', { turn: record.number, duration: hint })
+        : t('turnFold.turnTitle', { turn: record.number })
+      if (title.textContent !== text) title.textContent = text
+    }
+  }
+
+  /** 页签按钮文案。 */
+  const tabLabelOf = (tab: TurnTab): string =>
+    tab === 'request' ? t('turnFold.tabRequest')
+      : tab === 'process' ? t('turnFold.tabProcess')
+        : t('turnFold.tabResult')
+
+  /**
+   * 按当前页签显示/隐藏宿主行（不移动节点，只加标记；内容不预载——
+   * 过程页签按 processShown 分页展示，点「展示更多」再加一页）。
+   */
+  const applyTurnTab = (record: TurnRecord): void => {
+    const frame = record.frame
+    if (frame === undefined) return
+    frame.dataset['tab'] = record.tab
+    frame.setAttribute('data-chat-power-frame', record.number === currentTurn ? 'current' : 'history')
+    const isLive = record.number === currentTurn && isLiveOutput()
+    // 结果页签（默认）：宿主的答案行可见；流式中所有行都可见（输出贴底继续）。
+    const answerRows: HTMLElement[] = []
+    const requestRows: HTMLElement[] = []
+    const processRows: HTMLElement[] = []
+    for (const row of record.rows) {
+      if (row.matches(USER_ROW_SELECTOR)) requestRows.push(row)
+      else if (row.querySelector('[data-answer-body]') !== null) answerRows.push(row)
+      else processRows.push(row)
+    }
+    const hiddenAttr = TAB_HIDDEN_ATTR
+    const show = (row: HTMLElement): void => row.removeAttribute(hiddenAttr)
+    const hide = (row: HTMLElement): void => row.setAttribute(hiddenAttr, '')
+    for (const row of record.rows) {
+      if (isLive) { show(row); continue }
+      if (record.tab === 'result') {
+        // 结果视图：最后一条答案行**及其之后**的内容可见（答案、点赞行、文件块），
+        // 之前的请求/过程行全藏（它们进各自的页签看）。
+        const lastAnswer = answerRows.at(-1)
+        if (lastAnswer === undefined) { show(row); continue }
+        const precedes = (row.compareDocumentPosition(lastAnswer) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
+        if (precedes) hide(row)
+        else show(row)
+      } else if (record.tab === 'request') {
+        if (requestRows.includes(row)) show(row)
+        else hide(row)
+      } else {
+        // 过程：分页展示前 processShown 段。
+        const index = processRows.indexOf(row)
+        if (index >= 0 && index < record.processShown) show(row)
+        else hide(row)
+      }
+    }
+    // 页签按钮选中态 + 过程页签的「展示更多」条。
+    for (const btn of frame.querySelectorAll(`[${TURN_TAB_ATTR}]`)) {
+      const tab = (btn as HTMLElement).dataset['tab']
+      btn.setAttribute('data-active', tab === record.tab ? '' : 'false')
+      btn.setAttribute('aria-selected', tab === record.tab ? 'true' : 'false')
+    }
+    ensureShowMoreBar(record)
+    // 复制按钮针对当前展示内容：把当前页签的可见文本写进框上的标记，
+    // 由答案卡/标题行的复制按钮读取。
+    frame.dataset['copyText'] = visibleTextOf(record)
+  }
+
+  /** 当前页签可见内容的纯文本（复制按钮用）。 */
+  const visibleTextOf = (record: TurnRecord): string => {
+    const frame = record.frame
+    if (frame === undefined) return ''
+    if (record.tab === 'request') {
+      return record.rows
+        .filter(row => row.matches(USER_ROW_SELECTOR) && !row.hasAttribute(TAB_HIDDEN_ATTR))
+        .map(row => (row.textContent ?? '').trim())
+        .filter(text => text !== '')
+        .join('\n\n')
+    }
+    return (frame.parentElement?.textContent ?? '')
+      .replace(/\s+/g, ' ')
+      .trim()
+  }
+
+  /** 过程页签的「展示更多」条：还有未展示的段时插在框尾。 */
+  const ensureShowMoreBar = (record: TurnRecord): void => {
+    const frame = record.frame
+    if (frame === undefined) return
+    if (record.tab !== 'process') return
+    const processRows = record.rows.filter(row => !row.matches(USER_ROW_SELECTOR) && row.querySelector('[data-answer-body]') === null)
+    if (processRows.length <= record.processShown) return
+    let bar = frame.querySelector(`[${SHOW_MORE_ATTR}]`)
+    if (bar === null) {
+      bar = document.createElement('button')
+      bar.setAttribute('type', 'button')
+      bar.setAttribute(SHOW_MORE_ATTR, '')
+      bar.addEventListener('click', event => {
+        event.stopPropagation()
+        record.processShown += PROCESS_PAGE_SIZE
+        applyTurnTab(record)
+      })
+      frame.append(bar)
+    }
+    const remaining = processRows.length - record.processShown
+    bar.textContent = t('turnFold.showMore', { count: remaining })
   }
 
   /**
@@ -1149,63 +1093,6 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     }, true)
   }
 
-  /**
-   * 用户请求条：把这一轮的用户请求折成一行（标题条 + 首句摘要），点一下展开。
-   *
-   * 请求本身常常好几行，占掉本该给结果块的空间；折成一行后，当前轮里占地方的
-   * 就只剩结果块。展开时恢复原样，再点一下收起。
-   */
-  const ensureRequestBar = (record: TurnRecord): void => {
-    const userRow = record.rows.find(row => row.matches(USER_ROW_SELECTOR))
-    if (userRow === undefined) return
-    const parent = userRow.parentElement
-    if (parent === null) return
-    if (record.requestSummary === '') record.requestSummary = summarizeTurn([userRow])
-    let bar = record.requestBar
-    if (bar === undefined || !bar.isConnected || bar.parentElement !== parent) {
-      bar = document.createElement('div')
-      bar.className = css.requestBar ?? ''
-      bar.setAttribute(REQUEST_BAR_ATTR, '')
-      bar.addEventListener('click', () => {
-        record.requestCollapsed = !record.requestCollapsed
-        applyRequestBar(record)
-      })
-      parent.insertBefore(bar, userRow)
-      record.requestBar = bar
-    }
-    applyRequestBar(record)
-  }
-
-  /** 请求条与请求行的状态同步（收起 / 展开、文案、指示箭头）。 */
-  const applyRequestBar = (record: TurnRecord): void => {
-    const bar = record.requestBar
-    const userRows = record.rows.filter(row => row.matches(USER_ROW_SELECTOR))
-    if (bar === undefined || userRows.length === 0) return
-    // 请求收起时，这一轮的**所有**提问行（含中途引导）都要藏起——
-    // 只要有一行还在占位，就会把回答框往下挤。
-    for (const userRow of userRows) {
-      if (record.requestCollapsed) userRow.setAttribute(REQUEST_HIDDEN_ATTR, '')
-      else userRow.removeAttribute(REQUEST_HIDDEN_ATTR)
-    }
-    const signature = `${record.requestCollapsed ? 'c' : 'e'}|${record.requestSummary}`
-    if (bar.dataset['signature'] === signature) return
-    bar.dataset['signature'] = signature
-    while (bar.firstChild !== null) bar.removeChild(bar.firstChild)
-    const chevron = document.createElement('span')
-    chevron.className = css.stripChevron ?? ''
-    chevron.setAttribute('aria-hidden', 'true')
-    chevron.textContent = record.requestCollapsed ? '▸' : '▾'
-    const label = document.createElement('span')
-    label.className = css.stripLabel ?? ''
-    label.textContent = t('turnFold.requestLabel', { summary: record.requestSummary })
-    bar.append(chevron, label)
-    bar.setAttribute('role', 'button')
-    bar.setAttribute('tabindex', '0')
-    bar.setAttribute('aria-expanded', record.requestCollapsed ? 'false' : 'true')
-    bar.setAttribute('aria-label', record.requestCollapsed
-      ? `${label.textContent}（${t('turnFold.requestExpand')}）`
-      : `${label.textContent}（${t('turnFold.requestCollapse')}）`)
-  }
 
   /**
    * 把当前轮顶到滚动容器顶端：历史轮次的摘要条被顶到屏幕外，屏幕里只剩当前轮。
@@ -1214,9 +1101,8 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
   const alignCurrentTurnToTop = (record: TurnRecord, container: Element): void => {
     const scrollable = container as HTMLElement
     if (typeof scrollable.scrollTop !== 'number') return
-    // 吸顶对象：回答框已出现时对齐**回答框**（不是请求条）。
-    const anchor =
-      record.rows.map(frameBoxOf).find(box => box.hasAttribute(CAPPED_ATTR)) ?? record.requestBar ?? record.rows[0]
+    // 吸顶对象：这一轮的统一框（每轮一框）。
+    const anchor = record.frame ?? record.rows[0]
     if (anchor === undefined) return
     const target = scrollTopForTurnTop(
       anchor.getBoundingClientRect().top,
@@ -1233,7 +1119,8 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     if (container === null) return
     const key = sessionOf(container)
     if (key !== sessionKey) resetSession(key)
-    // 输入框的拖拽把手与记忆恢复：跟行无关，切会话/重渲染后也要补上。
+    // 输入框标题栏（点赞行迁移 + 快捷按钮）与拖拽把手：跟行无关，切会话/重渲染后也要补上。
+    ensureComposerBar(container)
     ensureComposerResize(container, t('turnFold.composerResizeTitle'))
     const rows = rowsOf(container)
     if (rows.length === 0) return
@@ -1253,11 +1140,8 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
           rows: group.rows as HTMLElement[],
           firstSeenAt: now(),
           summary: summarizeTurn(group.rows),
-          collapsed: false,
-          requestCollapsed: true,
-          requestSummary: '',
-          middleCollapsed: false,
-          middleHiddenCount: 0,
+          tab: 'result',
+          processShown: PROCESS_PAGE_SIZE,
         })
         continue
       }
@@ -1269,65 +1153,19 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     }
     const maxTurn = groups.reduce((max, group) => Math.max(max, group.number), 0)
     if (maxTurn > currentTurn) {
-      const collapsingNumbers = [...records.values()]
-        .filter(record => record.number < maxTurn)
-        .map(record => `${record.number}(${record.rows.length}行)`)
       currentTurn = maxTurn
-      // 新一轮开始：此前的轮次折叠成摘要条，只有当前轮留在主屏。
-      for (const record of records.values()) {
-        if (record.number < currentTurn) setCollapsed(record, true)
-      }
-      // 历史轮次被顶到屏幕外，屏幕里只剩当前轮。
+      // 每轮一框：历史轮不再折叠，只是新一轮出现时把最新框滚进视野。
       pendingAlign = true
-      // 自报状态：折叠链路的唯一现场线索（无 DOM 访问时的取证入口）。
-      console.info(`[chat-power] turn fold: 当前轮 → ${maxTurn}；折叠 ${collapsingNumbers.length} 轮 [${collapsingNumbers.join('、')}]；总行数 ${rows.length}`)
+      console.info(`[chat-power] turn frame: 当前轮 → ${maxTurn}；总轮数 ${records.size}`)
     }
     for (const record of records.values()) {
-      // 每个输出框底边的上下拖拽把手（冲掉了会补回；两个分支共用）。
+      // 每个输出框底边的上下拖拽把手（冲掉了会补回）。
+      // 每轮一框：先套框（把手挂在框上，必须先建框）。
+      ensureTurnFrame(record, container)
       ensureFrameResizeHandles(record, t('turnFold.frameResizeTitle'))
-      const firstRow = record.rows[0]
-      if (firstRow === undefined) continue
-      if (record.number === currentTurn) {
-        record.strip?.remove()
-        record.strip = undefined
-        if (record.collapsed) setCollapsed(record, false)
-        // 回答框出现后：提问气泡隐藏，但保留「请求 · 首句」摘要条（收起态 ✓）。
-        // 摘要条占位很小，会计入限高（框上面的部分），不会再把点赞行挤出去。
-        const framedBox = record.rows.map(frameBoxOf).find(box => box.hasAttribute(CAPPED_ATTR))
-        if (framedBox !== undefined) {
-          for (const row of record.rows) {
-            // 只处理排在回答框前面的行（提问 / 中途引导）。
-            if ((row.compareDocumentPosition(framedBox) & Node.DOCUMENT_POSITION_FOLLOWING) === 0) continue
-            if (!row.matches(USER_ROW_SELECTOR)) continue
-            if (!row.hasAttribute(REQUEST_HIDDEN_ATTR)) pendingAlign = true
-            row.setAttribute(REQUEST_HIDDEN_ATTR, '')
-          }
-          record.requestCollapsed = true
-        }
-        ensureRequestBar(record)
-        // 超大 turn 中段折叠：当前轮行数超阈值时，只留头尾可见，中间折起。
-        // 在限高与折叠思考之前做，让被折起的行不参与后续测量。
-        collapseMiddleSteps(record)
-        collapseThinking(record)
-        yieldGroupHeadToThinking(record)
-        applyCaps(record, availableHeight(container, record))
-        applyProcessHint(record, captureProcessHint(record))
-        markFeedbackRow(record)
-        markFrameState(record)
-        continue
-      }
-      ensureStrip(record, firstRow)
-      setCollapsed(record, record.collapsed)
-      if (record.collapsed) {
-        clearCaps(record)
-        // 整轮折成摘要条时，请求条也一起藏起来。
-        record.requestBar?.setAttribute(REQUEST_HIDDEN_ATTR, '')
-      } else {
-        record.requestBar?.removeAttribute(REQUEST_HIDDEN_ATTR)
-        ensureRequestBar(record)
-        collapseThinking(record)
-        applyCaps(record, availableHeight(container, record))
-      }
+      ensureTurnHeader(record)
+      applyTurnTab(record)
+      markFrameState(record)
     }
     if (followTailSession === key && isLiveOutput() && userAtBottom) {
       // 输出中：每次同步都落到底部（流式内容持续增长，保持跟随 ✓）。
@@ -1413,15 +1251,14 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     closeQuickPanel()
     for (const stale of document.querySelectorAll(`[${QUICK_BTN_ATTR}]`)) stale.remove()
     for (const record of records.values()) {
-      record.strip?.remove()
-      record.requestBar?.remove()
-      record.middleBar?.remove()
+      record.frame?.remove()
       for (const row of record.rows) {
-        row.removeAttribute(COLLAPSED_ATTR)
         row.removeAttribute(CAPPED_ATTR)
         row.removeAttribute(REQUEST_HIDDEN_ATTR)
-        row.removeAttribute(MIDDLE_HIDDEN_ATTR)
+        row.removeAttribute(TAB_HIDDEN_ATTR)
+        row.removeAttribute(GROUP_HIDDEN_ATTR)
         row.style.removeProperty('--chat-power-cap')
+        row.style.removeProperty('--chat-power-resize')
       }
     }
     records = new Map()

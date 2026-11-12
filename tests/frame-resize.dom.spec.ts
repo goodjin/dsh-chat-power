@@ -17,18 +17,15 @@ import {
   FRAME_RESIZE_ATTR,
 } from '../src/frame-resize.ts'
 
-function frameRow(turn: number, answer = false): HTMLElement {
+function chatRow(turn: number, kind: string, withAnswer = false): HTMLElement {
   const row = document.createElement('div')
   row.setAttribute('data-chat-turn', String(turn))
-  row.setAttribute('data-chat-flow-kind', answer ? 'assistant' : 'tool-call')
-  const box = document.createElement('div')
-  box.setAttribute('data-chat-power-frame-box', '')
-  if (answer) {
+  row.setAttribute('data-chat-flow-kind', kind)
+  if (withAnswer) {
     const body = document.createElement('div')
     body.setAttribute('data-answer-body', '')
-    box.appendChild(body)
+    row.appendChild(body)
   }
-  row.appendChild(box)
   return row
 }
 
@@ -47,9 +44,7 @@ function buildConversation(): Built {
   const scroller = document.createElement('div')
   scroller.setAttribute('data-conversation-scroll', '')
   const flow = document.createElement('div')
-  const toolRow = frameRow(3)
-  const answerRow = frameRow(3, true)
-  flow.append(toolRow, answerRow)
+  flow.append(chatRow(3, 'tool-call'), chatRow(3, 'assistant', true))
   // composer：座位 → 卡 → 滚动文本区（overflow-y auto）→ 编辑器。
   const seat = document.createElement('div')
   seat.setAttribute('data-composer-seat', '')
@@ -72,7 +67,8 @@ function buildConversation(): Built {
       return () => {}
     },
   })
-  const boxes = Array.from(scroller.querySelectorAll<HTMLElement>('[data-chat-power-frame-box]'))
+  // 每轮一框：统一框由控制器插入（整个会话只有一个框）。
+  const boxes = Array.from(scroller.querySelectorAll<HTMLElement>('[data-chat-power-turn-frame]'))
   return { scroller, seat, region, boxes, stop }
 }
 
@@ -89,12 +85,10 @@ afterEach(() => {
 })
 
 describe('块底边的上下拖拽把手', () => {
-  it('当前轮每个输出框底边都有把手', () => {
+  it('统一轮框底边有把手（每轮一框）', () => {
     const { boxes } = buildConversation()
-    expect(boxes.length).toBe(2)
-    for (const box of boxes) {
-      expect(box.querySelector(`[${FRAME_RESIZE_ATTR}]`)).not.toBeNull()
-    }
+    expect(boxes.length).toBe(1)
+    expect(boxes[0]!.querySelector(`[${FRAME_RESIZE_ATTR}]`)).not.toBeNull()
   })
 
   it('向下拖动加高：松手后框上带有用户设定高度（优先于自动限高）', () => {

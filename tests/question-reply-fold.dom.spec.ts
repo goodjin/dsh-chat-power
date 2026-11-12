@@ -1,18 +1,17 @@
 // @vitest-environment jsdom
 /**
- * 「模型提问，用户回答」场景的折叠回归（jsdom 真 document）。
+ * 「模型提问，用户回答」场景（jsdom 真 document）。
  *
  * 宿主把用户对提问的回答渲染成 `question-reply` 行（user-questions 界面认领，
- * 不带 user / steering 标记）——折叠逻辑此前漏掉它，回答块一直占着当前轮的
- * 空间，把回答框往下挤。这里钉住：question-reply 行与用户请求行一样折进
- * 「请求 · 首句」条，点条可展开、再点收起；回答框限高后它也一并收起。
+ * 不带 user / steering 标记）。每轮一框的设计下，这类行归入「请求」页签——
+ * 与用户请求一样，点框标题行的「请求」页签才展示，不占默认（结果）视图的空间。
  */
 import { afterEach, describe, expect, it } from 'vitest'
 
 import {
-  CAPPED_ATTR,
-  REQUEST_BAR_ATTR,
-  REQUEST_HIDDEN_ATTR,
+  TAB_HIDDEN_ATTR,
+  TURN_FRAME_ATTR,
+  TURN_TAB_ATTR,
   USER_ROW_SELECTOR,
   startTurnFold,
 } from '../src/turn-fold.ts'
@@ -26,87 +25,67 @@ function chatRow(turn: number, kind: string, text = ''): HTMLElement {
   return row
 }
 
-/** 一条带插件输出框的行；answer=true 时框里带答案正文标记。 */
-function frameRow(turn: number, answer = false): HTMLElement {
-  const row = chatRow(turn, answer ? 'assistant' : 'tool-call')
+/** 一条带答案正文的行。 */
+function answerRow(turn: number): HTMLElement {
+  const row = chatRow(turn, 'assistant')
   const box = document.createElement('div')
-  box.setAttribute('data-chat-power-frame-box', '')
-  if (answer) {
-    const body = document.createElement('div')
-    body.setAttribute('data-answer-body', '')
-    box.appendChild(body)
-  }
+  box.setAttribute('data-answer-body', '')
   row.appendChild(box)
   return row
 }
 
-interface Built {
-  readonly scroller: HTMLElement
-  readonly flow: HTMLElement
-  readonly userRow: HTMLElement
-  readonly questionReplyRow: HTMLElement
-  readonly answerRow: HTMLElement
-  readonly stop: () => void
-  readonly sync: () => void
-}
-
-/** 搭一棵单轮会话：用户请求 → 问题卡 → 用户回答（question-reply）→ 回答。 */
-function buildConversation(): Built {
+/** 搭一棵单轮会话：用户请求 → 用户回答（question-reply）→ 回答 → composer。 */
+function buildConversation(): { scroller: HTMLElement; rows: HTMLElement[]; stop: () => void } {
   const session = document.createElement('div')
   session.setAttribute('data-conversation-session', 's-qa')
   const scroller = document.createElement('div')
   scroller.setAttribute('data-conversation-scroll', '')
   const flow = document.createElement('div')
   const userRow = chatRow(7, 'user', '帮我把这个仓库的测试跑一遍')
-  const cardRow = frameRow(7)
   const questionReplyRow = chatRow(7, 'question-reply', '选择：只跑受影响的包')
-  const answerRow = frameRow(7, true)
-  flow.append(userRow, cardRow, questionReplyRow, answerRow)
+  const answer = answerRow(7)
+  flow.append(userRow, questionReplyRow, answer)
   scroller.appendChild(flow)
+  const seat = document.createElement('div')
+  seat.setAttribute('data-composer-seat', '')
+  scroller.appendChild(seat)
   session.appendChild(scroller)
   document.body.appendChild(session)
-  // jsdom 恒 0 的 clientHeight 抬起来，让限高链路（CAPPED）走得通。
   Object.defineProperty(scroller, 'clientHeight', { value: 800, configurable: true })
-  let sync: (() => void) | undefined
   const stop = startTurnFold({
     root: () => scroller,
     observe: (_target, callback) => {
-      sync = callback
+      callback()
       return () => {}
     },
   })
-  return { scroller, flow, userRow, questionReplyRow, answerRow, stop, sync: () => sync?.() }
+  return { scroller, rows: [userRow, questionReplyRow, answer], stop }
 }
 
 afterEach(() => {
   document.body.innerHTML = ''
 })
 
-describe('question-reply 行折进请求条', () => {
-  it('识别范围覆盖 question-reply（否则回答块永远不折）', () => {
+describe('question-reply 行归入请求页签', () => {
+  it('识别范围覆盖 question-reply（否则回答块进不了请求视图）', () => {
     expect(USER_ROW_SELECTOR).toContain('question-reply')
   })
 
-  it('回答块默认随请求条收起，不再占据当前轮空间', () => {
-    const { userRow, questionReplyRow } = buildConversation()
-    expect(userRow.hasAttribute(REQUEST_HIDDEN_ATTR)).toBe(true)
-    expect(questionReplyRow.hasAttribute(REQUEST_HIDDEN_ATTR)).toBe(true)
+  it('默认结果视图：question-reply 行隐藏，不占结果的空间', () => {
+    const { rows } = buildConversation()
+    const [, questionReplyRow] = rows
+    expect(questionReplyRow!.hasAttribute(TAB_HIDDEN_ATTR)).toBe(true)
   })
 
-  it('点请求条展开时回答块一起展开，再点收起', () => {
-    const { scroller, questionReplyRow } = buildConversation()
-    const bar = scroller.querySelector(`[${REQUEST_BAR_ATTR}]`)
-    expect(bar).not.toBeNull()
-    bar!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    expect(questionReplyRow.hasAttribute(REQUEST_HIDDEN_ATTR)).toBe(false)
-    bar!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    expect(questionReplyRow.hasAttribute(REQUEST_HIDDEN_ATTR)).toBe(true)
-  })
-
-  it('回答框限高后：回答块（排在框前）也被收起', () => {
-    const { sync, answerRow, questionReplyRow } = buildConversation()
-    sync()
-    expect(answerRow.querySelector('[data-chat-power-frame-box]')?.hasAttribute(CAPPED_ATTR)).toBe(true)
-    expect(questionReplyRow.hasAttribute(REQUEST_HIDDEN_ATTR)).toBe(true)
+  it('点「请求」页签：question-reply 行与用户请求一起展示', () => {
+    const { scroller, rows } = buildConversation()
+    const frame = scroller.querySelector(`[${TURN_FRAME_ATTR}]`)!
+    const requestTab = frame.querySelector(`[${TURN_TAB_ATTR}][data-tab='request']`) as HTMLElement
+    expect(requestTab).not.toBeNull()
+    requestTab.click()
+    const [, questionReplyRow, answer] = rows
+    expect(questionReplyRow!.hasAttribute(TAB_HIDDEN_ATTR)).toBe(false)
+    // 结果行（答案）在请求视图里隐藏。
+    expect(answer!.hasAttribute(TAB_HIDDEN_ATTR)).toBe(true)
   })
 })
