@@ -267,15 +267,9 @@ describe('余面统一：Mermaid、短 ID、宽表', () => {
     expect(locale).toContain("'mermaid.loading'")
   })
 
-  it('复制按钮 32px 点击区、16px 图标；整条不再整体降透明度；换会话复位状态', () => {
-    const css = read('../src/session-id-bar/session-id-bar.module.css')
-    expect(css).toMatch(/width:\s*32px/)
-    expect(css).not.toContain('opacity')
-    const source = read('../src/session-id-bar/index.ts')
-    expect(source).toMatch(/\[sessionId\]/)
-    expect(source).toContain('copyViaClipboard')
-    const locale = read('../src/locales.ts')
-    expect(locale).toContain("'panel.sessionBar.copyUnavailable'")
+  it('短 ID 条已移除（会话列表右键可查）；其词典键一并清理', () => {
+    const index = read('../src/index.ts')
+    expect(index).not.toContain('registerSessionIdBar')
   })
 
   it('宽表末列边距同时覆盖表头与单元格，选择器仍锚定 md-table-wide', () => {
