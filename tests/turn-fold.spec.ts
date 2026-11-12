@@ -10,6 +10,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import {
   formatClock,
+  frameBudgetHeight,
   frameKindOf,
   groupTurnsByNumber,
   middleFoldRange,
@@ -17,6 +18,7 @@ import {
   scrollTopForTurnTop,
   summarizeTurn,
   turnStripText,
+  USER_ROW_SELECTOR,
 } from '../src/turn-fold.ts'
 
 /** 最小行面：只要轮次号与文本，便于构造假行。 */
@@ -251,11 +253,13 @@ describe('提示与可用高度', () => {
     // 只取按钮里那段文字（后面跟着折叠箭头）
     expect(body).toContain("querySelector('span')")
   })
-  it('框的可用高度要扣掉框上方的东西（请求条、文案行），否则底部被输入框压住', () => {
+  it('框的可用高度只扣输入框与框下面的行；上面的内容不再扣（被顶出屏幕）', () => {
     const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
-    expect(source).toContain('aboveFrameHeight')
-    expect(source).toContain('requestBar')
-    expect(source).toContain('frameLabel')
+    // 预算函数存在且被 availableHeight 使用。
+    expect(source).toContain('frameBudgetHeight')
+    expect(source).toContain('frameBudgetHeight(viewport, measureComposerHeight(container), below)')
+    // 框下面的行仍然要扣（否则框底伸到输入框下面）。
+    expect(source).toContain('belowFrameHeight')
   })
 })
 
@@ -460,5 +464,31 @@ describe('超大 turn 中段折叠（middleFoldRange）', () => {
   it('头尾之和接近总长时中间只剩少量', () => {
     // 32 行（turn 3 那种规模）：不折叠（低于阈值 50）。
     expect(middleFoldRange(32).hidden).toBe(0)
+  })
+})
+
+describe('输出框固定高度：可用高度不再扣「上面的内容」', () => {
+  it('预算 = 可视区 − 输入框 − 余量(42) − 框下小行；上面的块多高都不影响', () => {
+    expect(frameBudgetHeight(800, 60, 30)).toBe(800 - 60 - 42 - 30)
+    expect(frameBudgetHeight(800, 0, 0)).toBe(758)
+  })
+
+  it('可视区为 0（隐藏的标签页）时不给预算', () => {
+    expect(frameBudgetHeight(0, 60, 30)).toBe(0)
+  })
+
+  it('扣完不剩（负数）时归零', () => {
+    expect(frameBudgetHeight(100, 60, 30)).toBe(0)
+  })
+
+  it('源码约束：availableHeight 不再读框上面的高度（aboveFrameHeight 已移除）', () => {
+    const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
+    expect(source).not.toContain('aboveFrameHeight')
+  })
+})
+
+describe('用户行识别覆盖「模型提问，用户回答」', () => {
+  it('USER_ROW_SELECTOR 含 question-reply', () => {
+    expect(USER_ROW_SELECTOR).toContain('question-reply')
   })
 })

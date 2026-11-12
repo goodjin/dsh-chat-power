@@ -18,6 +18,7 @@
 import { fallbackT } from './locales.ts'
 import type { RuntimeT } from './locales.ts'
 import css from './turn-fold.module.css'
+import { ensureComposerResize, ensureFrameResizeHandles, removeResizeHandles } from './frame-resize.ts'
 
 /** 行元素的最小面：轮次号与文本（便于在无 DOM 环境里测试）。 */
 export interface TurnRowLike {
@@ -134,8 +135,13 @@ export function middleFoldRange(total: number): { headEnd: number; tailStart: nu
   return { headEnd, tailStart, hidden: tailStart - headEnd }
 }
 
-/** 用户的请求行（首条用户消息、补发消息）。 */
-const USER_ROW_SELECTOR = '[data-chat-flow-kind="user"],[data-chat-flow-kind="steering"]'
+/**
+ * 用户的行：首条用户消息、补发消息（steering），以及对模型提问的回答
+ * （`question-reply`——宿主的 user-questions 界面认领渲染的行，不带 user 标记）。
+ * 三者都随「请求 · 首句」条折叠，免得占着当前轮的空间把回答框往下挤。
+ */
+export const USER_ROW_SELECTOR =
+  '[data-chat-flow-kind="user"],[data-chat-flow-kind="steering"],[data-chat-flow-kind="question-reply"]'
 
 /** 输出框里当前展示的内容类型（框左上角的文案）。 */
 export type FrameKind = 'thinking' | 'tools' | 'answer'
@@ -202,6 +208,17 @@ export const FRAME_LABEL_ATTR = 'data-chat-power-frame-label'
 
 /** 限高时给会话区留的余量（框底到输入框之间的间距）。 */
 const HEIGHT_MARGIN = 42
+
+/**
+ * 输出框的可用高度预算：可视区 − 输入框 − 余量 − 框下面的小行。
+ *
+ * 框**上面**的内容（请求条、过程行、提问与回答）不参与预算——框的高度固定，
+ * 上面的块被吸顶对齐顶出屏幕上方，而不是把框压矮（2026-11-12 的挤压故障）。
+ */
+export function frameBudgetHeight(viewport: number, composerHeight: number, belowHeight: number): number {
+  if (viewport <= 0) return 0
+  return Math.max(0, Math.floor(viewport - composerHeight - HEIGHT_MARGIN - belowHeight))
+}
 
 /** 心跳间隔：聊天区晚挂载或被换掉时的重试节奏。 */
 const RETRY_INTERVAL_MS = 500
@@ -498,26 +515,20 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
   }
 
   /**
-   * 可用高度：会话区可视高度减去输入框高度与余量——当前轮的内容不超过这一块，
-   * 输入框与轮首始终留在视野里。会话区本身没有布局（隐藏的标签）时返回 0，
-   * 表示「先别限高」。
+   * 可用高度：会话区可视高度减去输入框高度与余量——输出框固定占满这一块，
+   * 上面的内容被吸顶对齐顶出屏幕上方（见 {@link frameBudgetHeight}）。
+   * 会话区本身没有布局（隐藏的标签）时返回 0，表示「先别限高」。
    */
   const availableHeight = (container: Element, record?: TurnRecord): number => {
     const viewport = typeof HTMLElement === 'undefined' ? 0 : (container as HTMLElement).clientHeight
     if (viewport === 0) return 0
-    const composer = container.querySelector('[data-composer-seat]')
-    const composerHeight = composer === null ? 0 : composer.getBoundingClientRect().height
-    // 框上方还有请求条与文案行——不扣掉，框底会伸到输入框下面。
-    let above = 0
+    // 框**上面**的内容不再扣预算：框固定占满，上面的块被吸顶对齐顶出屏幕上方。
     let below = 0
     if (record !== undefined) {
       const framed = record.rows.map(frameBoxOf).find(box => box.hasAttribute(CAPPED_ATTR))
-      if (framed !== undefined) {
-        above = aboveFrameHeight(record, framed)
-        below = belowFrameHeight(framed, container)
-      }
+      if (framed !== undefined) below = belowFrameHeight(framed, container)
     }
-    return viewport - composerHeight - HEIGHT_MARGIN - above - below
+    return frameBudgetHeight(viewport, measureComposerHeight(container), below)
   }
 
   /**
@@ -535,23 +546,6 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     if (typeof document === 'undefined') return false
     if (document.querySelector('[data-chat-running]') !== null) return true
     return document.querySelector('[data-answer-status="running"]') !== null
-  }
-
-  /**
-   * 框上方占了多少高度：请求条、文案行，以及本轮里排在框前面的行。
-   *
-   * 可用高度要把它们扣掉，否则框的底边会伸到输入框下面（底部被压住）。
-   */
-  const aboveFrameHeight = (record: TurnRecord, framedBox: HTMLElement): number => {
-    let total = record.requestBar?.offsetHeight ?? 0
-    for (const row of record.rows) {
-      const box = frameBoxOf(row)
-      if (box === framedBox) continue
-      // 只算排在框前面的行（文档顺序）。
-      if ((box.compareDocumentPosition(framedBox) & Node.DOCUMENT_POSITION_FOLLOWING) === 0) continue
-      total += row.getBoundingClientRect().height
-    }
-    return total
   }
 
   /**
@@ -1003,6 +997,8 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     if (container === null) return
     const key = sessionOf(container)
     if (key !== sessionKey) resetSession(key)
+    // 输入框的拖拽把手与记忆恢复：跟行无关，切会话/重渲染后也要补上。
+    ensureComposerResize(container, t('turnFold.composerResizeTitle'))
     const rows = rowsOf(container)
     if (rows.length === 0) return
     const groups = groupTurnsByNumber(rows)
@@ -1051,6 +1047,8 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
       console.info(`[chat-power] turn fold: 当前轮 → ${maxTurn}；折叠 ${collapsingNumbers.length} 轮 [${collapsingNumbers.join('、')}]；总行数 ${rows.length}`)
     }
     for (const record of records.values()) {
+      // 每个输出框底边的上下拖拽把手（冲掉了会补回；两个分支共用）。
+      ensureFrameResizeHandles(record, t('turnFold.frameResizeTitle'))
       const firstRow = record.rows[0]
       if (firstRow === undefined) continue
       if (record.number === currentTurn) {
@@ -1165,6 +1163,7 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     if (retryTimer !== undefined && typeof window !== 'undefined') window.clearInterval(retryTimer)
     retryTimer = undefined
     if (typeof window !== 'undefined') window.removeEventListener('resize', onViewportChange)
+    removeResizeHandles()
     for (const record of records.values()) {
       record.strip?.remove()
       record.requestBar?.remove()

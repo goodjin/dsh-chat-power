@@ -56,6 +56,7 @@ export type ChatPowerLocaleKey =
   | 'turnFold.frameError' | 'turnFold.frameRetry' | 'turnFold.frameCompaction'
   | 'turnFold.frameContext' | 'turnFold.frameLimit' | 'turnFold.frameQuestion'
   | 'turnFold.frameWorkflow' | 'turnFold.frameRunning'
+  | 'turnFold.frameResizeTitle' | 'turnFold.composerResizeTitle'
   | 'turnFold.collapseAria' | 'turnFold.expandAria'
   | 'tools.chat' | 'tools.files' | 'tools.browser' | 'tools.terminal'
   | 'tools.openLocalFile' | 'settings.title' | 'settings.linkOpenDefault' | 'settings.linkOpenRight' | 'settings.linkOpenBrowser'
@@ -160,6 +161,8 @@ export const zh: Record<ChatPowerLocaleKey, string> = {
   'turnFold.frameQuestion': '提问',
   'turnFold.frameWorkflow': '工作流',
   'turnFold.frameRunning': '进行中',
+  'turnFold.frameResizeTitle': '上下拖动调整这块高度 · 双击恢复自动高度',
+  'turnFold.composerResizeTitle': '上下拖动调整输入框高度 · 双击复原',
   'turnFold.requestLabel': '你的请求 · {summary}',
   'turnFold.requestExpand': '展开请求',
   'turnFold.requestCollapse': '收起请求',
@@ -282,6 +285,8 @@ export const en: Record<ChatPowerLocaleKey, string> = {
   'turnFold.frameQuestion': 'Question',
   'turnFold.frameWorkflow': 'Workflow',
   'turnFold.frameRunning': 'Running',
+  'turnFold.frameResizeTitle': 'Drag to resize this block · double-click to reset',
+  'turnFold.composerResizeTitle': 'Drag to resize the input box · double-click to reset',
   'turnFold.requestLabel': 'Your request · {summary}',
   'turnFold.requestExpand': 'Expand request',
   'turnFold.requestCollapse': 'Collapse request',
