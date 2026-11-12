@@ -689,12 +689,33 @@ export function createMarkdownTurnReaders(remote: () => unknown): MarkdownTurnRe
         ? session.create
         : undefined
       if (create === undefined) throw new Error('session.create is missing')
-      // 新会话要继承当前会话的工作目录：空参数会让宿主把 cwd 落在 App 默认目录上，
-      // 新会话掉进陌生的项目分组（2026-11-05 现场，用户报告「项目是 nexa-service」
-      // 但新会话建到了 ~/.dsh/profiles/desktop）。
       let request: unknown = {}
       const inheritFrom = options?.inheritCwdFrom
-      if (inheritFrom !== undefined && session !== undefined && typeof session.list === 'function') {
+      let workspaceId: string | undefined
+      if (inheritFrom !== undefined) {
+        const workspace = isRecord(holder) && isRecord(holder.workspace) ? holder.workspace : undefined
+        if (!workspace || typeof workspace.follow !== 'function') throw new Error('无法查询当前会话的工作区，请稍后重试')
+        const controller = new AbortController()
+        const timeout = setTimeout(() => controller.abort(), 10000)
+        try {
+          let received = false
+          for await (const frame of workspace.follow(controller.signal)) {
+            if (!isRecord(frame) || frame.type !== 'baseline' || !isRecord(frame.value) || !Array.isArray(frame.value.items)) {
+              throw new Error('工作区列表响应无效')
+            }
+            received = true
+            const owner = frame.value.items.find((item: unknown) => isRecord(item) && Array.isArray(item.sessionIds) && item.sessionIds.includes(inheritFrom))
+            if (isRecord(owner) && typeof owner.workspaceId === 'string') workspaceId = owner.workspaceId
+            break
+          }
+          if (!received) throw new Error('无法取得当前会话的工作区')
+        } finally {
+          clearTimeout(timeout)
+          controller.abort()
+        }
+      }
+      if (workspaceId !== undefined) request = { workspaceId }
+      if (workspaceId === undefined && inheritFrom !== undefined && session !== undefined && typeof session.list === 'function') {
         try {
           const summaries: unknown = await session.list()
           // 宿主 remote 的 session.list 返回 **{ items: [...] } 信封**（RemoteSessionService
