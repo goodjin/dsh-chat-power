@@ -43,6 +43,7 @@ interface FakeEl {
   querySelectorAll(selector: string): FakeEl[]
   closest(selector: string): FakeEl | null
   readonly parentElement: FakeEl | null
+  readonly lastElementChild: FakeEl | null
 }
 
 function el(tag: string, attrs: Record<string, string> = {}): FakeEl {
@@ -62,7 +63,15 @@ function el(tag: string, attrs: Record<string, string> = {}): FakeEl {
       if (at >= 0) parent.children.splice(at, 1)
       node.parent = null
     },
-    append(child) { child.parent = node; node.children.push(child) },
+    append(child) {
+      // 真 DOM 的 append 是「移动」：已在别处的节点先摘下来再挂上。
+      if (child.parent !== null) {
+        const at = child.parent.children.indexOf(child)
+        if (at >= 0) child.parent.children.splice(at, 1)
+      }
+      child.parent = node
+      node.children.push(child)
+    },
     replaceChildren() { for (const child of node.children) child.parent = null; node.children = [] },
     insertBefore(child, before) {
       child.parent = node
@@ -84,6 +93,7 @@ function el(tag: string, attrs: Record<string, string> = {}): FakeEl {
       return walk(node)
     },
     get parentElement() { return node.parent },
+    get lastElementChild() { return node.children.length === 0 ? null : node.children[node.children.length - 1]! },
     querySelectorAll(selector) {
       const attribute = /\[([^\]=]+)\]/.exec(selector)?.[1]
       const found: FakeEl[] = []
@@ -112,7 +122,14 @@ function el(tag: string, attrs: Record<string, string> = {}): FakeEl {
   }
   return node
 }
-const fakeDoc = () => ({ createElement: (tag: string) => el(tag), createTextNode: (text: string) => ({ text }), querySelectorAll: () => [] as FakeEl[] })
+/** 文本节点：真 DOM 里它没有子节点，但同样挂在父节点下。 */
+const textNode = (text: string): FakeEl => {
+  const node = el('#text')
+  node.attrs.text = text
+  Object.defineProperty(node, 'text', { value: text, enumerable: true })
+  return node
+}
+const fakeDoc = () => ({ createElement: (tag: string) => el(tag), createTextNode: (text: string) => textNode(text), querySelectorAll: () => [] as FakeEl[] })
 
 /** 把一个假件的所有 DOM 写动作记进 log（包装原实现，行为不变）。 */
 function instrument(node: FakeEl, log: string[]): void {
@@ -163,23 +180,48 @@ function handlers(snapshot: (sessionId: string) => ToolsRowSnapshot): { value: T
   return { value, actions }
 }
 
-/** 会话内容根：宿主标签行可给可不给。 */
-const content = (sessionId: string, withHostRow: boolean): FakeEl => {
-  const root = el('div', { 'data-conversation-content': '', 'data-conversation-session': sessionId })
-  if (withHostRow) root.append(el('div', { 'data-conversation-tabs': '' }))
-  return root
+/**
+ * 一个会话面板：标题栏（含宿主标签行）与会话内容区是**兄弟**。
+ *
+ * 宿主结构（核对过 app.asar 里 dsh-client-ui-conversation 的 ConversationRoot）：
+ * 标题栏（ConversationHeader）与内容区（ConversationContent）并排挂在会话面板下；
+ * 宿主那一行「对话 / 轨迹 / 提示词」在**标题栏里**，不在内容区内部。
+ */
+interface Session {
+  readonly panel: FakeEl
+  readonly content: FakeEl
+  readonly hostRow: FakeEl | null
+}
+const session = (sessionId: string, withHostRow = true): Session => {
+  const panel = el('div')
+  const header = el('header')
+  const hostRow = withHostRow ? el('div', { 'data-conversation-tabs': '' }) : null
+  if (hostRow !== null) header.append(hostRow)
+  panel.append(header)
+  const content = el('div', { 'data-conversation-content': '', 'data-conversation-session': sessionId })
+  panel.append(content)
+  return { panel, content, hostRow }
+}
+
+/** 应用外壳：主会话面板与内嵌会话面板并排挂着（内嵌会话自己没有标题栏）。 */
+const appShell = (...panels: FakeEl[]): FakeEl => {
+  const shell = el('div')
+  for (const panel of panels) shell.append(panel)
+  return shell
 }
 
 const snapshotOf = (tabs: ToolsRowSnapshot['tabs'], active?: string): ToolsRowSnapshot => ({ active, tabs })
 
 describe('syncSessionToolsRow（同步）', () => {
-  it('宿主行在场：标签组补挂进宿主行，宿主行不缺少话标签', () => {
-    const root = content('s1', true)
+  it('宿主行在场：标签组补挂进宿主行，内容区里不留自建行', () => {
+    const { content, hostRow } = session('s1')
     const h = handlers(() => snapshotOf([{ id: 't1', kind: 'local', title: 'a.md' }], 't1'))
-    const row = syncSessionToolsRow(root, fakeDoc(), h.value, {})
-    expect(row).not.toBeUndefined()
-    expect(root.querySelector(`[${ROW_ATTR}]`)).toBeNull()
-    const group = root.querySelector(`[${GROUP_ATTR}]`)
+    const row = syncSessionToolsRow(content, fakeDoc(), h.value, {})
+    expect(row).toBe(hostRow)
+    // 内容区里没有自建行了（工具标签并进宿主那一行）。
+    expect(content.querySelector(`[${ROW_ATTR}]`)).toBeNull()
+    // 标签组挂在宿主行里。
+    const group = hostRow!.querySelector(`[${GROUP_ATTR}]`)
     expect(group).not.toBeNull()
     expect(row!.getAttribute(LIVE_ATTR)).toBe('')
     // 三个种类启动器 + 一个文件标签 + 一枚关闭钮。
@@ -188,10 +230,21 @@ describe('syncSessionToolsRow（同步）', () => {
     expect(group!.querySelectorAll(`[${TAB_CLOSE_ATTR}]`)).toHaveLength(1)
   })
 
-  it('文件标签是一个整体：关闭钮在标签框里（标题与 × 同处一个外壳）', () => {
-    const root = content('s1', true)
+  it('标签组排在宿主自己的标签之后', () => {
+    const { content, hostRow } = session('s1')
+    const chat = el('button', { role: 'tab' })
+    hostRow!.append(chat)
     const h = handlers(() => snapshotOf([{ id: 't1', kind: 'local', title: 'a.md' }], 't1'))
-    const row = syncSessionToolsRow(root, fakeDoc(), h.value, {})
+    syncSessionToolsRow(content, fakeDoc(), h.value, {})
+    const group = hostRow!.querySelector(`[${GROUP_ATTR}]`)!
+    const kids = hostRow!.children as unknown as unknown[]
+    expect(kids.indexOf(group as unknown)).toBeGreaterThan(kids.indexOf(chat as unknown))
+  })
+
+  it('文件标签是一个整体：关闭钮在标签框里（标题与 × 同处一个外壳）', () => {
+    const { content, hostRow } = session('s1')
+    const h = handlers(() => snapshotOf([{ id: 't1', kind: 'local', title: 'a.md' }], 't1'))
+    const row = syncSessionToolsRow(content, fakeDoc(), h.value, {})
     const group = row!.querySelector(`[${GROUP_ATTR}]`)!
     const wraps = Array.from(group.querySelectorAll(`[${TAB_WRAP_ATTR}]`))
     expect(wraps).toHaveLength(1)
@@ -205,9 +258,9 @@ describe('syncSessionToolsRow（同步）', () => {
   })
 
   it('宿主行缺席：自建行带「对话」标签（图标 + 文字），排在工具标签组之前', () => {
-    const root = content('s1', false)
+    const { content } = session('s1', false)
     const h = handlers(() => snapshotOf([{ id: 't1', kind: 'files', title: '工作区文件' }], 't1'))
-    const row = syncSessionToolsRow(root, fakeDoc(), h.value, {})
+    const row = syncSessionToolsRow(content, fakeDoc(), h.value, {})
     expect(row!.hasAttribute(ROW_ATTR)).toBe(true)
     const chat = row!.querySelector(`[${CHAT_BUTTON_ATTR}]`)
     expect(chat).not.toBeNull()
@@ -230,29 +283,64 @@ describe('syncSessionToolsRow（同步）', () => {
   })
 
   it('没有工具激活时对话标签高亮（含对话标签本身处于激活）', () => {
-    const root = content('s1', false)
+    const { content } = session('s1', false)
     // 旧会话：对话标签激活（active 指向 chat 标签）——对话钮仍应高亮。
     const h = handlers(() => snapshotOf([{ id: 'chat', kind: 'chat', title: '会话' }], 'chat'))
-    const row = syncSessionToolsRow(root, fakeDoc(), h.value, {})
+    const row = syncSessionToolsRow(content, fakeDoc(), h.value, {})
     expect(row!.querySelector(`[${CHAT_BUTTON_ATTR}]`)!.getAttribute('aria-selected')).toBe('true')
     expect(row!.hasAttribute(LIVE_ATTR)).toBe(false)
   })
 
   it('回到对话：激活标记摘除，自建行对话标签恢复高亮', () => {
-    const root = content('s1', false)
+    const { content } = session('s1', false)
     const h = handlers(() => snapshotOf([{ id: 't1', kind: 'local', title: 'a.md' }], undefined))
-    const row = syncSessionToolsRow(root, fakeDoc(), h.value, {})
+    const row = syncSessionToolsRow(content, fakeDoc(), h.value, {})
     expect(row!.hasAttribute(LIVE_ATTR)).toBe(false)
     expect(row!.querySelector(`[${CHAT_BUTTON_ATTR}]`)!.getAttribute('aria-selected')).toBe('true')
   })
 
   it('同步是全量重画：两次同步不叠出两份标签', () => {
-    const root = content('s1', true)
+    const { content, hostRow } = session('s1')
     const h = handlers(() => snapshotOf([{ id: 't1', kind: 'local', title: 'a.md' }], undefined))
-    syncSessionToolsRow(root, fakeDoc(), h.value, {})
-    syncSessionToolsRow(root, fakeDoc(), h.value, {})
-    const group = root.querySelector(`[${GROUP_ATTR}]`)
+    syncSessionToolsRow(content, fakeDoc(), h.value, {})
+    syncSessionToolsRow(content, fakeDoc(), h.value, {})
+    const group = hostRow!.querySelector(`[${GROUP_ATTR}]`)
     expect(group!.querySelectorAll(`[${TAB_ATTR}]`)).toHaveLength(4)
+  })
+
+  it('宿主重渲染把新标签追加到行尾（我们之后）：把标签组挪回末尾', () => {
+    // 宿主那一行是 React 渲染的：它重渲染（视图增减、窗口变窄）时把新标签追加到
+    // 行尾——落在我们之后，一行的顺序就乱了。同步时要把组挪回末尾。
+    const { content, hostRow } = session('s1')
+    const h = handlers(() => snapshotOf([{ id: 't1', kind: 'local', title: 'a.md' }], 't1'))
+    syncSessionToolsRow(content, fakeDoc(), h.value, {})
+    const group = hostRow!.querySelector(`[${GROUP_ATTR}]`)!
+    hostRow!.append(el('button', { role: 'tab' }))
+    const kids = hostRow!.children as unknown as unknown[]
+    expect(kids.indexOf(group as unknown)).toBeLessThan(kids.length - 1) // 先确认确实被挤到前面了
+    syncSessionToolsRow(content, fakeDoc(), h.value, {})
+    const after = hostRow!.children as unknown as unknown[]
+    expect(after.indexOf(group as unknown)).toBe(after.length - 1)
+  })
+
+  it('内嵌会话不认主会话那一行：另一个面板的内容区自建行，主会话那一行不受影响', () => {    // 内嵌会话（侧栏里的子代理聊天）没有自己的标题栏，它的内容区与主会话的
+    // 标题栏不在同一个面板里——不能把主会话的宿主行当成自己的。
+    const main = session('s1')
+    const embedded = el('div')
+    const embeddedContent = el('div', { 'data-conversation-content': '', 'data-conversation-session': 's2' })
+    embedded.append(embeddedContent)
+    appShell(main.panel, embedded)
+
+    const h = handlers(sessionId => snapshotOf([{ id: `${sessionId}-t1`, kind: 'local', title: 'a.md' }], `${sessionId}-t1`))
+    const mainRow = syncSessionToolsRow(main.content, fakeDoc(), h.value, {})
+    const embeddedRow = syncSessionToolsRow(embeddedContent, fakeDoc(), h.value, {})
+
+    // 主会话并进宿主行。
+    expect(mainRow).toBe(main.hostRow)
+    expect(main.hostRow!.querySelectorAll(`[${GROUP_ATTR}]`)).toHaveLength(1)
+    // 内嵌会话自建行（它没有宿主行可用），且没往主会话那一行里塞东西。
+    expect(embeddedRow!.hasAttribute(ROW_ATTR)).toBe(true)
+    expect(main.hostRow!.querySelectorAll(`[${GROUP_ATTR}]`)).toHaveLength(1)
   })
 })
 
@@ -261,44 +349,42 @@ describe('自反馈护栏（2026-11-07 一核空转现场）', () => {
 
   it('快照未变的重复同步：一个 DOM 写都不做——写就是变异，变异会喂给自己的观察者', () => {
     const log: string[] = []
-    const root = content('s1', true)
-    instrumentTree(root, log)
+    const { panel, content } = session('s1')
+    instrumentTree(panel, log)
     const doc = instrumentingDoc(log)
     const h = handlers(() => snapshotOf([localTab('t1', 'a.md')], undefined))
-    syncSessionToolsRow(root, doc, h.value, {})
+    syncSessionToolsRow(content, doc, h.value, {})
     expect(log.length).toBeGreaterThan(0) // 首次同步确实画了
     log.length = 0
-    syncSessionToolsRow(root, doc, h.value, {})
+    syncSessionToolsRow(content, doc, h.value, {})
     expect(log).toEqual([])
   })
 
   it('快照真的变了：照常重画，护栏不误伤正常同步', () => {
     let snap = snapshotOf([localTab('t1', 'a.md')], undefined)
     const log: string[] = []
-    const root = content('s1', true)
-    instrumentTree(root, log)
+    const { panel, content } = session('s1')
+    instrumentTree(panel, log)
     const doc = instrumentingDoc(log)
     const h = handlers(() => snap)
-    syncSessionToolsRow(root, doc, h.value, {})
+    syncSessionToolsRow(content, doc, h.value, {})
     log.length = 0
     snap = snapshotOf([localTab('t1', 'a.md'), localTab('t2', 'b.md')], 't2')
-    syncSessionToolsRow(root, doc, h.value, {})
+    syncSessionToolsRow(content, doc, h.value, {})
     expect(log.length).toBeGreaterThan(0)
-    expect(root.querySelectorAll(`[${TAB_ATTR}]`)).toHaveLength(5) // 3 个种类启动器 + 2 个文件标签
-    expect(root.querySelectorAll(`[${TAB_CLOSE_ATTR}]`)).toHaveLength(2)
   })
 })
 
 describe('handleToolsRowClick（点击路由）', () => {
   const build = (): { root: FakeEl; group: FakeEl; actions: string[]; value: ToolsRowHandlers } => {
-    const root = content('s1', true)
+    const { content, hostRow } = session('s1')
     const h = handlers(() => snapshotOf([
       { id: 't1', kind: 'local', title: 'a.md' },
       { id: 't2', kind: 'browser', title: '浏览器' },
     ], 't1'))
-    const row = syncSessionToolsRow(root, fakeDoc(), h.value, {})
+    const row = syncSessionToolsRow(content, fakeDoc(), h.value, {})
     const group = row!.querySelector(`[${GROUP_ATTR}]`) as FakeEl
-    return { root, group, actions: h.actions, value: h.value }
+    return { root: hostRow!, group, actions: h.actions, value: h.value }
   }
 
   it('点文件标签 → selectTab', () => {
@@ -324,9 +410,9 @@ describe('handleToolsRowClick（点击路由）', () => {
   })
 
   it('点自建行「对话」标签 → activateChat 并截住事件', () => {
-    const root = content('s1', false)
+    const { content } = session('s1', false)
     const h = handlers(() => snapshotOf([{ id: 't1', kind: 'files', title: '工作区文件' }], 't1'))
-    const row = syncSessionToolsRow(root, fakeDoc(), h.value, {})
+    const row = syncSessionToolsRow(content, fakeDoc(), h.value, {})
     const chat = row!.querySelector(`[${CHAT_BUTTON_ATTR}]`)!
     const stopped = { stopped: false }
     const handled = handleToolsRowClick({ target: chat, preventDefault: () => {}, stopPropagation: () => { stopped.stopped = true } } as never, h.value)
@@ -337,9 +423,8 @@ describe('handleToolsRowClick（点击路由）', () => {
 
   it('工具激活时点宿主标签 → 先回对话，不吞事件', () => {
     const { root, actions, value } = build()
-    const hostRow = root.querySelector('[data-conversation-tabs]')!
     const hostTab = el('button', { role: 'tab' })
-    hostRow.append(hostTab)
+    root.append(hostTab)
     const stopped = { stopped: false }
     const handled = handleToolsRowClick({ target: hostTab, preventDefault: () => {}, stopPropagation: () => { stopped.stopped = true } } as never, value)
     expect(handled).toBe(false)

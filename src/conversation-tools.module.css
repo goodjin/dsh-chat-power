@@ -17,8 +17,19 @@
    标签补挂在宿主标签行的 tablist 里，排在对话 / 轨迹之后；样式只用本包
    独占的 data 标记做选择器，不碰宿主类名。 */
 
-/* 标签组：单行横向滚动，标签多时不再挤出新的一排。 */
-[data-chat-tools-group] { display:inline-flex; align-items:center; gap:2px; flex:none; min-width:0; overflow-x:auto; scrollbar-width:thin; }
+/* 我们的标签组：追加进宿主「对话 / 轨迹」那一行时要在同一行排开
+   （组是宿主 tablist 里的一个子元素，块级会被挤到下一行）。
+   允许收窄并横向滚动：标签多了就在组内滚，不去挤宿主的行。 */
+[data-chat-tools-group] {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  flex-wrap: nowrap;
+}
 
 /* 一枚标签 = 一片框线：默认细框灰字，悬停变色。 */
 [data-chat-tools-tab] { display:inline-flex; align-items:center; gap:4px; max-width:180px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; padding:3px 10px; border:1px solid var(--dsw-alias-border-l2,rgba(127,127,127,.2)); border-radius:6px; background:transparent; color:var(--dsw-alias-label-secondary,inherit); font:inherit; font-size:12px; cursor:pointer; }
@@ -97,14 +108,9 @@
   color: currentColor;
 }
 
-/* 我们的标签组：追加进宿主「对话 / 轨迹」那一行时要在同一行排开
-   （组是宿主 tablist 里的一个子元素，块级会被挤到下一行）。 */
-[data-chat-tools-group] {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: nowrap;
-}
+/* 宿主标签行是 flex 布局、标签间距较大（32px）：我们的组是其中一个子元素，
+   紧挨着宿主的标签会显得是同一组，负外边距把两者拉开一点。 */
+[data-conversation-tabs] [data-chat-tools-group] { margin-left: -16px; }
 
 [data-chat-tools-group] > [data-chat-tools-tab],
 [data-chat-tools-group] > [data-chat-tools-tab-wrap] {
