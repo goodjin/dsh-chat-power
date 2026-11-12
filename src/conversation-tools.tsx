@@ -136,6 +136,10 @@ export function registerConversationTools(ctx: any) {
           return <div key={tab.id} hidden={!visible} className={css.body}>
             {tab.kind === 'local' && doc !== undefined
               ? <LocalFileComposerCard variant="tab" doc={doc} readers={readers} t={fallbackT} sessionId={id}
+                  onReveal={tab.contentId.startsWith('edit://') ? () => {
+                    const path = decodeURIComponent(tab.contentId.slice('edit://'.length))
+                    void readers.revealFile(id, path).catch(() => { toolsNotice.set(id, `打开所在文件夹失败：${path}`) })
+                  } : undefined}
                   onDraftChange={text => {
                     docs.set(docKey(id, tab.contentId), { ...doc, text, seq: Date.now() })
                     toolsState.markDraft(id, tab.id, true)

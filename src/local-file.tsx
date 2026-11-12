@@ -21,13 +21,13 @@
  */
 import { useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
-import { FileTypeIcon, IconChevronDownOutlineRegular, IconCloseOutlineRegular, IconWarningOutlineRegular, Toast, classifyFileType } from '@deepseek-ai/dsh-client-ui-primitives'
+import { FileTypeIcon, IconChevronDownOutlineRegular, IconCloseOutlineRegular, IconFolderOpenOutlineRegular, IconWarningOutlineRegular, Toast, classifyFileType } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { MarkdownTurnReaders } from './markdown-turn-sources.ts'
 import type { RuntimeT } from './locales.ts'
 import { NAMESPACE } from './locales.ts'
 import { ComposeCard } from './compose-card.tsx'
 import { copyTextToClipboard, createSendController } from './send-actions.ts'
-import { inputClass, statusNoticeClass } from './ui-theme.ts'
+import { inputClass, statusNoticeClass, uiButtonClass } from './ui-theme.ts'
 import css from './markdown-turn.module.css'
 
 /** 本机文件选择框可挑的类型：text/* 之外再加常用的代码 / 配置 / 文档后缀。 */
@@ -96,6 +96,8 @@ export function LocalFileComposerCard(props: {
   readonly doc: LocalFileDoc
   readonly readers: MarkdownTurnReaders
   readonly t: RuntimeT
+  /** 在 Finder 中打开文件所在文件夹（工作区文件编辑提供；本机文件没有路径，缺席不画）。 */
+  readonly onReveal?: () => void
   /** overlay = 输入框上方的卡（默认）；tab = 工具标签里的纯编辑卡。 */
   readonly variant?: 'overlay' | 'tab'
 }): ReactNode {
@@ -171,9 +173,17 @@ export function LocalFileComposerCard(props: {
       ? <ComposeCard
           title={props.doc.name}
           subtitle={t('compose.copyHint')}
-          headExtra={<span className={css.icon} data-file-icon={classifyFileType(props.doc.name)}>
-            <FileTypeIcon path={props.doc.name} size={14} />
-          </span>}
+          headerActions={props.onReveal === undefined ? undefined : (
+        <button
+          type="button"
+          className={uiButtonClass}
+          data-local-reveal=""
+          title="在 Finder 中打开所在文件夹"
+          onClick={props.onReveal}
+        >
+          <IconFolderOpenOutlineRegular size={16} />
+        </button>
+      )}
           onCancel={close}
           onCopy={copyAll}
           onSave={props.onSave === undefined ? undefined : saveOnly}
