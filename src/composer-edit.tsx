@@ -1,11 +1,11 @@
 import { useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { IconFolderOpenOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconFolderOpenOutlineRegular, IconCheckOutlineRegular, IconNewChatOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import { BIG_CLASS } from './expand-editor.tsx'
 import { ComposeCard } from './compose-card.tsx'
 import { copyTextToClipboard } from './send-actions.ts'
-import { statusNoticeClass, uiButtonClass } from './ui-theme.ts'
+import { statusNoticeClass, uiButtonClass, btnClass } from './ui-theme.ts'
 import { fallbackT } from './locales.ts'
-import { attachComposerEdit, closeComposerEdit, composerEditText, detachComposerEdit, getComposerEdit, performComposerEdit, setComposerEditNotice, subscribeComposerEdit, type EditShell } from './composer-edit-state.ts'
+import { attachComposerEdit, composerEditAttached, closeComposerEdit, composerEditText, detachComposerEdit, getComposerEdit, performComposerEdit, setComposerEditNotice, subscribeComposerEdit, type EditShell } from './composer-edit-state.ts'
 import './composer-edit.module.css'
 
 export function ComposerEditSurface({ sessionId, shellOf }: { sessionId: string; shellOf(id: string): EditShell | undefined }) {
@@ -13,7 +13,6 @@ export function ComposerEditSurface({ sessionId, shellOf }: { sessionId: string;
   const anchor = useRef<HTMLSpanElement>(null)
   const [mounts, setMounts] = useState<{ head: HTMLElement; actions: HTMLElement } | null>(null)
   const [ready, setReady] = useState(false)
-  const [hasText, setHasText] = useState(false)
   const request = entry?.request
   useLayoutEffect(() => {
     if (!request) return
@@ -25,7 +24,7 @@ export function ComposerEditSurface({ sessionId, shellOf }: { sessionId: string;
     const head = document.createElement('div')
     const actions = document.createElement('div')
     head.dataset.composeEditHead = ''; actions.dataset.composeEditActions = ''
-    card.prepend(head); card.append(actions)
+    card.prepend(head); head.after(actions)
     const wasExpanded = card.classList.contains(BIG_CLASS)
     card.classList.add(BIG_CLASS)
     card.dataset.composeEdit = ''
@@ -36,28 +35,9 @@ export function ComposerEditSurface({ sessionId, shellOf }: { sessionId: string;
       attachComposerEdit(sessionId, shell)
       setReady(true)
     } catch (error) { setComposerEditNotice(sessionId, String(error)) }
-    const update = () => setHasText(composerEditText(sessionId).trim() !== '')
-    update()
-    const observer = new MutationObserver(update)
-    observer.observe(input, { subtree: true, childList: true, characterData: true })
-    // Keep every keyboard submit route in editing mode as a newline; native
-    // submission stays mounted but its controls are hidden while our transaction owns the draft.
-    let composing = false
-    const compositionStart = () => { composing = true }
-    const compositionEnd = () => { composing = false }
-    input.addEventListener('compositionstart', compositionStart)
-    input.addEventListener('compositionend', compositionEnd)
-    const key = (event: KeyboardEvent) => {
-      if (!input.contains(event.target as Node) || event.key !== 'Enter' || composing || event.isComposing || (event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey)) return
-      event.preventDefault(); event.stopImmediatePropagation()
-      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', shiftKey: true, bubbles: true, cancelable: true }))
-    }
-    window.addEventListener('keydown', key, true)
+    // Reuse the existing expanded-input keyboard behavior.
     input.focus()
     return () => {
-      observer.disconnect(); window.removeEventListener('keydown', key, true)
-      input.removeEventListener('compositionstart', compositionStart)
-      input.removeEventListener('compositionend', compositionEnd)
       try { detachComposerEdit(sessionId) } catch (error) { console.warn('[chat-power] restore draft:', error) }
       head.remove(); actions.remove()
       card.classList.toggle(BIG_CLASS, wasExpanded)
@@ -72,21 +52,40 @@ export function ComposerEditSurface({ sessionId, shellOf }: { sessionId: string;
     input.setAttribute('contenteditable', 'false')
     const block = (event: Event) => { event.preventDefault(); event.stopImmediatePropagation() }
     input.addEventListener('beforeinput', block, true)
+    const card = input.closest('[data-composer-card]')!
+    card.addEventListener('click', block, true)
     return () => {
       if (editable === null) input.removeAttribute('contenteditable'); else input.setAttribute('contenteditable', editable)
       input.removeEventListener('beforeinput', block, true)
+      card.removeEventListener('click', block, true)
     }
   }, [entry?.pending])
   const t = fallbackT
   return <><span ref={anchor} hidden />{entry && mounts && <ComposeCard
     mounts={mounts} title={entry.request.title} subtitle={t('compose.copyHint')}
-    headerActions={entry.request.reveal && <button type="button" className={uiButtonClass} data-local-reveal="" title="打开文件所在文件夹" aria-label="打开文件所在文件夹" disabled={entry.pending || !ready} onClick={() => { void performComposerEdit(sessionId, 'reveal') }}><IconFolderOpenOutlineRegular size={16} /></button>}
+    headerActions={<>
+      {entry.request.save && <button type="button" className={btnClass} data-compose-save="" disabled={entry.pending || entry.nativePending || !ready} onClick={() => { void performComposerEdit(sessionId, 'save') }}><IconCheckOutlineRegular size={15} />{t('compose.save')}</button>}
+      {entry.request.reveal && <button type="button" className={uiButtonClass} data-local-reveal="" title="打开文件所在文件夹" aria-label="打开文件所在文件夹" disabled={entry.pending || entry.nativePending || !ready} onClick={() => { void performComposerEdit(sessionId, 'reveal') }}><IconFolderOpenOutlineRegular size={16} /></button>}
+    </>}
     onCancel={() => closeComposerEdit(sessionId)}
     onCopy={() => { void copyTextToClipboard(composerEditText(sessionId)).then(ok => setComposerEditNotice(sessionId, ok ? '已复制' : '复制失败')) }}
-    onSave={entry.request.save ? () => { void performComposerEdit(sessionId, 'save') } : undefined}
-    onSend={() => { void performComposerEdit(sessionId, 'current') }}
-    onSendNewSession={() => { void performComposerEdit(sessionId, 'new') }}
-    pending={entry.pending || !ready} sendDisabled={!hasText}
+    pending={entry.pending || entry.nativePending || !ready}
     labels={{ cancel: t('markdownTurn.cancel'), copy: t('compose.copy'), save: t('compose.save'), send: t('compose.sendCurrent'), newSession: t('compose.sendNewSession') }}
   >{entry.notice && <p role="status" className={statusNoticeClass}>{entry.notice}</p>}</ComposeCard>}</>
+}
+
+/** Add one control in the host's existing bottom row; do not replace that row. */
+export function ComposerEditNewSession(props: {
+  sessionId: string
+  useInput: <T>(select: (state: { draft: string; phase: string }) => T) => T
+}) {
+  const entry = useSyncExternalStore(subscribeComposerEdit, () => getComposerEdit(props.sessionId))
+  const draft = props.useInput(state => state.draft)
+  const phase = props.useInput(state => state.phase)
+  if (!entry) return null
+  return <button type="button" className={btnClass} data-compose-new-session=""
+    disabled={entry.pending || entry.nativePending || !composerEditAttached(props.sessionId) || !draft.trim() || !['plain', 'claimed'].includes(phase)}
+    onClick={() => { void performComposerEdit(props.sessionId, 'new') }}>
+    <IconNewChatOutlineRegular size={15} />{fallbackT('compose.sendNewSession')}
+  </button>
 }

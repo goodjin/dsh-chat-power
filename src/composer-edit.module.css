@@ -1,22 +1,14 @@
-/* Expand the native bottom-docked composer upward, just like its expand button.
-   No percentage-height chain or flex overrides on the host's seat/wrappers. */
+/* Only add height. Native width, borders, padding, controls and information stay. */
 [data-composer-card][data-compose-edit] {
-  box-sizing: border-box;
   display: flex !important;
   flex-direction: column !important;
-  flex: none !important;
   height: 60vh !important;
   min-height: 50vh !important;
-  width: 100%;
-  max-width: var(--dsh-chat-content-width, 748px);
-  margin-inline: auto;
 }
-[data-compose-edit] > :not([data-input-scroll]):not([data-compose-edit-head]):not([data-compose-edit-actions]) { display: none !important; }
 [data-compose-edit] [data-input-scroll] {
   flex: 1 1 auto !important;
   min-height: 0 !important;
   max-height: none !important;
-  overflow: auto;
 }
-[data-compose-edit] [data-composer-input] { min-height: 224px; white-space: pre-wrap; tab-size: 4; }
 [data-compose-edit-head], [data-compose-edit-actions] { flex: none; }
+[data-compose-edit] :global(.dshcp-composer-toggle) { display: none; }

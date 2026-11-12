@@ -4,7 +4,7 @@ import { closeSelectionEdit, currentSessionIdFromDom, getSelectionEdit, selectio
 import type { MarkdownTurnReaders } from './markdown-turn-sources.ts'
 import type { RuntimeT } from './locales.ts'
 import { NAMESPACE } from './locales.ts'
-import { ComposerEditSurface } from './composer-edit.tsx'
+import { ComposerEditSurface, ComposerEditNewSession } from './composer-edit.tsx'
 import { openComposerEdit, setComposerEditNotice, type EditShell } from './composer-edit-state.ts'
 export const SELECTION_EDIT_ID = 'chat-power-selection-edit'
 /** overlay 座位宿主的最小结构类型。 */
@@ -35,7 +35,11 @@ export function registerSelectionEditComposer(
   },
   shellOf: (id: string) => EditShell | undefined = () => undefined,
 ): () => void {
-  return slots.inject('conversation.input.overlay', () => slots.register(
+  const disposeNewSession = slots.inject('conversation.input.right', () => slots.register(
+    { name: 'conversation.input.right', id: 'chat-power-edit-new-session', order: 20, locale: NAMESPACE },
+    ComposerEditNewSession,
+  )) as () => void
+  const disposeSurface = slots.inject('conversation.input.overlay', () => slots.register(
     {
       name: 'conversation.input.overlay',
       id: SELECTION_EDIT_ID,
@@ -65,4 +69,5 @@ export function registerSelectionEditComposer(
       return id ? <ComposerEditSurface sessionId={id} shellOf={shellOf} /> : null
     },
   )) as () => void
+  return () => { disposeSurface?.(); disposeNewSession?.() }
 }

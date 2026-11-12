@@ -80,3 +80,31 @@ describe('composer edit transaction', () => {
     closeComposerEdit(key)
   })
 })
+
+ it('native send keeps host controls in charge, preserves failed drafts and restores after acceptance', async () => {
+  const key = id()
+  let listener = () => {}
+  let phase = 'plain', text = '原草稿'
+  const host = {
+    get snapshot() { return { draft: text, phase } },
+    get draftSnapshot() { return { text, references: [] } },
+    setDraft(value: any) { text = typeof value === 'string' ? value : value.text },
+    state: { subscribe(callback: () => void) { listener = callback; return () => { listener = () => {} } } },
+  }
+  const send = vi.fn()
+  openComposerEdit({ sessionId: key, title: 'text', text: '编辑正文', send })
+  attachComposerEdit(key, host)
+  phase = 'sending'; listener()
+  expect(getComposerEdit(key)?.nativePending).toBe(true)
+  closeComposerEdit(key)
+  expect(getComposerEdit(key)).toBeDefined()
+  phase = 'plain'; listener()
+  expect(composerEditText(key)).toBe('编辑正文')
+  expect(getComposerEdit(key)?.nativePending).toBe(false)
+  phase = 'sending'; listener()
+  text = ''; phase = 'plain'; listener()
+  await Promise.resolve()
+  expect(getComposerEdit(key)).toBeUndefined()
+  expect(text).toBe('原草稿')
+  expect(send).not.toHaveBeenCalled()
+ })
