@@ -300,9 +300,9 @@ describe('会话区排布', () => {
     const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
     expect(source).toContain('belowFrameHeight')
   })
-  it('点赞行被认出来并留在原位（不再挪进标题栏——本轮文件入口靠它展开）', () => {
+  it('点赞行留在宿主原位（绝不搬进标题栏——搬走破坏宿主 React 调和）', () => {
     const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
-    expect(source).toContain('data-chat-power-feedback')
+    expect(source).not.toContain('bar.append(tail)')
     expect(source).not.toContain('header.append(holder)')
   })
 })
@@ -427,11 +427,12 @@ describe('每轮一框（turn-frame-redesign）', () => {
     expect(source).toContain("frame.setAttribute('data-chat-power-frame'")
   })
 
-  it('flow 行不搬进框（宿主 React 拥有行位置，挪走会清空会话区）', () => {
+  it('宿主行（flow 行 / turn-tail 行）一律不搬（挪走破坏 React 调和，会话区会清空）', () => {
     const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
-    // 框只承载标题行；行留在宿主原位，文件尾行靠附加轮次标记纳入。
+    // 框只承载标题行；行与点赞容器都留在宿主原位。
     expect(source).not.toContain('frame.append(row)')
-    expect(source).toContain("data-chat-power-tail-attached")
+    expect(source).not.toContain('bar.append(tail)')
+    expect(source).toContain('data-chat-power-tail-attached')
   })
 
   it('框标题行有 请求/过程/结果 三个页签，默认结果', () => {

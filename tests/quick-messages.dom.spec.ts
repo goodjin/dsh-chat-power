@@ -46,7 +46,7 @@ function buildConversation(sessionId = 's-q', onSendQuick?: (text: string) => vo
   const stack = document.createElement('div')
   seat.appendChild(stack)
   scroller.appendChild(seat)
-  // 点赞行容器：宿主画在答案下面的 turn-tail 行（不带轮次号）。
+  // 点赞行容器留在宿主原位（不搬进标题栏——搬走会破坏宿主 React 调和）。
   const tail = document.createElement('div')
   tail.setAttribute('data-turn-tail', '1')
   tail.appendChild(holder)

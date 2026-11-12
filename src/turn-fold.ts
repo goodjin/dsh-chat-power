@@ -535,14 +535,9 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
       if (sessionId !== '') bar.append(buildQuickButton(sessionId))
       stack.insertBefore(bar, stack.firstChild)
     }
-    // 宿主的点赞行容器（`[data-turn-tail]`，含 IconActions 那排）整体搬进标题栏：
-    // tail 行还是宿主的元素，只是换了父级；宿主重渲染重建后观察器再搬回来。
-    for (const tail of Array.from(container.querySelectorAll('[data-turn-tail]'))) {
-      if (tail.parentElement === bar) continue
-      if (tail.closest(`[${COMPOSER_BAR_ATTR}]`) === tail) continue
-      tail.setAttribute('data-chat-power-feedback', '')
-      bar.append(tail)
-    }
+    // turn-tail 行（点赞/文件那排）**不搬**：它和 flow 行一样是宿主 React 渲染树的
+    // 位置本身，挪走会破坏调和（2026-11-13 现场：整个会话区只剩「加载更早」）。
+    // 标题栏只放插件自己的按钮（快捷信息）；宿主的点赞行留在原地。
   }
 
   /**
