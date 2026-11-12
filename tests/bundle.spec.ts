@@ -15,7 +15,6 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { PANEL_ID } from '../src/session-id-bar/index.ts'
 import { MARKDOWN_TAIL_ID } from '../src/markdown-turn.tsx'
 
 /** 会话头部工具行（会话作用域 list 插槽）。 */
@@ -74,7 +73,7 @@ describe('lib/client.js 是页面能装的产物', () => {
     expect(injected).toContain('conversation.chat.turnTail')
     // 会话 ID 条、文件阅读区都注册了；答案卡片包住了 assistant-step 渲染位。
     const registeredIds = registered.map(options => options.id)
-    expect(registeredIds).toContain(PANEL_ID)
+    expect(registeredIds).toContain(MARKDOWN_TAIL_ID)
     expect(registeredIds).toContain(MARKDOWN_TAIL_ID)
     expect(registered.some(options => options.key === 'assistant-step')).toBe(true)
   })
