@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, typ
 import { createPortal } from 'react-dom'
 import { browserState, folders, selectedBookmarks, type Bookmark, type Page } from './state.ts'
 import css from './workspace.module.css'
+import { requestChrome } from './chrome-request.ts'
 const useBrowser = () => useSyncExternalStore(browserState.subscribe, browserState.get, browserState.get)
 function BookmarkItems({ nodes, onOpen }: { nodes: Bookmark[]; onOpen: (url: string) => void }) {
   return <>{nodes.map(n => n.children ? <details key={n.id} className={css.folder}><summary>{n.name || '未命名文件夹'}</summary><div><BookmarkItems nodes={n.children} onOpen={onOpen} />{n.children.length === 0 && <span>空文件夹</span>}</div></details> : <span key={n.id} className={css.bookmark}><button title={n.url} onClick={() => { if (n.url) onOpen(n.url) }}>{n.name || n.url}</button><button aria-label={`在新标签打开 ${n.name}`} title="在新标签打开" onClick={() => browserState.open('page', n.url)}>↗</button></span>)}</>
@@ -31,12 +32,6 @@ export function BrowserChrome({ hostProps, children }: { hostProps: any; childre
   </div>
 }
 function allIds(nodes: Bookmark[]): string[] { return nodes.flatMap(n => [n.id, ...allIds(n.children ?? [])]) }
-async function requestChrome(root?: string, profile?: string) {
-  const response = await fetch('/chat-power/chrome-bookmarks', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ root: root || undefined, profile }) })
-  const result = await response.json()
-  if (!response.ok) throw new Error(result.error || `读取失败（${response.status}）`)
-  return result
-}
 function ImportBookmarks() {
   const [root, setRoot] = useState('')
   const [profiles, setProfiles] = useState<{ id: string; name: string }[]>([])
@@ -53,9 +48,9 @@ function ImportBookmarks() {
     try {
       const result = await requestChrome(root, readProfile)
       if (version !== generation.current) return
-      if (result.bookmarks) { setTree(result.bookmarks); setSelected(new Set(allIds(result.bookmarks))) }
+      if ('bookmarks' in result) { setTree(result.bookmarks); setSelected(new Set(allIds(result.bookmarks))) }
       else { setRoot(result.root); setProfiles(result.profiles); setProfile(result.profiles[0]?.id ?? ''); if (!result.profiles.length) setMessage('此目录未发现 Chrome 书签，也可直接选择 Bookmarks 文件') }
-    } catch (error) { if (version === generation.current) setMessage(String(error)) }
+    } catch (error) { if (version === generation.current) setMessage(error instanceof Error ? error.message : String(error)) }
     finally { if (version === generation.current) setBusy(false) }
   }
   const toggle = (node: Bookmark, checked: boolean) => {
@@ -83,7 +78,7 @@ function BookmarkManager({ draft }: { draft?: { name: string; url: string } }) {
   const render = (nodes: Bookmark[], parentId = ''): ReactNode => <ul>{nodes.map(n => <li key={n.id}><span>{n.children ? '▸ ' : ''}{n.name}</span> <button onClick={() => { setEditing(n); setName(n.name); setUrl(n.url ?? ''); setFolder(!!n.children); setParent(parentId); setMessage('') }}>编辑 / 移动</button><button onClick={() => browserState.removeBookmark(n.id)}>删除</button>{n.url && <button onClick={() => browserState.open('page', n.url)}>打开</button>}{n.children && render(n.children, n.id)}</li>)}</ul>
   return <section className={css.operation}><h2>管理书签</h2><form onSubmit={e => {
     e.preventDefault()
-    try { browserState.saveBookmark({ id: editing?.id, name, ...(folder ? { children: editing?.children ?? [] } : { url }) }, parent); setName(''); setUrl(''); setEditing(undefined); setMessage('已保存') } catch (error) { setMessage(String(error)) }
+    try { browserState.saveBookmark({ id: editing?.id, name, ...(folder ? { children: editing?.children ?? [] } : { url }) }, parent); setName(''); setUrl(''); setEditing(undefined); setMessage('已保存') } catch (error) { setMessage(error instanceof Error ? error.message : String(error)) }
   }}><label>名称<input value={name} onChange={e => setName(e.target.value)} required /></label><label><input type="checkbox" checked={folder} disabled={!!editing} onChange={e => setFolder(e.target.checked)} />文件夹</label>{!folder && <label>网址<input value={url} onChange={e => setUrl(e.target.value)} required placeholder="https://" /></label>}
     <label>位置<select value={parent} onChange={e => setParent(e.target.value)}><option value="">书签栏</option>{folders(snapshot.bookmarks).map(f => <option key={f.id} value={f.id}>{f.name}</option>)}</select></label><button>{editing ? '保存修改' : '添加'}</button><button type="button" onClick={() => { setEditing(undefined); setName(''); setUrl(''); setFolder(false); setParent('') }}>新建书签 / 文件夹</button></form>{message && <p role="status">{message}</p>}{render(snapshot.bookmarks)}</section>
 }
