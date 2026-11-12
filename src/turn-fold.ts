@@ -245,30 +245,89 @@ interface TurnRecord {
 }
 
 /** 折叠控制器的可注入面（便于测试与宿主差异适配）。 */
-/** git 快捷动作的种类。 */
-export type GitAction = 'commit' | 'merge' | 'sync'
 
-/** git 按钮的文案（git 动词保持英文习惯）。 */
-const GIT_LABELS: Record<GitAction, string> = { commit: 'Commit', merge: 'Merge', sync: 'Sync' }
-
-/** 各动作当前会发送的指令（可经编辑钮修改；页内有效）。 */
-const gitInstructionStore: Record<GitAction, string> = {
-  commit: '请将当前改动提交到本地仓库（commit）。',
-  merge: '请将当前分支合并回 main（merge）。',
-  sync: '请将本地仓库与远程同步：先拉取远端更新，再推送本地提交。',
+/** 一条快捷信息：发送到会话的文本 + 稳定 id（删除 / 修改按 id 定位）。 */
+export interface QuickMessage {
+  readonly id: string
+  readonly text: string
 }
 
-/** 某动作当前会发送的指令（按钮 tooltip 与发送都用它）。 */
-export function getGitInstruction(action: GitAction): string {
-  return gitInstructionStore[action] ?? ''
+/** 快捷信息的存储键（localStorage；值为 JSON 数组）。 */
+export const QUICK_MESSAGES_KEY = 'chat-power.quick-messages'
+
+/** 内置快捷信息（用户没存过或存储读不下来时用）。 */
+const BUILTIN_QUICK_MESSAGES: readonly QuickMessage[] = [
+  { id: 'commit', text: '请将当前改动提交到本地仓库（commit）。' },
+  { id: 'merge', text: '请将当前分支合并回 main（merge）。' },
+  { id: 'sync', text: '请将本地仓库与远程同步：先拉取远端更新，再推送本地提交。' },
+]
+
+/** 快捷信息存储读取面（localStorage 的最小切片，测试可注入）。 */
+export type QuickStorage = {
+  getItem(key: string): string | null
+  setItem(key: string, value: string): void
 }
 
-function setGitInstruction(action: GitAction, text: string): void {
-  gitInstructionStore[action] = text
+/** 读存储里的快捷信息；坏 JSON / 结构不对 / 空数组都退回内置三条。 */
+export function loadQuickMessages(read: (key: string) => string | null): QuickMessage[] {
+  let raw: string | null = null
+  try {
+    raw = read(QUICK_MESSAGES_KEY)
+  } catch {
+    raw = null
+  }
+  if (raw !== null) {
+    try {
+      const value = JSON.parse(raw) as unknown
+      if (Array.isArray(value)) {
+        const messages = value.filter((item): item is QuickMessage =>
+          typeof item === 'object' && item !== null &&
+          typeof (item as { id?: unknown }).id === 'string' &&
+          typeof (item as { text?: unknown }).text === 'string',
+        )
+        if (messages.length > 0) return messages
+      }
+    } catch {
+      // 坏 JSON：落到内置。
+    }
+  }
+  return [...BUILTIN_QUICK_MESSAGES]
+}
+
+/** 写回快捷信息：剔除空文本；id 缺失时按文本补一个稳定 id。 */
+export function saveQuickMessages(messages: readonly QuickMessage[], write: (key: string, value: string) => void): void {
+  const cleaned: QuickMessage[] = []
+  for (const item of messages) {
+    const text = item.text.trim()
+    if (text === '') continue
+    const id = item.id !== '' ? item.id : `q-${text}`
+    cleaned.push({ id, text })
+  }
+  try {
+    write(QUICK_MESSAGES_KEY, JSON.stringify(cleaned))
+  } catch {
+    // 存不了（隐私模式）就只影响本页。
+  }
+}
+
+/** 页面 localStorage 读取面（jsdom / 浏览器都有；隐私模式可能抛错）。 */
+function quickStorageOf(): QuickStorage | undefined {
+  if (typeof localStorage === 'undefined') return undefined
+  return {
+    getItem: key => localStorage.getItem(key),
+    setItem: (key, value) => { localStorage.setItem(key, value) },
+  }
 }
 
 /** 编辑浮层的铅笔图标。 */
 const PENCIL_SVG = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M11.2 2.2a1.6 1.6 0 0 1 2.6 2.6L6 12.5l-3.5.9.9-3.5 7.8-7.7Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>'
+
+/** 插件插入的「快捷信息」按钮标记（点赞行里，替代原三个 git 按钮）。 */
+export const QUICK_BTN_ATTR = 'data-chat-power-quick-btn'
+/** 插件插入的「快捷信息」面板标记（挂在按钮内、绝对定位在上方）。 */
+export const QUICK_PANEL_ATTR = 'data-chat-power-quick-panel'
+/** 快捷方式图标（闪电形，与宿主 primitives 的 bolt 图标同形）。 */
+export const QUICK_BTN_SVG = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8.9 1.5 3.4 8.2a.6.6 0 0 0 .46.98h2.9l-1.1 4.6a.6.6 0 0 0 1.05.53l5.5-6.7a.6.6 0 0 0-.46-.98h-2.9l1.1-4.6a.6.6 0 0 0-1.05-.53Z" fill="currentColor"/></svg>'
 
 export interface TurnFoldOptions {
   /** 聊天滚动容器；缺省按 `[data-conversation-scroll]` 查。 */
@@ -279,8 +338,8 @@ export interface TurnFoldOptions {
   observe?: (target: Element, callback: () => void) => () => void
   /** 注入时钟。 */
   now?: () => number
-  /** 点 git 快捷按钮：把对应指令发给当前会话执行。 */
-  onGitAction?: (sessionId: string, action: GitAction) => void
+  /** 点快捷信息条：把文本发送到指定会话。 */
+  onSendQuick?: (sessionId: string, text: string) => void
 }
 
 /**
@@ -613,103 +672,210 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
       const holder = like.parentElement
       if (holder === null) continue
       holder.setAttribute('data-chat-power-feedback', '')
-      // git 快捷按钮：commit / merge / push（发指令给当前会话执行）。
-      if (options.onGitAction !== undefined && holder.querySelector('[data-chat-power-git-actions]') === null) {
+      // 快捷信息按钮：点开快捷信息列表面板（点击信息条即发送到当前会话）。
+      if (holder.querySelector(`[${QUICK_BTN_ATTR}]`) === null) {
         const sessionId = row.closest('[data-conversation-session]')?.getAttribute('data-conversation-session') ?? ''
-        if (sessionId !== '') {
-          const bar = document.createElement('span')
-          bar.setAttribute('data-chat-power-git-actions', '')
-          for (const kind of ['commit', 'merge', 'sync'] as const) {
-            const btn = document.createElement('button')
-            btn.setAttribute('type', 'button')
-            btn.setAttribute('data-chat-power-git-btn', kind)
-            btn.textContent = GIT_LABELS[kind]
-            // 悬停出 tips：展示这条按钮会发送的指令，tips 里可直接编辑。
-            btn.addEventListener('mouseenter', () => { showGitTip(bar, btn, kind) })
-            btn.addEventListener('mouseleave', () => { scheduleGitTipHide(bar) })
-            btn.addEventListener('click', event => {
-              event.stopPropagation()
-              options.onGitAction?.(sessionId, kind)
-            })
-            bar.append(btn)
-          }
-          holder.append(bar)
-        }
+        if (sessionId !== '') holder.append(buildQuickButton(sessionId))
       }
     }
   }
 
-  const gitTipTimers = new WeakMap<HTMLElement, ReturnType<typeof setTimeout>>()
+  /**
+   * 快捷信息面板：从当前按钮（含各会话的旧按钮）收起的唯一面板。
+   * 一次只开一个：点别的按钮先把旧面板摘掉。
+   */
+  let quickPanel: HTMLElement | undefined
+  let quickPanelAnchor: HTMLElement | undefined
+  let quickEditingId: string | undefined
+  /** 「新增」的草稿条目：尚未入库（保存时才写存储，取消即丢弃）。 */
+  let quickDraft: QuickMessage | undefined
 
-  const hideGitTip = (bar: HTMLElement): void => {
-    bar.querySelector('[data-chat-power-git-tip]')?.remove()
-    const timer = gitTipTimers.get(bar)
-    if (timer !== undefined) { clearTimeout(timer); gitTipTimers.delete(bar) }
+  const closeQuickPanel = (): void => {
+    quickPanel?.remove()
+    quickPanel = undefined
+    quickPanelAnchor?.removeAttribute('data-open')
+    quickPanelAnchor = undefined
+    quickEditingId = undefined
   }
 
-  const cancelGitTipHide = (bar: HTMLElement): void => {
-    const timer = gitTipTimers.get(bar)
-    if (timer !== undefined) { clearTimeout(timer); gitTipTimers.delete(bar) }
+  /** 快捷信息按钮上方（bottom 之上）的面板定位：贴按钮左缘，超出右缘时右对齐。 */
+  const positionQuickPanel = (panel: HTMLElement, anchor: HTMLElement): void => {
+    panel.style.left = `${Math.max(0, anchor.offsetLeft - 8)}px`
+    const overflow = anchor.offsetLeft + panel.offsetWidth - window.innerWidth
+    if (overflow > 0) panel.style.left = `${Math.max(0, anchor.offsetLeft + anchor.offsetWidth - panel.offsetWidth)}px`
   }
 
-  const scheduleGitTipHide = (bar: HTMLElement): void => {
-    const tip = bar.querySelector('[data-chat-power-git-tip]')
-    // 编辑中不自动关：输入到一半的指令不能丢。
-    if (tip !== null && tip.getAttribute('data-mode') === 'edit') return
-    cancelGitTipHide(bar)
-    gitTipTimers.set(bar, setTimeout(() => { hideGitTip(bar) }, 150))
-  }
-
-  /** 悬停 tips：展示该按钮会发送的指令；tips 内的「编辑」直接改这条内容。 */
-  const showGitTip = (bar: HTMLElement, button: HTMLElement, kind: GitAction): void => {
-    hideGitTip(bar)
-    const tip = document.createElement('div')
-    tip.setAttribute('data-chat-power-git-tip', '')
-    tip.dataset['kind'] = kind
-    const render = (editing: boolean): void => {
-      tip.dataset['mode'] = editing ? 'edit' : 'view'
-      while (tip.firstChild !== null) tip.removeChild(tip.firstChild)
-      if (editing) {
-        const box = document.createElement('textarea')
-        box.value = getGitInstruction(kind)
-        tip.append(box)
+  /** 重画面板内容（列表态 / 编辑态）。编辑态渲染编辑框 + 保存 / 取消。 */
+  const renderQuickPanel = (): void => {
+    const panel = quickPanel
+    if (panel === undefined) return
+    while (panel.firstChild !== null) panel.removeChild(panel.firstChild)
+    const storage = quickStorageOf()
+    const read = storage?.getItem.bind(storage) ?? (() => null)
+    for (const message of loadQuickMessages(read)) {
+      if (message.id === quickEditingId) {
+        const editor = document.createElement('textarea')
+        editor.setAttribute('data-chat-power-quick-edit', '')
+        editor.value = message.text
         const actions = document.createElement('div')
-        actions.setAttribute('data-chat-power-git-tip-actions', '')
+        actions.setAttribute('data-chat-power-quick-actions', '')
         const save = document.createElement('button')
         save.setAttribute('type', 'button')
         save.textContent = '保存'
-        save.addEventListener('click', () => {
-          setGitInstruction(kind, box.value)
-          button.title = box.value
-          render(false)
+        save.addEventListener('click', event => {
+          event.stopPropagation()
+          const next = (quickStorageOf())
+          if (next !== undefined) {
+            const current = loadQuickMessages(next.getItem.bind(next))
+            const updated = current.map(item => item.id === message.id ? { ...item, text: editor.value } : item)
+            saveQuickMessages(updated, next.setItem.bind(next))
+          }
+          quickEditingId = undefined
+          renderQuickPanel()
         })
         const cancel = document.createElement('button')
         cancel.setAttribute('type', 'button')
         cancel.textContent = '取消'
-        cancel.addEventListener('click', () => { render(false) })
+        cancel.addEventListener('click', event => {
+          event.stopPropagation()
+          quickEditingId = undefined
+          renderQuickPanel()
+        })
         actions.append(save, cancel)
-        tip.append(actions)
-        box.focus()
-        return
+        panel.append(editor, actions)
+        editor.focus()
+        continue
       }
-      const text = document.createElement('span')
-      text.setAttribute('data-chat-power-git-tip-text', '')
-      text.textContent = getGitInstruction(kind)
-      const edit = document.createElement('button')
-      edit.setAttribute('data-chat-power-git-tip-edit', '')
+      const row = document.createElement('button')
+      row.setAttribute('type', 'button')
+      row.setAttribute('data-chat-power-quick-row', '')
+      row.title = message.text
+      const label = document.createElement('span')
+      label.setAttribute('data-chat-power-quick-text', '')
+      label.textContent = message.text
+      // 点信息条：把这条文本发到当前会话，然后收起面板。
+      row.addEventListener('click', event => {
+        event.stopPropagation()
+        const session = panel.dataset['session'] ?? ''
+        if (session === '' || message.text.trim() === '') return
+        options.onSendQuick?.(session, message.text)
+        closeQuickPanel()
+      })
+      const edit = document.createElement('span')
+      edit.setAttribute('data-chat-power-quick-edit-btn', '')
+      edit.setAttribute('role', 'button')
       edit.setAttribute('title', '编辑')
       edit.insertAdjacentHTML('afterbegin', PENCIL_SVG)
       edit.addEventListener('click', event => {
         event.stopPropagation()
-        render(true)
+        quickEditingId = message.id
+        renderQuickPanel()
       })
-      tip.append(text, edit)
+      const remove = document.createElement('span')
+      remove.setAttribute('data-chat-power-quick-remove-btn', '')
+      remove.setAttribute('role', 'button')
+      remove.setAttribute('title', '删除')
+      remove.textContent = '×'
+      remove.addEventListener('click', event => {
+        event.stopPropagation()
+        const next = (quickStorageOf())
+        if (next !== undefined) {
+          const current = loadQuickMessages(next.getItem.bind(next))
+          saveQuickMessages(current.filter(item => item.id !== message.id), next.setItem.bind(next))
+        }
+        renderQuickPanel()
+      })
+      const tools = document.createElement('span')
+      tools.setAttribute('data-chat-power-quick-tools', '')
+      tools.append(edit, remove)
+      row.append(label, tools)
+      panel.append(row)
     }
-    render(false)
-    tip.addEventListener('mouseenter', () => { cancelGitTipHide(bar) })
-    tip.addEventListener('mouseleave', () => { scheduleGitTipHide(bar) })
-    tip.style.left = `${Math.max(0, button.offsetLeft - 40)}px`
-    bar.append(tip)
+    if (quickDraft !== undefined) {
+      const draft = quickDraft
+      const editor = document.createElement('textarea')
+      editor.setAttribute('data-chat-power-quick-edit', '')
+      editor.setAttribute('data-chat-power-quick-draft', '')
+      editor.value = quickDraft.text
+      const actions = document.createElement('div')
+      actions.setAttribute('data-chat-power-quick-actions', '')
+      const save = document.createElement('button')
+      save.setAttribute('type', 'button')
+      save.textContent = '保存'
+      save.addEventListener('click', event => {
+        event.stopPropagation()
+        const text = editor.value.trim()
+        if (text !== '') {
+          const next = quickStorageOf()
+          if (next !== undefined) {
+            const current = loadQuickMessages(next.getItem.bind(next))
+            saveQuickMessages([...current, { id: draft.id, text }], next.setItem.bind(next))
+          }
+        }
+        quickDraft = undefined
+        renderQuickPanel()
+      })
+      const cancel = document.createElement('button')
+      cancel.setAttribute('type', 'button')
+      cancel.textContent = '取消'
+      cancel.addEventListener('click', event => {
+        event.stopPropagation()
+        quickDraft = undefined
+        renderQuickPanel()
+      })
+      actions.append(save, cancel)
+      panel.append(editor, actions)
+      editor.focus()
+    }
+    const add = document.createElement('button')
+    add.setAttribute('type', 'button')
+    add.setAttribute('data-chat-power-quick-add', '')
+    add.textContent = '+ 新增'
+    add.addEventListener('click', event => {
+      event.stopPropagation()
+      // 新增走内存草稿：保存时才入库（空文本直接存会被剔除），取消即丢弃。
+      quickDraft = { id: `q-${Date.now()}`, text: '' }
+      renderQuickPanel()
+    })
+    panel.append(add)
+    positionQuickPanel(panel, quickPanelAnchor ?? panel)
+  }
+
+  /** 快捷信息按钮：点开面板；面板只在点击处展开，点面板外收起。 */
+  const buildQuickButton = (sessionId: string): HTMLElement => {
+    const btn = document.createElement('button')
+    btn.setAttribute('type', 'button')
+    btn.setAttribute(QUICK_BTN_ATTR, '')
+    btn.setAttribute('title', t('turnFold.quickMessagesTitle'))
+    btn.setAttribute('aria-label', t('turnFold.quickMessagesTitle'))
+    btn.setAttribute('aria-haspopup', 'true')
+    btn.insertAdjacentHTML('afterbegin', QUICK_BTN_SVG)
+    btn.addEventListener('click', event => {
+      event.stopPropagation()
+      const reuse = quickPanelAnchor === btn && quickPanel !== undefined
+      closeQuickPanel()
+      if (reuse) return
+      const panel = document.createElement('div')
+      panel.setAttribute(QUICK_PANEL_ATTR, '')
+      panel.dataset['session'] = sessionId
+      btn.setAttribute('data-open', '')
+      btn.append(panel)
+      quickPanel = panel
+      quickPanelAnchor = btn
+      renderQuickPanel()
+    })
+    return btn
+  }
+
+  // 点面板外收起（capture：比宿主的别的处理早一步，不抢事件）。
+  const onDocumentClick = (event: MouseEvent): void => {
+    if (quickPanel === undefined) return
+    const target = event.target
+    if (target instanceof Element && (quickPanel.contains(target) || quickPanelAnchor?.contains(target) === true)) return
+    closeQuickPanel()
+  }
+  if (typeof document !== 'undefined') {
+    document.addEventListener('click', onDocumentClick, true)
   }
 
   const applyCaps = (record: TurnRecord, available: number): void => {
@@ -1163,7 +1329,11 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     if (retryTimer !== undefined && typeof window !== 'undefined') window.clearInterval(retryTimer)
     retryTimer = undefined
     if (typeof window !== 'undefined') window.removeEventListener('resize', onViewportChange)
+    if (typeof document !== 'undefined') document.removeEventListener('click', onDocumentClick, true)
     removeResizeHandles()
+    // 快捷信息面板与按钮：一并摘掉（宿主重渲染后由新控制器重挂）。
+    closeQuickPanel()
+    for (const stale of document.querySelectorAll(`[${QUICK_BTN_ATTR}]`)) stale.remove()
     for (const record of records.values()) {
       record.strip?.remove()
       record.requestBar?.remove()
