@@ -56,6 +56,7 @@ export type ChatPowerLocaleKey =
   | 'turnFold.frameContext' | 'turnFold.frameLimit' | 'turnFold.frameQuestion'
   | 'turnFold.frameWorkflow' | 'turnFold.frameRunning'
   | 'turnFold.frameResizeTitle' | 'turnFold.composerResizeTitle'
+  | 'turnFold.quickMessagesTitle'
   | 'turnFold.collapseAria' | 'turnFold.expandAria'
   | 'tools.chat' | 'tools.files' | 'tools.browser' | 'tools.terminal'
   | 'tools.openLocalFile' | 'settings.title' | 'settings.linkOpenDefault' | 'settings.linkOpenRight' | 'settings.linkOpenBrowser'
@@ -166,6 +167,7 @@ export const zh: Record<ChatPowerLocaleKey, string> = {
   'turnFold.showedMiddle': '已展开中间 {count} 步',
   'turnFold.labelWithSummary': '第 {turn} 轮 · {clock} · {summary}',
   'turnFold.collapseAria': '收起这一轮',
+  'turnFold.quickMessagesTitle': '快捷信息',
   'turnFold.expandAria': '展开这一轮',
   'tools.chat': '会话',
   'tools.files': '工作区文件',
@@ -287,6 +289,7 @@ export const en: Record<ChatPowerLocaleKey, string> = {
   'turnFold.showedMiddle': 'Middle {count} steps expanded',
   'turnFold.labelWithSummary': 'Turn {turn} · {clock} · {summary}',
   'turnFold.collapseAria': 'Collapse this turn',
+  'turnFold.quickMessagesTitle': 'Quick messages',
   'turnFold.expandAria': 'Expand this turn',
   'tools.chat': 'Chat',
   'tools.files': 'Workspace files',
