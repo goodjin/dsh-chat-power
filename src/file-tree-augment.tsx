@@ -39,9 +39,8 @@ export interface ElementLike {
   hasAttribute(name: string): boolean
   prepend(node: unknown): void
   append(node: unknown): void
-  insertBefore(node: unknown, before: unknown): void
+  after(node: unknown): void
   querySelector(selector: string): ElementLike | null
-  nextSibling?: unknown
   closest(selector: string): unknown
   checked?: boolean
   innerHTML?: string
@@ -107,7 +106,7 @@ export function decorateRow(row: ElementLike, sessionId: string, handlers: Augme
   const open = row.querySelector('button:first-of-type')
   if (open !== null) open.prepend(check)
   else row.prepend(check)
-  if (open !== null) row.insertBefore(edit, open.nextSibling)
+  if (open !== null) open.after(edit)
   else row.append(edit)
   row.setAttribute(DECORATED_ATTR, '')
   // 大文件预拦截：decorate 时异步 stat，超过上限就给行打标记。点击时

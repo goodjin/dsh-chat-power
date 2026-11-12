@@ -5,8 +5,7 @@
  * 外层包会当场撞名，文件面板整块起不来。于是改成在**渲染出来的目录树上
  * 直接补控件**：只看会话区工具区里的行，宿主右侧栏的文件树不受影响。
  *
- * 仓库没有 jsdom，这里用最小假 DOM 钉住三件事：补控件、按会话查勾选
- * 状态、点击动作怎么路由。
+ * 最小假 DOM 仅验证控件状态与点击路由；嵌套结构与监听收敛由真实 DOM 测试覆盖。
  */
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
@@ -25,7 +24,6 @@ interface FakeEl {
   attrs: Record<string, string>
   children: FakeEl[]
   parent: FakeEl | null
-  nextSibling: FakeEl | null
   checked: boolean
   innerHTML: string
   setAttribute(name: string, value: string): void
@@ -33,7 +31,7 @@ interface FakeEl {
   hasAttribute(name: string): boolean
   prepend(node: FakeEl): void
   append(node: FakeEl): void
-  insertBefore(node: FakeEl, before: FakeEl | null): void
+  after(node: FakeEl): void
   querySelector(selector: string): FakeEl | null
   closest(selector: string): FakeEl | null
 }
@@ -46,18 +44,16 @@ function el(tag: string, attrs: Record<string, string> = {}): FakeEl {
     parent: null,
     checked: false,
     innerHTML: '',
-    get nextSibling(): FakeEl | null {
-      const p = node.parent
-      if (p === null) return null
-      const at = p.children.indexOf(node)
-      return at < 0 ? null : p.children[at + 1] ?? null
-    },
     setAttribute(name, value) { node.attrs[name] = value },
     getAttribute(name) { return name in node.attrs ? (node.attrs[name] ?? null) : null },
     hasAttribute(name) { return name in node.attrs },
     prepend(child) { child.parent = node; node.children.unshift(child) },
     append(child) { child.parent = node; node.children.push(child) },
-    insertBefore(child, before) { child.parent = node; const at = before === null ? -1 : node.children.indexOf(before); if (at < 0) node.children.push(child); else node.children.splice(at, 0, child) },
+    after(child) {
+      if (node.parent === null) return
+      child.parent = node.parent
+      node.parent.children.splice(node.parent.children.indexOf(node) + 1, 0, child)
+    },
     querySelector(selector) { const tag = /^([a-z]+)/.exec(selector)?.[1]; return node.children.find(child => child.tag === tag) ?? null },
     closest(selector) {
       // 只支持 `[data-xxx]` 形态的选择器：取属性名往上找。
