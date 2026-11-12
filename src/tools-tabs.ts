@@ -1,10 +1,15 @@
 /**
  * 工具标签并入宿主「对话 / 轨迹」所在行。
  *
- * 宿主的 conversation.view 条目是全局的：标签行对每个会话渲染同一份条目、
- * label 不带会话上下文，装不下「每个会话各自打开的文件标签」。所以沿用
- * 文件树行控件的同款做法——不动宿主的座位表，在宿主渲染出来的标签行
+ * 不动宿主的座位表（conversation.view 条目全局共享、装不下每个会话各自的
+ * 文件标签），沿用文件树行控件的同款做法——在宿主渲染出来的标签行
  * （`[data-conversation-tabs]`，role=tablist）里补挂自己的标签：
+ *
+ * 宿主那一行在**会话标题栏**里，与会话内容区（`[data-conversation-content]`）
+ * 是**兄弟**（核对过 app.asar 的 ConversationHeader / ConversationContent）：
+ * 只在内容区内部找标签行永远找不到，于是此前一直退回「自建行」，界面上
+ * 就多出第二栏。故按「会话面板」作用域找——标题栏与内容区必须属于同一个
+ * 面板，侧栏里的内嵌会话（子代理聊天）不认主会话那一行：
  *
  * - 会话视图（文件 / 浏览器 / 终端）与打开的文件标签排在宿主标签之后；
  * - 文件标签是一个整体：标题与关闭钮同处一个框里（Chrome 风格）；关闭 = 退出
@@ -14,6 +19,9 @@
  * - 宿主行缺席（未开开发者工具时没有轨迹行、标签行整行不渲染）就在会话
  *   内容区前自建一行（`data-chat-tools-row`），并带自己的「对话」标签；
  *   宿主行一旦出现就摘掉自建行，改挂宿主行。
+ *
+ * 宿主那一行由 React 渲染：它重渲染（视图增减、窗口变窄）时可能把新标签
+ * 追加到行尾、落到我们之后，一行的顺序就乱了——同步时把标签组挪回末尾。
  *
  * 选中状态仍归 toolsState：补挂只是把入口画进宿主那一行，点击路由走调用方
  * 注入的处理器。事件用捕获阶段委托：我们的标签要先于宿主的视图切换拿到点击。
@@ -89,6 +97,14 @@ export interface RowElementLike {
   readonly parentElement?: RowElementLike | null
   /** 真实 DOM 有 children；测试假件可缺省（护栏签名比对退化到总是重画）。 */
   readonly children?: { readonly length: number }
+  /**
+   * 真实 DOM 有 lastElementChild；测试假件可缺省。
+   *
+   * 用来保证我们的标签组排在宿主标签**之后**：宿主那一行是 React 渲染的，
+   * 它重渲染（窗口变窄、视图增减）时可能把新标签追加到行尾、插到我们前面，
+   * 于是顺序被挤乱——要把组挪回末尾。
+   */
+  readonly lastElementChild?: RowElementLike | null
   ownerDocument?: RowDocumentLike
   /** 图标用 SVG 源码填进去（真实 DOM 有；测试假件可缺省）。 */
   innerHTML?: string
@@ -138,6 +154,31 @@ function sessionContentOf(target: RowElementLike): RowElementLike | null {
   return null
 }
 
+/**
+ * 找本次会话的宿主标签行（对话 / 轨迹 / 提示词 那一行）。
+ *
+ * 宿主那一行在**会话标题栏**里，与会话内容区是**兄弟**（核对过 app.asar 的
+ * ConversationHeader / ConversationContent）：只在内容区内部找标签行永远找不到，
+ * 于是此前一直退回「自建行」，界面上就多出第二栏。
+ *
+ * 作用域按「这一行归属哪个会话」判定：宿主那一行与它的会话内容区同属一个面板，
+ * 所以从行往上找它所属的内容区（与点击路由里的 sessionContentOf 同一套办法），
+ * 那个内容区就是本次会话才认。侧栏里的内嵌会话（子代理聊天）没有自己的标题栏，
+ * 它往上看见的宿主行归属主会话——主会话的标签混进内嵌会话那一行，两个会话的
+ * 标签就串在一处了。
+ */
+function hostRowOf(root: RowElementLike): RowElementLike | null {
+  let node: RowElementLike | null = root.parentElement ?? null
+  while (node !== null) {
+    // 同一层可能有多个标签行（别的面板的），逐个比对归属，别只取第一个。
+    for (const row of node.querySelectorAll('[data-conversation-tabs]')) {
+      if (sessionContentOf(row) === root) return row
+    }
+    node = node.parentElement ?? null
+  }
+  return null
+}
+
 /** 每个会话内容根上次同步的签名：快照与行都没变就不再碰 DOM。 */
 interface SyncSignature {
   readonly sig: string
@@ -159,7 +200,7 @@ export function syncSessionToolsRow(root: RowElementLike, doc: RowDocumentLike, 
   const sessionId = sessionOfContent(root)
   if (sessionId === undefined) return undefined
   const snapshot = handlers.snapshot(sessionId)
-  const hostRow = root.querySelector('[data-conversation-tabs]')
+  const hostRow = hostRowOf(root)
   let row: RowElementLike
   let ownsChatButton: boolean
   if (hostRow !== null) {
@@ -209,7 +250,10 @@ export function syncSessionToolsRow(root: RowElementLike, doc: RowDocumentLike, 
   const expectedChildren = 3 + snapshot.tabs.filter(tab => !['chat', 'files', 'browser', 'terminal'].includes(tab.kind)).length
   const prev = lastSync.get(root)
   const groupForCheck = row.querySelector(`[${GROUP_ATTR}]`)
-  if (prev !== undefined && prev.sig === sig && prev.row === row && groupForCheck !== null && (groupForCheck.children?.length ?? -1) === expectedChildren) return row
+  // 宿主那一行是 React 渲染的：它重渲染时可能把新标签插到我们前面，顺序就乱了。
+  // 顺序不对也算「变了」——要重画并把组挪回末尾。
+  const outOfOrder = groupForCheck !== null && row.lastElementChild !== undefined && row.lastElementChild !== groupForCheck
+  if (prev !== undefined && prev.sig === sig && prev.row === row && groupForCheck !== null && !outOfOrder && (groupForCheck.children?.length ?? -1) === expectedChildren) return row
   lastSync.set(root, { sig, row, children: expectedChildren })
   // 以下是重画路径：只在快照或行结构真的变了时走到。
   const activeTool = snapshot.tabs.find(tab => tab.kind !== 'chat' && isActive(snapshot, tab))
@@ -225,6 +269,9 @@ export function syncSessionToolsRow(root: RowElementLike, doc: RowDocumentLike, 
   if (group === null) {
     group = doc.createElement('div')
     group.setAttribute(GROUP_ATTR, '')
+    // 宿主那一行是 role="tablist"：我们的组是它的子元素，要声明自己是
+    // 呈现性的容器（presentation），里面的按钮才算这一行里的标签。
+    group.setAttribute('role', 'presentation')
     row.append(group)
   }
   // 同步是全量重画：先清掉上一轮的标签，再按当前快照重建（目录树重绘、
@@ -280,6 +327,9 @@ export function syncSessionToolsRow(root: RowElementLike, doc: RowDocumentLike, 
   }
   if (ownsChatButton) row.setAttribute('data-chat-tools-owns-chat', '')
   else row.removeAttribute('data-chat-tools-owns-chat')
+  // 组要排在宿主自己的标签之后：宿主重渲染把新标签插到我们前面时，挪回末尾。
+  // 挪动是一次 DOM 写（会喂给自己的观察者），但下一次同步顺序已对，护栏会原样返回。
+  if (row.lastElementChild !== undefined && row.lastElementChild !== group) row.append(group)
   return row
 }
 
