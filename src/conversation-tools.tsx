@@ -1,7 +1,9 @@
 import { createPortal } from 'react-dom'
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { browserState } from './browser/state.ts'
+import { BrowserWorkspace, browserMenu } from './browser/workspace.tsx'
 import { toolsState } from './tools-state.ts'
-import { createToolsAdapter, toolSlot } from './tools-adapter.tsx'
+import { createToolsAdapter, toolSlot, browserBodySlot } from './tools-adapter.tsx'
 import { attachToolsRow } from './tools-tabs.ts'
 import { createToolMessageHider, isToolMessageNode, mountToolBody, toolHiddenNodes } from './tools-layout.ts'
 import { attachFilesTreeAugment, hasHistoryForPhase, type AugmentHandlers } from './file-tree-augment.tsx'
@@ -21,6 +23,7 @@ import { readDefaultLinkOpenMode, openInBrowser } from './link-open.ts'
 import { statusNoticeClass } from './ui-theme.ts'
 import css from './conversation-tools.module.css'
 const ROOT = 'chat-power.tools'
+const BROWSER = 'chat-power.browser-workspace'
 const BODY = toolSlot('sidebar.right.pane.tab')
 
 /** 草稿文本按「会话 + contentId」保管：关闭标签不删，重开同内容自动找回。 */
@@ -123,11 +126,11 @@ export function registerConversationTools(ctx: any) {
     // 文件类标签（工作区文件编辑 / 文档预览）激活时：给工具区打标记，
     // 样式据此让文件内容与上方（标签行）、下方（输入框）各留 10px。
     const fileLive = activeTab !== undefined && (activeTab.kind === 'local' || activeTab.kind === 'text')
-    return <section className={css.tools} data-chat-tools="" data-chat-tools-file-live={fileLive ? '' : undefined} aria-label="会话工具">
+    return <section hidden={activeTab?.kind === 'browser'} className={css.tools} data-chat-tools="" data-chat-tools-file-live={fileLive ? '' : undefined} aria-label="会话工具">
       {(notice !== '') && <p role="alert" className={statusNoticeClass} data-variant="error">{notice}</p>}
       <div className={css.content} data-chat-tools-bodies="" data-chat-tools-session={id}>
         {s.tabs.map(tab => {
-          if (tab.kind === 'chat') return null
+          if (tab.kind === 'chat' || tab.kind === 'browser') return null
           const visible = tab.id === s.active
           const definition = adapter.definitions.get(tab.kind)
           const info = adapter.tabInfo(id, tab, visible)
@@ -178,6 +181,19 @@ export function registerConversationTools(ctx: any) {
     const editorActive = toolActive && activeTab !== undefined && activeTab.kind === 'local' && activeTab.contentId.startsWith('edit://')
     const [mounts, setMounts] = useState<{ button: HTMLElement | null; body: HTMLElement; content: Element | null } | null>(null)
     const [reference, setReference] = useState<any>(null)
+    const [browserReference, setBrowserReference] = useState<any>(null)
+    const browserHeld = useRef<any>(null)
+    useEffect(() => {
+      if (!id || browserHeld.current) return
+      const ref = ctx.get('sessions').retain(id, { source: 'chatPowerBrowser' })
+      browserHeld.current = ref
+      adapter.setBrowserSession(id)
+      setBrowserReference({ id, ref })
+      ref.ready.catch((error: unknown) => console.error('[chat-power] browser session:', error))
+    }, [id])
+    useEffect(() => () => { browserHeld.current?.release(); browserState.dispose() }, [])
+    const browserActive = activeTab?.kind === 'browser'
+    useEffect(() => { browserState.setVisible(browserActive) }, [browserActive])
     useEffect(() => {
       if (!id) { setReference(null); return }
       const ref = ctx.get('sessions').retain(id, { source: 'chatPowerTools' })
@@ -303,16 +319,27 @@ export function registerConversationTools(ctx: any) {
     return <>
       {reference && reference.id === id && createPortal(
         <props.SessionProvider session={reference.ref}>{props.renderSlot(ROOT, {})}</props.SessionProvider>, mounts.body)}
+      {browserReference && createPortal(<div className={css.browserWorkspace} hidden={!browserActive}>
+        <props.SessionProvider session={browserReference.ref}>{props.renderSlot(BROWSER, {})}</props.SessionProvider>
+      </div>, mounts.body)}
     </>
   }
   ctx.slots.inject('shell.overlay', () => ctx.slots.register({ name: 'shell.overlay', id: 'chat-power-tools-portal',
-    children: { [ROOT]: { kind: 'single', scope: 'session' } },
+    children: { [ROOT]: { kind: 'single', scope: 'session' }, [BROWSER]: { kind: 'single', scope: 'session' } },
   }, PortalRoot))
   ctx.slots.inject(ROOT, () => ctx.slots.register({ name: ROOT, children: {
     [BODY]: { kind: 'keyed', scope: 'session', inject: { hooks: { tabInfo: (_: any, hook: any) => hook } } },
     [toolSlot('sidebar.right.pane.tab.title')]: { kind: 'keyed', scope: 'session', inject: { hooks: { tabInfo: (_: any, hook: any) => hook } } },
     [toolSlot('sidebar.right.tab.guide.entry')]: { kind: 'keyed', scope: 'session' },
   } }, ToolArea))
+  ctx.slots.inject(BROWSER, () => ctx.slots.register({ name: BROWSER, children: {
+    [browserBodySlot]: { kind: 'keyed', scope: 'session', inject: { hooks: { tabInfo: (_: any, hook: any) => hook } } },
+  } }, (props: any) => <BrowserWorkspace renderPage={(page, visible) => {
+    const definition = adapter.definitions.get('browser')
+    if (!definition) return <p role="alert">浏览器模块尚未就绪</p>
+    const info = adapter.tabInfo(props.sessionId, browserState.tab(page), visible && !!browserState.get().visible)
+    return props.renderSlot(browserBodySlot, {}, { entryKey: definition.id, hookContext: () => info })
+  }} />))
   // 工具标签并入宿主「对话 / 轨迹」行：在宿主渲染出来的标签行上补挂自己的标签。
   // 文件标签的关闭走丢弃草稿的关闭；其余标签直接关。
   ctx.effect(() => attachToolsRow({
@@ -320,6 +347,7 @@ export function registerConversationTools(ctx: any) {
     activateChat: id => toolsState.activateChat(id),
     selectTab: (id, tabId) => toolsState.select(id, tabId),
     openKind,
+    openBrowserMenu: id => { openKind(id, 'browser'); browserMenu() },
     closeTab: (id, tabId) => {
       const tab = toolsState.get(id).tabs.find(t => t.id === tabId)
       if (tab !== undefined && (tab.kind === 'local' || tab.kind === 'text')) { closeDocument(id, tabId); return }
@@ -476,12 +504,6 @@ export function registerConversationTools(ctx: any) {
       const id = currentId(); if (!id) return
       event.preventDefault(); event.stopImmediatePropagation()
       if (readDefaultLinkOpenMode() === 'browser') { openInBrowser(url.href); return }
-      // 复用策略：普通外链只让位**最近一个**内置浏览器标签（腾出宿主工厂的
-      // 单页面位），其余浏览器标签原样保留——此前批量关闭会丢掉用户正在
-      // 阅读的页面。
-      const browserTabs = toolsState.get(id).tabs.filter(t => t.kind === 'browser')
-      const latest = browserTabs.at(-1)
-      if (latest !== undefined) adapter.close(id, latest.id)
       adapter.open(id, 'browser', { params: { url: url.href } })
     }
     document.addEventListener('click', click, true)

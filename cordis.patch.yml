@@ -22,6 +22,8 @@
       name: '@goodjin2/dsh-chat-power'
     - id: chat-power-mermaid-asset
       name: '@goodjin2/dsh-chat-power/mermaid-asset'
+    - id: chat-power-chrome-bookmarks
+      name: '@goodjin2/dsh-chat-power/chrome-bookmarks'
     - id: chat-power-workspace-write
       name: '@goodjin2/dsh-chat-power/workspace-write'
 
