@@ -70,7 +70,6 @@ export interface ToolsRowHandlers {
   /** 打开（或聚焦）一个会话视图。 */
   openKind(sessionId: string, kind: ToolRowKind): void
   /** 关闭标签（文件标签走丢弃草稿的关闭）。 */
-  openBrowserMenu?(sessionId: string): void
   closeTab(sessionId: string, tabId: string): void
   /** 工具状态变化通知（toolsState.subscribe）。 */
   subscribe(listener: () => void): () => void
@@ -248,7 +247,7 @@ export function syncSessionToolsRow(root: RowElementLike, doc: RowDocumentLike, 
   // 即使写同值也会产生变异记录）：快照没变、行没换、子节点齐全就原样返回。
   const sig = signatureOf(snapshot)
   // 组内子节点：三个种类入口各一枚 + 每个文件标签一个外壳（标题与关闭钮同框）。
-  const expectedChildren = (handlers.openBrowserMenu ? 4 : 3) + snapshot.tabs.filter(tab => !['chat', 'files', 'browser', 'terminal'].includes(tab.kind)).length
+  const expectedChildren = 3 + snapshot.tabs.filter(tab => !['chat', 'files', 'browser', 'terminal'].includes(tab.kind)).length
   const prev = lastSync.get(root)
   const groupForCheck = row.querySelector(`[${GROUP_ATTR}]`)
   // 宿主那一行是 React 渲染的：它重渲染时可能把新标签插到我们前面，顺序就乱了。
@@ -299,15 +298,6 @@ export function syncSessionToolsRow(root: RowElementLike, doc: RowDocumentLike, 
     }
     button.append(doc.createTextNode(handlers.labels.kinds[kind]))
     render(button)
-    if (kind === 'browser' && handlers.openBrowserMenu) {
-      const menu = doc.createElement('button')
-      menu.setAttribute('type', 'button')
-      menu.setAttribute('data-chat-browser-menu', '')
-      menu.setAttribute('aria-label', '浏览器设置')
-      menu.setAttribute('aria-haspopup', 'menu')
-      menu.append(doc.createTextNode('⋯'))
-      render(menu)
-    }
   }
   for (const tab of snapshot.tabs) {
     if (tab.kind === 'chat' || tab.kind === 'files' || tab.kind === 'browser' || tab.kind === 'terminal') continue
@@ -354,11 +344,6 @@ export function handleToolsRowClick(event: { target: unknown; preventDefault(): 
   const content = sessionContentOf(target)
   const sessionId = content === null ? undefined : sessionOfContent(content)
   if (sessionId === undefined) return false
-  if (target.closest('[data-chat-browser-menu]') !== null) {
-    event.stopPropagation(); event.preventDefault()
-    handlers.openBrowserMenu?.(sessionId)
-    return true
-  }
   const close = target.closest(`[${TAB_CLOSE_ATTR}]`) as RowElementLike | null
   if (close !== null) {
     const tabId = close.getAttribute(TAB_ID_ATTR)
