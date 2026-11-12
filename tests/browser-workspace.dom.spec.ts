@@ -1,7 +1,7 @@
 import { createElement, act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { BrowserChrome, BrowserWorkspace, browserMenu } from '../src/browser/workspace.tsx'
+import { BrowserChrome, BrowserWorkspace } from '../src/browser/workspace.tsx'
 import { browserState, type Page } from '../src/browser/state.ts'
 let host: HTMLDivElement; let root: Root
 const button = (text: string) => [...host.querySelectorAll('button')].find(b => b.textContent === text)!
@@ -34,7 +34,10 @@ describe('浏览器工作台真实 DOM', () => {
     await click(host.querySelector('[aria-label="添加当前页面到书签"]')!)
     expect(host.textContent).toContain('管理书签')
     expect(host.querySelector('input[value="https://example.com/"]')).not.toBeNull()
-    await act(async () => browserMenu())
+    expect(host.textContent).not.toContain('暂无书签')
+    const menuButton = host.querySelector('[aria-label="浏览器设置"]')!
+    expect(menuButton.previousElementSibling?.getAttribute('aria-label')).toBe('网页标签')
+    await click(menuButton)
     await click(button('隐藏书签栏'))
     expect(host.querySelector('iframe')).not.toBeNull()
     const star = host.querySelector('[aria-label="添加当前页面到书签"]')!
