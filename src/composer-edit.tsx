@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { IconFolderOpenOutlineRegular, IconCheckOutlineRegular, IconNewChatOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconFolderOpenOutlineRegular, IconCheckOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import { BIG_CLASS } from './expand-editor.tsx'
 import { ComposeCard } from './compose-card.tsx'
 import { copyTextToClipboard } from './send-actions.ts'
@@ -86,6 +86,8 @@ export function ComposerEditNewSession(props: {
   return <button type="button" className={btnClass} data-compose-new-session=""
     disabled={entry.pending || entry.nativePending || !composerEditAttached(props.sessionId) || !draft.trim() || !['plain', 'claimed'].includes(phase)}
     onClick={() => { void performComposerEdit(props.sessionId, 'new') }}>
-    <IconNewChatOutlineRegular size={15} />{fallbackT('compose.sendNewSession')}
+    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M8.3125 0.980183C8.66767 1.0531 8.97902 1.20418 9.2627 1.43233C9.48724 1.61297 9.73029 1.85793 9.97949 2.10714L14.707 6.83468L13.293 8.24874L9 3.95577V15.0417H7V3.95577L2.70703 8.24874L1.29297 6.83468L6.02051 2.10714C6.26971 1.85793 6.51277 1.61297 6.7373 1.43233C6.97662 1.23986 7.28445 1.04402 7.6875 0.980183C7.8973 0.947006 8.1031 0.95516 8.3125 0.980183Z" fill="currentColor" />
+    </svg>{fallbackT('compose.sendNewSession')}
   </button>
 }
