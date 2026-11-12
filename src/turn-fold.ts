@@ -407,6 +407,11 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
   let pendingAlign = false
   /** 切换到的会话（其输出期间持续落底跟随；undefined = 不跟随）。 */
   let followTailSession: string | undefined = undefined
+  /**
+   * 用户的滚动意图：贴底 = 跟随输出；上滚 = 停止跟随、保持阅读位置。
+   * 由会话滚动容器的 scroll 事件维护；程序化落底也经它复核（落底后恒为贴底）。
+   */
+  let userAtBottom = true
   let lastOrderLog = ''
   let records = new Map<number, TurnRecord>()
   let stopObserving: (() => void) | undefined
@@ -453,6 +458,7 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     // 直到输出结束才停止跟随。不再做「当前轮对齐到顶部」——它和宿主的贴底
     // 跟随打架，停在中间。
     followTailSession = key
+    userAtBottom = true
     sessionKey = key
   }
 
@@ -1323,7 +1329,7 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
         applyCaps(record, availableHeight(container, record))
       }
     }
-    if (followTailSession === key && isLiveOutput()) {
+    if (followTailSession === key && isLiveOutput() && userAtBottom) {
       // 输出中：每次同步都落到底部（流式内容持续增长，保持跟随 ✓）。
       const scrollable = container as HTMLElement
       if (typeof scrollable.scrollTop === 'number') scrollable.scrollTop = scrollable.scrollHeight
@@ -1353,6 +1359,14 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     stopObserving?.()
     observedContainer = container
     stopObserving = observe(container, () => { scheduleSync() })
+    // 用户的滚动意图：贴底 = 跟随；上滚 = 停止跟随（保持阅读位置）。
+    if (typeof container.addEventListener === 'function') {
+      container.addEventListener('scroll', () => {
+        const el = container as HTMLElement
+        userAtBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 24
+        scheduleSync()
+      }, { passive: true })
+    }
     const composer = container.querySelector('[data-composer-seat]')
     composerObserver?.disconnect()
     composerObserver = undefined

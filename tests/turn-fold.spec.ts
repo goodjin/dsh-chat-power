@@ -541,3 +541,13 @@ describe('快捷信息面板的定位（panelPlacement）', () => {
     expect(normal.left).toBe(600 - 8)
   })
 })
+
+describe('用户滚动意图', () => {
+  it('跟随输出前先确认用户贴底；上滚即冻结阅读位置', () => {
+    const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
+    expect(source).toContain('userAtBottom')
+    expect(source).toContain('followTailSession === key && isLiveOutput() && userAtBottom')
+    expect(source).toContain("addEventListener('scroll'")
+    expect(source).toContain('sessionKey = key')
+  })
+})
