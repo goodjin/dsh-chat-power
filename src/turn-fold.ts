@@ -681,13 +681,16 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
   }
 
   /**
-   * 快捷信息面板：从当前按钮（含各会话的旧按钮）收起的唯一面板。
-   * 一次只开一个：点别的按钮先把旧面板摘掉。
+   * 快捷信息面板：挂在 body 下、按按钮视口坐标固定定位。
+   *
+   * 不嵌进宿主的消息 DOM——宿主随时会重渲染那块区域，嵌在里面就会被整块冲掉
+   * （编辑框「总是容易消失」的根因）。一次只开一个面板。
    */
   let quickPanel: HTMLElement | undefined
   let quickPanelAnchor: HTMLElement | undefined
+  /** 正在编辑的条目 id（列表态里点「编辑」）。 */
   let quickEditingId: string | undefined
-  /** 「新增」的草稿条目：尚未入库（保存时才写存储，取消即丢弃）。 */
+  /** 「新增」草稿：尚未入库（保存时才写存储，取消即丢弃）。 */
   let quickDraft: QuickMessage | undefined
 
   const closeQuickPanel = (): void => {
@@ -696,56 +699,113 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     quickPanelAnchor?.removeAttribute('data-open')
     quickPanelAnchor = undefined
     quickEditingId = undefined
+    quickDraft = undefined
   }
 
-  /** 快捷信息按钮上方（bottom 之上）的面板定位：贴按钮左缘，超出右缘时右对齐。 */
+  /**
+   * 编辑态（独立界面）：整块只有编辑框与保存/取消——不渲染已有记录。
+   * 「新增」与「编辑既有条目」共用这一块。
+   */
+  const renderQuickEditor = (panel: HTMLElement, sessionId: string, initial: string, onCommit: (text: string) => void): void => {
+    const editor = document.createElement('textarea')
+    editor.setAttribute('data-chat-power-quick-edit', '')
+    editor.placeholder = t('turnFold.quickMessagesPlaceholder')
+    editor.value = initial
+    editor.addEventListener('keydown', event => {
+      // Enter 提交（Shift+Enter 换行）；Escape 取消。事件不外泄。
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault()
+        onCommit(editor.value)
+      } else if (event.key === 'Escape') {
+        event.preventDefault()
+        closeQuickPanel()
+      }
+    })
+    const actions = document.createElement('div')
+    actions.setAttribute('data-chat-power-quick-actions', '')
+    const save = document.createElement('button')
+    save.setAttribute('type', 'button')
+    save.textContent = t('turnFold.quickSave')
+    save.addEventListener('click', event => {
+      event.stopPropagation()
+      onCommit(editor.value)
+    })
+    const cancel = document.createElement('button')
+    cancel.setAttribute('type', 'button')
+    cancel.textContent = t('turnFold.quickCancel')
+    cancel.addEventListener('click', event => {
+      event.stopPropagation()
+      // 取消回到列表态（面板保持开着）：丢弃草稿 / 放弃编辑，不关整个面板。
+      quickDraft = undefined
+      quickEditingId = undefined
+      renderQuickPanel()
+    })
+    actions.append(save, cancel)
+    panel.append(editor, actions)
+    editor.focus()
+    void sessionId
+  }
+
+  /** 按视口坐标把面板定位到按钮上方；贴不下就放下方，超右缘右对齐。 */
   const positionQuickPanel = (panel: HTMLElement, anchor: HTMLElement): void => {
-    panel.style.left = `${Math.max(0, anchor.offsetLeft - 8)}px`
-    const overflow = anchor.offsetLeft + panel.offsetWidth - window.innerWidth
-    if (overflow > 0) panel.style.left = `${Math.max(0, anchor.offsetLeft + anchor.offsetWidth - panel.offsetWidth)}px`
+    const rect = anchor.getBoundingClientRect()
+    panel.style.visibility = 'hidden'
+    panel.style.display = 'flex'
+    const height = panel.offsetHeight
+    const width = panel.offsetWidth
+    const below = rect.bottom + 6 + height > window.innerHeight
+    panel.style.top = below ? `${rect.bottom + 6}px` : `${Math.max(0, rect.top - height - 6)}px`
+    let left = rect.left - 8
+    if (left + width > window.innerWidth - 8) left = window.innerWidth - width - 8
+    panel.style.left = `${Math.max(8, left)}px`
+    panel.style.visibility = ''
   }
 
-  /** 重画面板内容（列表态 / 编辑态）。编辑态渲染编辑框 + 保存 / 取消。 */
+  /** 重画面板（列表态：已有记录 + 新增钮；编辑态由 renderQuickEditor 独占整块）。 */
   const renderQuickPanel = (): void => {
     const panel = quickPanel
     if (panel === undefined) return
     while (panel.firstChild !== null) panel.removeChild(panel.firstChild)
+    const sessionId = panel.dataset['session'] ?? ''
     const storage = quickStorageOf()
     const read = storage?.getItem.bind(storage) ?? (() => null)
-    for (const message of loadQuickMessages(read)) {
-      if (message.id === quickEditingId) {
-        const editor = document.createElement('textarea')
-        editor.setAttribute('data-chat-power-quick-edit', '')
-        editor.value = message.text
-        const actions = document.createElement('div')
-        actions.setAttribute('data-chat-power-quick-actions', '')
-        const save = document.createElement('button')
-        save.setAttribute('type', 'button')
-        save.textContent = '保存'
-        save.addEventListener('click', event => {
-          event.stopPropagation()
-          const next = (quickStorageOf())
-          if (next !== undefined) {
-            const current = loadQuickMessages(next.getItem.bind(next))
-            const updated = current.map(item => item.id === message.id ? { ...item, text: editor.value } : item)
-            saveQuickMessages(updated, next.setItem.bind(next))
+    // 编辑态：独立界面，不显示已有记录。
+    if (quickDraft !== undefined) {
+      renderQuickEditor(panel, sessionId, '', text => {
+        const trimmed = text.trim()
+        if (trimmed !== '' && storage !== undefined) {
+          const current = loadQuickMessages(storage.getItem.bind(storage))
+          saveQuickMessages([...current, { id: quickDraft!.id, text: trimmed }], storage.setItem.bind(storage))
+        }
+        // 保存（或空文本放弃）后回到列表态：面板保持开着，可继续管理。
+        quickDraft = undefined
+        renderQuickPanel()
+      })
+      positionQuickPanel(panel, quickPanelAnchor ?? panel)
+      return
+    }
+    if (quickEditingId !== undefined) {
+      const editing = loadQuickMessages(read).find(item => item.id === quickEditingId)
+      if (editing !== undefined) {
+        renderQuickEditor(panel, sessionId, editing.text, text => {
+          const trimmed = text.trim()
+          if (storage !== undefined) {
+            const current = loadQuickMessages(storage.getItem.bind(storage))
+            const updated = trimmed === ''
+              ? current.filter(item => item.id !== editing.id)
+              : current.map(item => item.id === editing.id ? { ...item, text: trimmed } : item)
+            saveQuickMessages(updated, storage.setItem.bind(storage))
           }
           quickEditingId = undefined
           renderQuickPanel()
         })
-        const cancel = document.createElement('button')
-        cancel.setAttribute('type', 'button')
-        cancel.textContent = '取消'
-        cancel.addEventListener('click', event => {
-          event.stopPropagation()
-          quickEditingId = undefined
-          renderQuickPanel()
-        })
-        actions.append(save, cancel)
-        panel.append(editor, actions)
-        editor.focus()
-        continue
+        positionQuickPanel(panel, quickPanelAnchor ?? panel)
+        return
       }
+      quickEditingId = undefined
+    }
+    // 列表态：每条一行（点条发送、右侧编辑/删除），底部新增钮。
+    for (const message of loadQuickMessages(read)) {
       const row = document.createElement('button')
       row.setAttribute('type', 'button')
       row.setAttribute('data-chat-power-quick-row', '')
@@ -753,18 +813,16 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
       const label = document.createElement('span')
       label.setAttribute('data-chat-power-quick-text', '')
       label.textContent = message.text
-      // 点信息条：把这条文本发到当前会话，然后收起面板。
       row.addEventListener('click', event => {
         event.stopPropagation()
-        const session = panel.dataset['session'] ?? ''
-        if (session === '' || message.text.trim() === '') return
-        options.onSendQuick?.(session, message.text)
+        if (message.text.trim() === '' || sessionId === '') return
+        options.onSendQuick?.(sessionId, message.text)
         closeQuickPanel()
       })
       const edit = document.createElement('span')
       edit.setAttribute('data-chat-power-quick-edit-btn', '')
       edit.setAttribute('role', 'button')
-      edit.setAttribute('title', '编辑')
+      edit.title = t('turnFold.quickEdit')
       edit.insertAdjacentHTML('afterbegin', PENCIL_SVG)
       edit.addEventListener('click', event => {
         event.stopPropagation()
@@ -774,14 +832,13 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
       const remove = document.createElement('span')
       remove.setAttribute('data-chat-power-quick-remove-btn', '')
       remove.setAttribute('role', 'button')
-      remove.setAttribute('title', '删除')
+      remove.title = t('turnFold.quickRemove')
       remove.textContent = '×'
       remove.addEventListener('click', event => {
         event.stopPropagation()
-        const next = (quickStorageOf())
-        if (next !== undefined) {
-          const current = loadQuickMessages(next.getItem.bind(next))
-          saveQuickMessages(current.filter(item => item.id !== message.id), next.setItem.bind(next))
+        if (storage !== undefined) {
+          const current = loadQuickMessages(storage.getItem.bind(storage))
+          saveQuickMessages(current.filter(item => item.id !== message.id), storage.setItem.bind(storage))
         }
         renderQuickPanel()
       })
@@ -791,49 +848,12 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
       row.append(label, tools)
       panel.append(row)
     }
-    if (quickDraft !== undefined) {
-      const draft = quickDraft
-      const editor = document.createElement('textarea')
-      editor.setAttribute('data-chat-power-quick-edit', '')
-      editor.setAttribute('data-chat-power-quick-draft', '')
-      editor.value = quickDraft.text
-      const actions = document.createElement('div')
-      actions.setAttribute('data-chat-power-quick-actions', '')
-      const save = document.createElement('button')
-      save.setAttribute('type', 'button')
-      save.textContent = '保存'
-      save.addEventListener('click', event => {
-        event.stopPropagation()
-        const text = editor.value.trim()
-        if (text !== '') {
-          const next = quickStorageOf()
-          if (next !== undefined) {
-            const current = loadQuickMessages(next.getItem.bind(next))
-            saveQuickMessages([...current, { id: draft.id, text }], next.setItem.bind(next))
-          }
-        }
-        quickDraft = undefined
-        renderQuickPanel()
-      })
-      const cancel = document.createElement('button')
-      cancel.setAttribute('type', 'button')
-      cancel.textContent = '取消'
-      cancel.addEventListener('click', event => {
-        event.stopPropagation()
-        quickDraft = undefined
-        renderQuickPanel()
-      })
-      actions.append(save, cancel)
-      panel.append(editor, actions)
-      editor.focus()
-    }
     const add = document.createElement('button')
     add.setAttribute('type', 'button')
     add.setAttribute('data-chat-power-quick-add', '')
-    add.textContent = '+ 新增'
+    add.textContent = t('turnFold.quickAdd')
     add.addEventListener('click', event => {
       event.stopPropagation()
-      // 新增走内存草稿：保存时才入库（空文本直接存会被剔除），取消即丢弃。
       quickDraft = { id: `q-${Date.now()}`, text: '' }
       renderQuickPanel()
     })
@@ -841,7 +861,7 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     positionQuickPanel(panel, quickPanelAnchor ?? panel)
   }
 
-  /** 快捷信息按钮：点开面板；面板只在点击处展开，点面板外收起。 */
+  /** 快捷信息按钮：点开面板；面板挂在 body 下，点面板外收起。 */
   const buildQuickButton = (sessionId: string): HTMLElement => {
     const btn = document.createElement('button')
     btn.setAttribute('type', 'button')
@@ -858,8 +878,11 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
       const panel = document.createElement('div')
       panel.setAttribute(QUICK_PANEL_ATTR, '')
       panel.dataset['session'] = sessionId
+      // 面板内点击一律拦在面板容器上：不冒泡到宿主的监听（防止宿主重渲染冲掉面板）。
+      panel.addEventListener('click', event => { event.stopPropagation() })
+      if (typeof document === 'undefined') return
+      document.body.appendChild(panel)
       btn.setAttribute('data-open', '')
-      btn.append(panel)
       quickPanel = panel
       quickPanelAnchor = btn
       renderQuickPanel()
