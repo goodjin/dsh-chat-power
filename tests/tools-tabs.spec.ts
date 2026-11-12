@@ -213,6 +213,22 @@ const appShell = (...panels: FakeEl[]): FakeEl => {
 const snapshotOf = (tabs: ToolsRowSnapshot['tabs'], active?: string): ToolsRowSnapshot => ({ active, tabs })
 
 describe('syncSessionToolsRow（同步）', () => {
+  it('真实布局：header 与 content 是兄弟，工具并入 header 并移除兜底行', () => {
+    const shell = el('section')
+    const header = el('header')
+    const row = el('div', { 'data-conversation-tabs': '' })
+    const root = el('div', { 'data-conversation-content': '', 'data-conversation-session': 's1' })
+    const h = handlers(() => snapshotOf([]))
+    shell.append(header)
+    shell.append(root)
+    syncSessionToolsRow(root, fakeDoc(), h.value, {})
+    expect(root.querySelector(`[${ROW_ATTR}]`)).not.toBeNull()
+    header.append(row)
+    expect(syncSessionToolsRow(root, fakeDoc(), h.value, {})).toBe(row)
+    expect(root.querySelector(`[${ROW_ATTR}]`)).toBeNull()
+    expect(row.querySelectorAll(`[${TAB_KIND_ATTR}]`)).toHaveLength(3)
+  })
+
   it('宿主行在场：标签组补挂进宿主行，内容区里不留自建行', () => {
     const { content, hostRow } = session('s1')
     const h = handlers(() => snapshotOf([{ id: 't1', kind: 'local', title: 'a.md' }], 't1'))

@@ -108,14 +108,51 @@
   color: currentColor;
 }
 
-/* 宿主标签行是 flex 布局、标签间距较大（32px）：我们的组是其中一个子元素，
-   紧挨着宿主的标签会显得是同一组，负外边距把两者拉开一点。 */
-[data-conversation-tabs] [data-chat-tools-group] { margin-left: -16px; }
-
-[data-chat-tools-group] > [data-chat-tools-tab],
-[data-chat-tools-group] > [data-chat-tools-tab-wrap] {
-  flex: none;
+/* 与宿主文字标签使用同一套高度、点击区域和底部选中线。 */
+[data-conversation-tabs] [data-chat-tools-group] {
+  align-items: flex-start;
+  gap: 32px;
+  overflow: visible;
+  flex-wrap: wrap;
 }
+[data-conversation-tabs] [data-chat-tools-group] > [data-chat-tools-tab] {
+  --dsh-tab-hit-inline: 10px;
+  box-sizing: border-box;
+  flex: none;
+  min-height: 35px;
+  margin: -10px -10px 0;
+  padding: 10px 10px 9px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 16px;
+  position: relative;
+}
+[data-conversation-tabs] [data-chat-tools-group] > [data-chat-tools-tab]::after {
+  content: "";
+  position: absolute;
+  right: 10px;
+  bottom: -1px;
+  left: 10px;
+  height: 2px;
+  border-radius: 2px;
+}
+[data-conversation-tabs] [data-chat-tools-group] > [data-chat-tools-tab][aria-selected=true] {
+  color: var(--dsw-alias-state-business-primary);
+}
+[data-conversation-tabs] [data-chat-tools-group] > [data-chat-tools-tab][aria-selected=true]::after {
+  background: var(--dsw-alias-state-business-primary);
+}
+[data-conversation-tabs][data-chat-tools-live] > button[role=tab] {
+  opacity: 1;
+  color: var(--dsw-alias-label-tertiary);
+}
+[data-conversation-tabs][data-chat-tools-live] > button[role=tab]::after { background: transparent; }
+/* 工具入口已平铺，移除这一行末尾的插件扩展下拉入口。 */
+[data-conversation-tabs]:has([data-chat-tools-group]) + * { display: none; }
 
 /* 工具标签里的编辑卡：占满工具区可用高度（文本域随卡片拉伸）。
    之前卡片高度按内容自适应，编辑长文件时高度不够。 */
