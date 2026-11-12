@@ -14,7 +14,10 @@ function fakeSlots() {
   const registered: { name: string; options: Record<string, unknown> }[] = []
   const slots = {
     entries: (key: string) => key === 'conversation.chat.node'
-      ? [{ options: { key: 'assistant-step', priority: 0 }, component: () => null }]
+      ? [
+          { options: { key: 'assistant-step', priority: 0 }, component: () => null },
+          { options: { key: 'turn-error', priority: 0 }, component: () => null },
+        ]
       : [],
     subscribe: (_key: string, fn: () => void) => { fn(); return () => {} },
     inject: (key: string, callback: () => unknown) => { callback(); return () => {} },
@@ -51,7 +54,8 @@ describe('展开大编辑区座位注册', () => {
     expect(overlayEntries[0]?.options.id).toBe(EXPAND_EDITOR_ID)
     // 另一个表面的注册不受本座位影响。
     registerConversationSurfaces(makeCtx(slots) as Parameters<typeof registerConversationSurfaces>[0])
-    const wrap = registered.find(r => r.options.key === 'assistant-step')
-    expect(wrap, '答案卡片 wrap 必须安装').toBeDefined()
+        const frames = registered.filter(r => r.name === 'conversation.chat.node')
+    expect(frames.length, 'EXTRA_FRAMES 节点帧照常注册').toBeGreaterThan(0)
+    expect(frames.every(r => r.options.key !== 'assistant-step'), 'assistant-step 不接管').toBe(true)
   })
 })

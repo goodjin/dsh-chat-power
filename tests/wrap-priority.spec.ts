@@ -1,31 +1,20 @@
 /**
- * 两包同时装时，谁在外层。
+ * `assistant-step` 的两层 wrap（本包 -50 / acp-agent -40 兜底）已全部拆除：
+ * 原生 AssistantNodeView 声明了子座位，遮蔽 wrap 两条路都死
+ * （SlotOwnershipError / already declared，见 conversation-surfaces.tsx 的说明）。
  *
- * `conversation.chat.node` 是 keyed 插槽：同一个格子（key = `assistant-step`）里
- * 可以有多个 wrap，规则是**优先级最低的那条渲染**（`entriesOfSlot` 按升序取每个
- * 格子的第一条；DSH 自己的模型标签也是用 -10 盖住 0）。
- *
- * 两个包都包这个格子：
- * - `@goodjin2/dsh-chat-power`（本包）：答案卡片 + 把 ACP 段交给座位渲染；
- * - `@goodjin2/dsh-acp-agent`：只装它而没有本包时的兜底。
- *
- * 所以本包必须严格更外层（数值更小），否则 acp-agent 的兜底会盖住本包，答案卡片
- * 整块不出现——2026-11-03 就是这样（本包 -20、acp-agent -40），而且 acp-agent 的
- * 注释里还写着本包是 -30，两边从没对过数。
- *
- * 这里钉住：本包 < acp-agent 的字面量 -40。改优先级时两个包一起改。
+ * 这里钉住「谁都不许再注册 assistant-step wrap」——两包任一侧回归都会把会话流
+ * 打挂（2026-11-13 现场）。acp-agent 侧的同款约束在它自己仓库的
+ * tests/seat-contract.spec.ts。
  */
 
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { ACP_AGENT_FALLBACK_PRIORITY, ASSISTANT_STEP_WRAP_PRIORITY } from '../src/conversation-surfaces.tsx'
 
-describe('assistant-step 的两层 wrap', () => {
-  it('本包在外层（数值更小），acp-agent 的兜底层在内层', () => {
-    expect(ASSISTANT_STEP_WRAP_PRIORITY).toBeLessThan(ACP_AGENT_FALLBACK_PRIORITY)
-  })
-
-  it('acp-agent 的兜底优先级与它仓库里的常量一致（-40）', () => {
-    // 跨包不能共享常量，这一行是「对过数」的证据；改 acp-agent 时这里也要改。
-    expect(ACP_AGENT_FALLBACK_PRIORITY).toBe(-40)
+describe('assistant-step 不再有遮蔽 wrap', () => {
+  it('源码不再注册 assistant-step wrap（原生带子座位授权，无法合法遮蔽）', () => {
+    const source = readFileSync(new URL('../src/conversation-surfaces.tsx', import.meta.url), 'utf8')
+    expect(source).not.toContain("key: NODE_KEY")
+    expect(source).not.toContain("key: 'assistant-step'")
   })
 })

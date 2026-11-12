@@ -78,7 +78,7 @@ describe('思考块一律收起', () => {
   it('按宿主自己的组标记收起思考块，不改宿主状态', () => {
     const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
     expect(source).toContain('data-step-process')
-    expect(source).toContain('data-answer-body')
+    expect(source).toContain('isAnswerRow')
     expect(source).toContain('data-chat-power-group-hidden')
   })
   it('样式只隐藏思考行，组头保留（用户还能点开看）', () => {
@@ -142,34 +142,27 @@ describe('输出外框', () => {
     const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
     expect(source).toContain('data-chat-group-part')
     expect(source).toContain('tool-call')
-    expect(source).toContain('data-answer-body')
+    expect(source).toContain('data-chat-flow-kind="assistant-step"')
     expect(source).toContain('data-chat-power-frame-label')
   })
-  it('回答完成后才出现编辑/复制按钮（宿主给 running/settled）', () => {
-    const card = readFileSync(new URL('../src/answer-card.tsx', import.meta.url), 'utf8')
-    expect(card).toContain("status")
-    expect(card).toContain('running')
-    const wrapper = readFileSync(new URL('../src/conversation-surfaces.tsx', import.meta.url), 'utf8')
-    expect(wrapper).toContain('status')
+  it('框状态标记仍在（markFrameState 按宿主 running/settled 打徽标）', () => {
+    const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
+    expect(source).toContain('markFrameState')
+    expect(source).toContain('turnFold.frameRunning')
   })
 })
 
 describe('输出框的固定顶栏与底部间距', () => {
-  it('顶栏固定：框上的文案与答案卡头都吸顶', () => {
+  it('顶栏固定：轮次框标题行吸顶', () => {
     const css = readFileSync(new URL('../src/turn-fold.module.css', import.meta.url), 'utf8')
-    const cardCss = readFileSync(new URL('../src/answer-card.module.css', import.meta.url), 'utf8')
-    expect(css).toMatch(/position:\s*sticky/)
-    expect(cardCss).toMatch(/position:\s*sticky/)
+    expect(css).toMatch(/\[data-chat-power-turn-header\][^{]*\{[^}]*position:\s*sticky/)
   })
   it('流式输出时裁切、回答完成后框内可滚动（出滚动条）', () => {
     const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
     const css = readFileSync(new URL('../src/turn-fold.module.css', import.meta.url), 'utf8')
     expect(source).toContain('data-chat-power-scroll')
-    expect(source).toContain('data-answer-status')
+    expect(source).toContain('data-chat-running')
     expect(css).toContain("data-chat-power-scroll='auto'")
-    // 答案卡把宿主给的状态透出来，DOM 层据此判断是否还在流式输出
-    const card = readFileSync(new URL('../src/answer-card.tsx', import.meta.url), 'utf8')
-    expect(card).toContain('data-answer-status')
   })
   it('框底与输入框之间留出间距', () => {
     const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
@@ -199,9 +192,9 @@ describe('框顶栏只在本轮', () => {
     expect(css).toContain('data-chat-power-frame')
     expect(css).toContain('data-answer-title')
   })
-  it('答案卡标题带标记，便于按框的状态显隐', () => {
-    const source = readFileSync(new URL('../src/answer-card.tsx', import.meta.url), 'utf8')
-    expect(source).toContain('data-answer-title')
+  it('框标题带标记，便于按框的状态显隐', () => {
+    const css = readFileSync(new URL('../src/turn-fold.module.css', import.meta.url), 'utf8')
+    expect(css).toContain('data-answer-title')
   })
   it('DOM 层标出哪个框是当前轮', () => {
     const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
@@ -213,9 +206,7 @@ describe('回答框只有一层', () => {
   it('答案卡就是框本体（只一层框）', () => {
     const css = readFileSync(new URL('../src/turn-fold.module.css', import.meta.url), 'utf8')
     expect(css).toContain('[data-chat-power-frame-box]')
-    const card = readFileSync(new URL('../src/answer-card.tsx', import.meta.url), 'utf8')
-    expect(card).toContain('data-answer-card')
-    expect(card).toContain('data-chat-power-frame-box')
+    expect(css).toContain('[data-chat-power-turn-frame]')
   })
   it('「用时」进框标题行（turnTitleWithDuration），不再写进答案卡', () => {
     const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
@@ -245,7 +236,7 @@ describe('框选哪一行', () => {
   it('有答案卡时以答案那行为框（否则思考行更高会让框套错地方）', () => {
     const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
     const body = source.slice(source.indexOf('const applyCaps'), source.indexOf('const applyCaps') + 2000)
-    expect(body).toContain('data-answer-body')
+    expect(body).toContain('isAnswerRow')
   })
   it('框底与输入框的间距按要求加大 10px', () => {
     const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
@@ -255,10 +246,11 @@ describe('框选哪一行', () => {
 })
 
 describe('思考逐行展开', () => {
-  it('流式中的思考由我们的帧展开成全文（宿主默认只给一行摘要）', () => {
-    const frame = readFileSync(new URL('../src/think-frame.tsx', import.meta.url), 'utf8')
-    expect(frame).toContain('MarkdownText')
-    expect(frame).toContain('streaming={props.running}')
+  // 思考帧已随 assistant-step wrap 拆除（2026-11-13）：流式思考由原生
+  // ReasoningRow 渲染（一行摘要 + 可展开），不再由插件展开全文。
+  it('思考分部不再有插件帧（留给原生 ReasoningRow）', () => {
+    const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
+    expect(source).toContain('[data-chat-group-part="reasoning"]')
   })
   it('「思考」+ 图标用官方那行（组头让位给思考行的头）', () => {
     const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')

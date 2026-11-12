@@ -53,12 +53,6 @@ describe('链接清单的 DOM 值', () => {
 })
 
 describe('接线约束', () => {
-  it('回答卡从正文算链接清单并写进 data 标记', () => {
-    const card = source('../src/answer-card.tsx')
-    expect(card).toContain('linkedFilePathsFromText')
-    expect(card).toContain('ANSWER_FILE_LINKS_ATTR')
-  })
-
   it('拦截层按「按钮 title 命中清单」认领回答块文件链接', () => {
     const tools = source('../src/conversation-tools.tsx')
     expect(tools).toContain('answerFileLinkPathAt')

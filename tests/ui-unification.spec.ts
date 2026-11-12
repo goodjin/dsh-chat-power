@@ -115,15 +115,10 @@ describe('统一编辑卡外壳 ComposeCard', () => {
 })
 
 describe('统一编辑链路', () => {
-  /** 四处编辑器：答案副本、本机文件、选区编辑、工作区文件（tab 复用本机文件组件）。 */
-  const EDITORS = ['../src/answer-card.tsx', '../src/local-file.tsx', '../src/selection-edit-card.tsx']
+  /** 编辑器：本机文件、选区编辑、工作区文件（tab 复用本机文件组件）。
+   * 答案副本编辑随 assistant-step wrap 拆除（2026-11-13，原生带子座位）。 */
+  const EDITORS = ['../src/local-file.tsx', '../src/selection-edit-card.tsx']
   const read = (relative: string): string => readFileSync(new URL(relative, import.meta.url), 'utf8')
-
-  it('答案编辑不再经全局 DOM 查询读值（多卡同开不串值）', () => {
-    const source = read('../src/answer-card.tsx')
-    expect(source).not.toContain("document.querySelector('[data-answer-edit-input]')")
-    expect(source).toContain('useRef')
-  })
 
   it('编辑入口共用宿主输入框，不再创建独立 textarea', () => {
     for (const file of EDITORS) {

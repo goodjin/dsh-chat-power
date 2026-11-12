@@ -44,7 +44,7 @@ function buildConversation(): Built {
   const scroller = document.createElement('div')
   scroller.setAttribute('data-conversation-scroll', '')
   const flow = document.createElement('div')
-  flow.append(chatRow(3, 'tool-call'), chatRow(3, 'assistant', true))
+  flow.append(chatRow(3, 'tool-call'), chatRow(3, 'assistant-step'))
   // composer：座位 → 卡 → 滚动文本区（overflow-y auto）→ 编辑器。
   const seat = document.createElement('div')
   seat.setAttribute('data-composer-seat', '')

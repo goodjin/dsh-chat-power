@@ -5,31 +5,20 @@
  *
  * - **会话尾部文件卡片**：挂进通用座位 `conversation.chat.turnTail`，排在官方
  *   改动卡片之后。readers 走会话的 workspaceFiles / session 口子。
- * - **答案卡片**：包住 `assistant-step` 渲染位——turn-process 标记的最终答案步
- *   套一张卡（标题图标 + 编辑/复制），思考（reasoning）留在卡内、保留原生折叠。
- *   编辑/复制复用文件阅读区那套 readers（发到当前会话 / 新建会话）。
- *
- * ## 与 ACP 的分工（一个跨插件挂钩）
- *
- * `assistant-step` 这个「包住原生渲染器」的挂载点同时被两种节点用：
- * - 带 `acpProcessSegment` 的节点是 ACP 进程段，由 **acp-agent** 渲染；
- * - 最终答案步是通用的，由本包的答案卡片渲染。
- *
- * 两者不能各自再挂一个 wrap（同一挂载点多 wrap 叠加行为不可控，会互相覆盖），
- * 所以由本包独占这个 wrap，再开一个**座位挂钩** `SEGMENT_RENDERER_SLOT`：
- * acp-agent 把它的 `AcpProcessComponent` 注册进这个座位，本包在 wrap 里遇到
- * ACP 进程段时取来渲染。缺席时退回原生渲染（不炸）。这样通用件归 chat-power，
- * ACP 专属渲染仍留在 acp-agent，两边只通过一个座位名耦合。
- *
- * `acpProcessSegment` 数据本身仍由 acp-agent 的 `wrapChatView` 注入节点；本包
- * 只读不写。
+ * - **答案卡片 / 思考帧（已拆除，2026-11-13）**：曾经包住 `assistant-step`
+ *   渲染位（答案卡 + 思考帧 + ACP 段分派共用一个 wrap）。原生 AssistantNodeView
+ *   声明了子座位 `conversation.chat.reasoning.body` 与
+ *   `conversation.chat.message.images`（展开思考、答案图片都要走 renderSlot），
+ *   而宿主对 renderSlot 逐 key 校验「本条目 children 表」：遮蔽 wrap 没声明的
+ *   座位，原生一调用就抛 SlotOwnershipError，错误边界把整棵会话流卸掉；转发
+ *   原生 children 又在 register 时抛 "already declared"（子座位单一存活 owner）。
+ *   两条路都死，只能留给原生渲染。答案区的框与标题改由 turn-fold 的 DOM 路线
+ *   （每轮一框）承担；ACP 段退回原生渲染。
  */
 
 import { createElement } from 'react'
 import type { ReactNode } from 'react'
 import type { ComponentType } from 'react'
-import { AnswerCard } from './answer-card.tsx'
-import { ThinkFrame } from './think-frame.tsx'
 import { ToolsFrame } from './tools-frame.tsx'
 import { createMarkdownTurnReaders } from './markdown-turn-sources.ts'
 import type { MarkdownTurnReaders } from './markdown-turn-sources.ts'
@@ -41,36 +30,9 @@ import { sessionKeyAccessorsOf } from './selection-actions.ts'
 import { en, fallbackT, NAMESPACE, zh } from './locales.ts'
 import type { RuntimeT } from './locales.ts'
 
-/**
- * ACP 进程段渲染器的座位名。acp-agent 把 `AcpProcessComponent` 注册进这里；
- * 本包在 `assistant-step` wrap 里遇到带 `acpProcessSegment` 的节点时取来渲染。
- * 两边必须字面一致（跨包不能共享常量）。
- */
-export const SEGMENT_RENDERER_SLOT = 'conversation.chat.node.acp-segment-renderer'
-
-/** 目标渲染位与 wrap 优先级。 */
+/** 目标渲染位与帧 wrap 优先级（EXTRA_FRAMES 用；assistant-step 已不接管）。 */
 const NODE_SLOT = 'conversation.chat.node'
-const NODE_KEY = 'assistant-step'
-/**
- * 本包必须在外层：数值要**小于** acp-agent 的兜底层（那里固定 -40）。
- *
- * 这个插槽的规则是「同一格子里优先级最低的那条渲染」（`entriesOfSlot` 按升序
- * 取第一个；DSH 自己的模型标签也是用 -10 去盖住 0）。所以 -50 先于 -40 渲染：
- * 本包先分派——ACP 段交给座位 {@link SEGMENT_RENDERER_SLOT}（acp-agent 注册进来
- * 的渲染器），其余步骤走答案卡片。acp-agent 的 -40 只在**没装本包**时生效，
- * 那时座位没人声明，它自己渲染 ACP 段。
- *
- * 2026-11-03 现场：这里曾是 -20，而 acp-agent 是 -40，于是 acp-agent 盖住了
- * 本包，答案卡片整块不出现；acp-agent 注释里写的「chat-power 是 -30」也与实际
- * 不符。改优先级时两边一起改，本文件底部的测试钉住了这个不变量。
- */
 const WRAP_PRIORITY = -50
-
-/** 供测试钉住与 acp-agent 兜底层的先后关系（见 {@link WRAP_PRIORITY}）。 */
-export const ASSISTANT_STEP_WRAP_PRIORITY = WRAP_PRIORITY
-
-/** acp-agent 自己的兜底 wrap 优先级；本包必须严格更小（更低=更外层）。 */
-export const ACP_AGENT_FALLBACK_PRIORITY = -40
 
 type Surface = {
   readonly slots: unknown
@@ -116,74 +78,6 @@ function currentSessionIdFromDom(): string | undefined {
   return value === null || value === '' ? undefined : value
 }
 
-/** 取当前注册的 ACP 进程段渲染器；没注册返回 undefined（wrap 退回原生）。 */
-function segmentRendererOf(slots: NodeSlots): SegmentRenderer | undefined {
-  const entry = slots.entries(SEGMENT_RENDERER_SLOT)[0]
-  const component = entry?.component
-  return typeof component === 'function' ? (component as SegmentRenderer) : undefined
-}
-
-/**
- * 构造 `assistant-step` 的包装组件。
- *
- * 抓住原生渲染器（`Native`）后降优先级重注册；渲染时按节点分派：
- * - ACP 进程段 → 挂钩渲染器（缺席退回原生）；
- * - 最终答案步 → 答案卡片；其余 → 原生。
- */
-/** 把节点里的 reasoning 块拼成一段正文（思考帧自己渲染用）。 */
-function reasoningTextOf(blocks: readonly { kind: string; text?: string }[] | undefined): string {
-  if (blocks === undefined) return ''
-  return blocks
-    .filter(block => block.kind === 'reasoning')
-    .map(block => block.text ?? '')
-    .filter(text => text.trim() !== '')
-    .join('\n\n')
-}
-
-function makeAssistantStepWrapper(
-  Native: ComponentType<AssistantStepProps>,
-  host: { readonly slots: NodeSlots; readonly dshT: RuntimeT; readonly readers: MarkdownTurnReaders },
-): ComponentType<AssistantStepProps> {
-  return (props) => {
-    const segment = props.node?.data?.acpProcessSegment
-    if (segment !== undefined) {
-      const renderer = segmentRendererOf(host.slots)
-      if (renderer !== undefined) return createElement(renderer, { segment, t: props.t })
-      // 挂钩缺席（acp-agent 没装）：退回原生，别让 ACP 段渲染成空白。
-      return createElement(Native, props)
-    }
-    // 思考节点：由我们的思考帧接管（官方标题行 + 官方 Markdown 正文），
-    // 宿主「流式只给一行摘要」的预览规则就管不到我们。
-    if (props.groupPart === 'reasoning') {
-      const text = reasoningTextOf(props.node?.data?.blocks)
-      if (text !== '') {
-        return createElement(ThinkFrame, {
-          t: host.dshT,
-          text,
-          running: props.node?.data?.status === 'running',
-        })
-      }
-    }
-    const answerStep = props.turnProcess?.spec?.answerStep
-    const isAnswer = answerStep != null && answerStep === props.node?.data?.step
-    const native = createElement(Native, props)
-    if (!isAnswer) return native
-    const blocks = props.node?.data?.blocks as readonly { kind: string; text?: string }[] | undefined
-    const hasProse = blocks?.some(block =>
-      (block.kind === 'text' || block.kind === 'reasoning') &&
-      (block.text?.trim() ?? '') !== '') ?? false
-    if (!hasProse) return native
-    return createElement(AnswerCard, {
-      blocks: props.node.data.blocks,
-      sessionId: currentSessionIdFromDom(),
-      readers: host.readers,
-      t: host.dshT,
-      status: props.node?.data?.status as string | undefined,
-      children: native,
-    })
-  }
-}
-
 /** 把本包词典装进 host locale 注册中心；拿不到就安静退回。 */
 function registerLocales(ctx: Surface): void {
   try {
@@ -221,40 +115,13 @@ export function registerConversationSurfaces(ctx: Surface): void {
 
   registerLocales(ctx)
 
-  // 答案卡片 wrap：包住 assistant-step，与 acp-agent 的进程段渲染共用一个挂载点。
-  // 它最要紧，所以**第一个**注册；后面的表面各自隔离，谁失败都不拖垮它。
-  let removeRenderer: (() => void) | undefined
-  let originalComponent: unknown
-  let installing = false
-  let seatDeclared = false
-  const attachRenderer = (): void => {
-    if (installing) return
-    const entry = slots.entries(NODE_SLOT).find(
-      candidate => candidate.options.key === NODE_KEY && (candidate.options.priority as number | undefined ?? 0) >= 0,
-    )
-    if (entry === undefined || entry.component === originalComponent) return
-    installing = true
-    try {
-      removeRenderer?.()
-      originalComponent = entry.component
-      const Native = entry.component as ComponentType<AssistantStepProps>
-      const Renderer = makeAssistantStepWrapper(Native, { slots, dshT, readers })
-      // 声明 ACP 段渲染器座位：acp-agent 把 AcpProcessBlock 注册进这里，wrap 渲染时按座位名
-      // 取来用。座位**必须先声明**——register 契约里未声明的座位 register 会抛、specDynamic
-      // 返回 undefined，acp-agent 的 inject 回调在声明前永不触发（静默不渲染，ACP 段退回原生）。
-      // 只在首次声明一次：原生渲染器变化时本 wrap 会重注册，而重复声明同一座位 register 会抛
-      // 「already declared」。座位声明不随 entry dispose 撤销，故声明一次即长期有效。
-      removeRenderer = slots.register({
-        name: NODE_SLOT, key: NODE_KEY, priority: WRAP_PRIORITY,
-        ...(seatDeclared ? {} : { children: { [SEGMENT_RENDERER_SLOT]: { kind: 'list', scope: 'session' } } }),
-        ...(entry.locale === undefined ? {} : { locale: entry.locale }),
-        ...(entry.inject === undefined ? {} : { inject: entry.inject }),
-      }, Renderer)
-      seatDeclared = true
-    } finally { installing = false }
-  }
-  const unsubscribeRenderer = slots.subscribe(NODE_SLOT, attachRenderer)
-  attachRenderer()
+  // assistant-step 不接管：原生 AssistantNodeView 声明了子座位
+  // conversation.chat.reasoning.body 与 conversation.chat.message.images（展开思考、
+  // 答案图片都要走 renderSlot）。宿主对 renderSlot 逐 key 校验「本条目 children 表」，
+  // 遮蔽 wrap 没声明的座位，原生一调用就抛 SlotOwnershipError、错误边界卸掉整棵会话流；
+  // 转发原生 children 又在 register 时抛 "already declared"（子座位单一存活 owner）。
+  // 两条路都死，留给原生渲染（2026-11-13 与 tool-call 同批确认）。答案区的框与标题
+  // 由 turn-fold 的 DOM 路线承担。
 
   // 工具调用节点（tool-call）不接管：原生 ToolCallTree 声明了子座位
   // tool.call.toolview，宿主的「子座位单一所有者」契约不允许遮蔽 wrap 再声明它

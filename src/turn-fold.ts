@@ -131,6 +131,16 @@ export const REQUEST_HIDDEN_ATTR = 'data-chat-power-request-collapsed'
 export const USER_ROW_SELECTOR =
   '[data-chat-flow-kind="user"],[data-chat-flow-kind="steering"],[data-chat-flow-kind="question-reply"]'
 
+/**
+ * 答案行判定：答案卡 wrap 拆除后（2026-11-13，原生带子座位无法合法遮蔽），
+ * 改读宿主自己的行标记——`data-chat-flow-kind="assistant-step"` 且不是思考分部
+ * （reasoning 分部行带 `data-chat-group-part="reasoning"`，归过程页签）。
+ */
+const ANSWER_ROW_SELECTOR = '[data-chat-flow-kind="assistant-step"]:not([data-chat-group-part="reasoning"])'
+
+/** 这一行是不是最终答案步（宿主标记判定，见 {@link ANSWER_ROW_SELECTOR}）。 */
+const isAnswerRow = (row: Element): boolean => row.matches(ANSWER_ROW_SELECTOR)
+
 /** 输出框里当前展示的内容类型（框左上角的文案）。 */
 export type FrameKind = 'thinking' | 'tools' | 'answer'
 
@@ -788,7 +798,7 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
    * 工具调用行的 flow kind 是 `tool-call`，回答行里有我们自己的答案卡。
    */
   const frameLabelOf = (row: HTMLElement): FrameKind => frameKindOf({
-    hasAnswer: row.querySelector('[data-answer-body]') !== null,
+    hasAnswer: isAnswerRow(row),
     hasToolCalls: row.querySelector('[data-chat-flow-kind="tool-call"]') !== null
       || row.querySelector('[data-chat-flow-kind="tool-calls"]') !== null,
     hasReasoning: row.querySelector('[data-chat-group-part="reasoning"]') !== null,
@@ -961,7 +971,7 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     const processRows: HTMLElement[] = []
     for (const row of record.rows) {
       if (row.matches(USER_ROW_SELECTOR)) requestRows.push(row)
-      else if (row.querySelector('[data-answer-body]') !== null) answerRows.push(row)
+      else if (isAnswerRow(row)) answerRows.push(row)
       else processRows.push(row)
     }
     const hiddenAttr = TAB_HIDDEN_ATTR
@@ -1020,7 +1030,7 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     const frame = record.frame
     if (frame === undefined) return
     if (record.tab !== 'process') return
-    const processRows = record.rows.filter(row => !row.matches(USER_ROW_SELECTOR) && row.querySelector('[data-answer-body]') === null)
+    const processRows = record.rows.filter(row => !row.matches(USER_ROW_SELECTOR) && !isAnswerRow(row))
     if (processRows.length <= record.processShown) return
     let bar = frame.querySelector(`[${SHOW_MORE_ATTR}]`)
     if (bar === null) {
@@ -1060,23 +1070,24 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
    */
   const collapseThinking = (record: TurnRecord): void => {
     // 结果块可能在组外（单独一行），也可能在组内（宿主把结果步并进过程组）。
-    const turnHasAnswer = record.rows.some(row => row.querySelector('[data-answer-body]') !== null)
+    const turnHasAnswer = record.rows.some(row => isAnswerRow(row))
     // 思考块有时是独立的一行（不在过程组里）：结果出来后它也得收起，
     // 否则它会跑到框下面去——框里只留结果块。
     if (turnHasAnswer) {
       for (const row of record.rows) {
-        const isThinking = row.querySelector('[data-variant="think"]') !== null
-          || row.querySelector('[data-chat-power-think-frame]') !== null
+        // 独立思考行：reasoning 分部（宿主标记）或过程组内的思考变体。
+        const isThinking = row.matches('[data-chat-group-part="reasoning"]')
+          || row.querySelector('[data-variant="think"]') !== null
         if (!isThinking) continue
         // 行里同时有答案卡时不能整行藏掉（那是结果块本身）。
-        if (row.querySelector('[data-answer-body]') !== null) continue
+        if (isAnswerRow(row)) continue
         row.setAttribute(GROUP_HIDDEN_ATTR, '')
       }
     }
     for (const row of record.rows) {
       if (!row.matches('[data-step-process]')) continue
       const members = Array.from(row.querySelectorAll<HTMLElement>(`[${TURN_ATTR}]`)).filter(el => el !== row)
-      const insideAnswer = members.some(member => member.querySelector('[data-answer-body]') !== null)
+      const insideAnswer = members.some(member => isAnswerRow(member))
       // 还没出结果：思考照常展示，不动它。
       if (!turnHasAnswer && !insideAnswer) continue
       const state = managedGroups.get(row)
@@ -1085,7 +1096,7 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
       ensureGroupToggle(row)
       const hidden: HTMLElement[] = []
       for (const member of members) {
-        if (member.querySelector('[data-answer-body]') !== null) continue
+        if (isAnswerRow(member)) continue
         member.setAttribute(GROUP_HIDDEN_ATTR, '')
         hidden.push(member)
       }

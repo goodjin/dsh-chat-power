@@ -27,6 +27,7 @@ function buildConversation(sessionId = 's-q', onSendQuick?: (text: string) => vo
   row.setAttribute('data-chat-turn', '1')
   const answerRow = document.createElement('div')
   answerRow.setAttribute('data-chat-turn', '1')
+  answerRow.setAttribute('data-chat-flow-kind', 'assistant-step')
   const box = document.createElement('div')
   box.setAttribute('data-chat-power-frame-box', '')
   const body = document.createElement('div')

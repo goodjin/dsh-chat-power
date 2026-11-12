@@ -26,7 +26,10 @@ function fakeSlots() {
   const singleOccupied = new Set<string>(['conversation.input.attachments@0'])
   const slots = {
     entries: (key: string) => key === 'conversation.chat.node'
-      ? [{ options: { key: 'assistant-step', priority: 0 }, component: () => null }]
+      ? [
+          { options: { key: 'assistant-step', priority: 0 }, component: () => null },
+          { options: { key: 'turn-error', priority: 0 }, component: () => null },
+        ]
       : [],
     subscribe: (_key: string, fn: () => void) => { fn(); return () => {} },
     inject: (key: string, callback: () => unknown) => { callback(); return () => {} },
@@ -65,7 +68,7 @@ describe('本机文件卡座位与答案卡片共存', () => {
     expect(overlayEntry?.options.id).toBe(LOCAL_FILE_ID)
   })
 
-  it('本机文件卡注册路径失败时，答案卡片 wrap 照常安装', () => {
+  it('本机文件卡注册路径失败时，其余表面照常安装（assistant-step 已不接管）', () => {
     const { slots, registered } = fakeSlots()
     const ctx = makeCtx(slots) as Parameters<typeof registerConversationSurfaces>[0]
     ;(slots as { inject: (key: string, cb: () => unknown) => unknown }).inject = (key: string, cb: () => unknown) => {
@@ -73,7 +76,9 @@ describe('本机文件卡座位与答案卡片共存', () => {
       cb(); return () => {}
     }
     expect(() => registerConversationSurfaces(ctx)).not.toThrow()
-    const wrap = registered.find(r => r.options.key === 'assistant-step')
-    expect(wrap, '答案卡片 wrap 必须安装').toBeDefined()
+    // assistant-step 原生带子座位，遮蔽 wrap 无法合法渲染——不允许出现它的 wrap。
+    expect(registered.find(r => r.options.key === 'assistant-step')).toBeUndefined()
+    // 其余节点帧（EXTRA_FRAMES）不受本座位失败影响。
+    expect(registered.find(r => r.options.key === 'turn-error')).toBeDefined()
   })
 })

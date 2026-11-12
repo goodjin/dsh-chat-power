@@ -25,13 +25,9 @@ function chatRow(turn: number, kind: string, text = ''): HTMLElement {
   return row
 }
 
-/** 一条带答案正文的行。 */
+/** 一条最终答案步行（宿主标记：kind=assistant-step，不带 reasoning 分部标记）。 */
 function answerRow(turn: number): HTMLElement {
-  const row = chatRow(turn, 'assistant')
-  const box = document.createElement('div')
-  box.setAttribute('data-answer-body', '')
-  row.appendChild(box)
-  return row
+  return chatRow(turn, 'assistant-step')
 }
 
 /** 搭一棵单轮会话：用户请求 → 用户回答（question-reply）→ 回答 → composer。 */

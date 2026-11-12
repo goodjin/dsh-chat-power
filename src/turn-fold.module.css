@@ -472,14 +472,6 @@ body[data-chat-power-resizing] * {
 }
 
 /* 框内嵌套的答案卡框不再是独立视觉单元：去边框去间距（轮次框负责外观）。 */
-[data-chat-power-turn-frame] [data-chat-power-frame-box][data-answer-card],
-[data-chat-power-turn-frame] [data-answer-card][data-chat-power-frame-box] {
-  border: none;
-  margin-block: 0;
-  background: transparent;
-  max-height: none;
-  min-height: 0;
-}
 
 /* 框内文件尾行：去宿主的横向留白（框统一给内边距）。 */
 [data-chat-power-turn-frame] [data-turn-tail] {
