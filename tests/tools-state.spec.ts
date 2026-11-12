@@ -1,13 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { CHAT_TAB_ID, ToolsState } from '../src/tools-state.ts'
 describe('conversation tabs workspace', () => {
-  it('seeds a brand-new session with the workspace files tab active and no chat tab', () => {
+  it('seeds a brand-new session with the conversation tab active', () => {
     const state = new ToolsState()
     state.seed('one', false)
     const s = state.get('one')
-    expect(s.tabs.map(t => t.kind)).toEqual(['files'])
+    expect(s.tabs.map(t => t.kind)).toEqual(['chat'])
     expect(s.active).toBe(s.tabs[0]!.id)
-    expect(s.tabs.find(t => t.kind === 'chat')).toBeUndefined()
   })
   it('seeds an existing session with the conversation tab active', () => {
     const state = new ToolsState()
@@ -20,20 +19,20 @@ describe('conversation tabs workspace', () => {
     const state = new ToolsState()
     state.seed('one', false)
     state.seed('one', true)
-    expect(state.get('one').tabs.map(t => t.kind)).toEqual(['files'])
+    expect(state.get('one').tabs.map(t => t.kind)).toEqual(['chat'])
   })
   it('first send adds one conversation tab and switches to it, keeping tool tabs', () => {
     const state = new ToolsState()
     state.seed('one', false)
-    const files = state.get('one').tabs[0]!
+    state.open('one', 'files', 'Files', 'sidebar://files', undefined, true)
     state.activateChat('one')
     const s = state.get('one')
-    expect(s.tabs.map(t => t.kind)).toEqual(['files', 'chat'])
+    expect(s.tabs.map(t => t.kind)).toEqual(['chat', 'files'])
     expect(s.active).toBe(CHAT_TAB_ID)
     state.activateChat('one')
     expect(state.get('one').tabs).toHaveLength(2)
-    state.select('one', files.id)
-    expect(state.get('one').active).toBe(files.id)
+    state.select('one', state.get('one').tabs.find(t => t.kind === 'files')!.id)
+    expect(state.get('one').active).not.toBe(CHAT_TAB_ID)
   })
   it('an old session keeps a single conversation tab across sends', () => {
     const state = new ToolsState()
@@ -64,8 +63,8 @@ describe('conversation tabs workspace', () => {
     expect(tab.controller.signal.aborted).toBe(false)
     expect(state.get('two').tabs).toEqual([])
     state.activateChat('one')
-    expect(state.get('one').tabs.at(-1)?.kind).toBe('chat')
-    expect(state.get('one').tabs[1]).toBe(tab)
+    expect(state.get('one').tabs.at(-1)?.kind).toBe('browser')
+    expect(state.get('one').tabs.at(-1)).toBe(tab)
     expect(state.get('one').active).toBe(CHAT_TAB_ID)
   })
   it('closing a tool tab aborts its resources and selects the remaining tab', () => {

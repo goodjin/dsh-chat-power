@@ -49,13 +49,16 @@ export class ToolsState {
     if (!s.tabs.some(t => t.id === tabId)) return
     this.put(id, { ...s, tabs: s.tabs.map(t => t.id === tabId ? { ...t, draft } : t) })
   }
-  /** First-time shape of a session: history shows the chat, a blank one shows files. No-op once seeded. */
+  /**
+   * 会话第一次成形时的标签：一律从「对话」开始 ✓。
+   *
+   * 工具标签（工作区文件 / 浏览器 / 终端）只在**该会话自己**被点开时才出现 ✓——
+   * 每个会话记住各自打开的标签 ✓，互不影响；否则会出现「在 A 打开工作区文件、
+   * 切到 B 也显示」的串扰观感。
+   */
   seed(id: string, hasHistory: boolean) {
     if (this.sessions.has(id)) return
-    if (hasHistory) { this.markOpened(id, CHAT_TAB_ID); this.put(id, { active: CHAT_TAB_ID, tabs: [chatTab()] }); return }
-    const files: ToolTab = { id: `chat-tools-${crypto.randomUUID()}`, kind: 'files', title: '工作区文件', contentId: 'sidebar://files', controller: new AbortController(), commands: {} }
-    this.markOpened(id, files.id)
-    this.put(id, { active: files.id, tabs: [files] })
+    this.put(id, { active: CHAT_TAB_ID, tabs: [chatTab()] })
   }
   /** 记一次「打开」：已在表里的移到最新（去重），不在的追加到末尾。 */
   private markOpened(id: string, tabId: string) {
