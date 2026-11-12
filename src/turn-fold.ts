@@ -319,6 +319,46 @@ function quickStorageOf(): QuickStorage | undefined {
   }
 }
 
+/** 面板与按钮之间的间距（px）。 */
+const PANEL_GAP = 6
+/** 面板距视口边缘的最小间距（px）。 */
+const VIEWPORT_MARGIN = 8
+
+/**
+ * 面板摆放位置（纯逻辑，便于测试）：**优先上方**——列表和编辑框都出现在按钮
+ * 上方才顺（按钮本来就在屏幕下部，先判「下方放不放得下」会让面板几乎总是
+ * 掉到下方）。上方余量不够时才退到下方；两种摆法都把面板钳在视口内。
+ * 水平方向左对齐按钮（左缘内收 8px），超出右缘时右对齐到视口右缘内 8px。
+ *
+ * @param anchorRect - 按钮的视口坐标（top/bottom/left/width）。
+ * @param panelHeight - 面板实测高度。
+ * @param panelWidth - 面板实测宽度。
+ * @param viewport - 视口尺寸。
+ * @returns below（是否放下方）、top、left（面板应摆的视口坐标）。
+ */
+export function panelPlacement(
+  anchorRect: { top: number, bottom: number, left: number, width: number },
+  panelHeight: number,
+  panelWidth: number,
+  viewport: { width: number, height: number },
+): { below: boolean, top: number, left: number } {
+  // 上方余量：按钮顶到视口顶的距离（再扣面板与按钮的间距）。
+  const aboveFits = anchorRect.top - PANEL_GAP >= panelHeight
+  // 下方余量：按钮底到视口底的距离。
+  const belowFits = viewport.height - anchorRect.bottom - PANEL_GAP >= panelHeight
+  // 上方优先：上方放得下（或上下都放不下、上方余量更大）就摆上方。
+  const below = !aboveFits && belowFits
+  const top = below
+    ? Math.min(anchorRect.bottom + PANEL_GAP, viewport.height - panelHeight - VIEWPORT_MARGIN)
+    : Math.max(VIEWPORT_MARGIN, anchorRect.top - panelHeight - PANEL_GAP)
+  let left = anchorRect.left - VIEWPORT_MARGIN
+  if (left + panelWidth > viewport.width - VIEWPORT_MARGIN) {
+    left = viewport.width - panelWidth - VIEWPORT_MARGIN
+  }
+  left = Math.max(VIEWPORT_MARGIN, left)
+  return { below, top, left }
+}
+
 /** 编辑浮层的铅笔图标。 */
 const PENCIL_SVG = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M11.2 2.2a1.6 1.6 0 0 1 2.6 2.6L6 12.5l-3.5.9.9-3.5 7.8-7.7Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>'
 
@@ -751,13 +791,14 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     const rect = anchor.getBoundingClientRect()
     panel.style.visibility = 'hidden'
     panel.style.display = 'flex'
-    const height = panel.offsetHeight
-    const width = panel.offsetWidth
-    const below = rect.bottom + 6 + height > window.innerHeight
-    panel.style.top = below ? `${rect.bottom + 6}px` : `${Math.max(0, rect.top - height - 6)}px`
-    let left = rect.left - 8
-    if (left + width > window.innerWidth - 8) left = window.innerWidth - width - 8
-    panel.style.left = `${Math.max(8, left)}px`
+    const place = panelPlacement(
+      { top: rect.top, bottom: rect.bottom, left: rect.left, width: rect.width },
+      panel.offsetHeight,
+      panel.offsetWidth,
+      { width: window.innerWidth, height: window.innerHeight },
+    )
+    panel.style.top = `${place.top}px`
+    panel.style.left = `${place.left}px`
     panel.style.visibility = ''
   }
 

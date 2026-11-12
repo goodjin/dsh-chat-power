@@ -16,6 +16,7 @@ import {
   loadQuickMessages,
   middleFoldRange,
   MIDDLE_FOLD_THRESHOLD,
+  panelPlacement,
   saveQuickMessages,
   scrollTopForTurnTop,
   summarizeTurn,
@@ -505,5 +506,38 @@ describe('输出框固定高度：可用高度不再扣「上面的内容」', (
 describe('用户行识别覆盖「模型提问，用户回答」', () => {
   it('USER_ROW_SELECTOR 含 question-reply', () => {
     expect(USER_ROW_SELECTOR).toContain('question-reply')
+  })
+})
+
+describe('快捷信息面板的定位（panelPlacement）', () => {
+  const viewport = { width: 1280, height: 800 }
+
+  it('上方放得下 → 优先上方（面板底 = 按钮顶 − 间距）', () => {
+    // 按钮在屏幕中部，面板 300px 高：上方余量 400 > 300 + 6。
+    const place = panelPlacement({ top: 400, bottom: 424, left: 600, width: 24 }, 300, 320, viewport)
+    expect(place.below).toBe(false)
+    expect(place.top).toBe(400 - 300 - 6)
+  })
+
+  it('上方放不下 → 退到下方（面板顶 = 按钮底 + 间距）', () => {
+    // 按钮在屏幕顶部附近：上方余量不足。
+    const place = panelPlacement({ top: 20, bottom: 44, left: 600, width: 24 }, 300, 320, viewport)
+    expect(place.below).toBe(true)
+    expect(place.top).toBe(44 + 6)
+  })
+
+  it('点赞行在屏幕下部时也放上方（面板顶钳到 0，不出屏幕）', () => {
+    // 按钮在 600px 处，面板 300px：上方余量 600 > 306 够放。
+    const place = panelPlacement({ top: 600, bottom: 624, left: 600, width: 24 }, 300, 320, viewport)
+    expect(place.below).toBe(false)
+    expect(place.top).toBe(600 - 300 - 6)
+  })
+
+  it('水平方向：左对齐按钮，超右缘时右对齐且不出屏', () => {
+    const clamped = panelPlacement({ top: 100, bottom: 124, left: 1100, width: 24 }, 300, 320, viewport)
+    // 1100 + 320 > 1280 − 8 → 右对齐到视口右缘内 8px。
+    expect(clamped.left).toBe(1280 - 320 - 8)
+    const normal = panelPlacement({ top: 100, bottom: 124, left: 600, width: 24 }, 300, 320, viewport)
+    expect(normal.left).toBe(600 - 8)
   })
 })
