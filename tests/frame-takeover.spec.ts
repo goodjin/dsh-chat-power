@@ -96,11 +96,11 @@ describe('框的类型与状态', () => {
   })
 })
 
-describe('工具调用帧', () => {
-  it('工具调用节点由我们的帧接管（原生内容 + 我们的框与标题）', () => {
+describe('工具框（ToolsFrame）', () => {
+  it('ToolsFrame 仍用于其余节点帧；tool-call 留给原生（行为断言见 conversation-surfaces.spec）', () => {
     const wrapper = source('../src/conversation-surfaces.tsx')
     expect(wrapper).toContain('ToolsFrame')
-    expect(wrapper).toContain("'tool-call'")
+    expect(wrapper).toContain('EXTRA_FRAMES')
     const frame = source('../src/tools-frame.tsx')
     expect(frame).toContain('data-chat-power-frame-box')
     expect(frame).toContain('data-chat-power-tools-frame')
