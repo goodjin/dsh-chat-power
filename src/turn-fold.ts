@@ -291,6 +291,7 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
   let pendingAlign = false
   /** 切换到的会话（其输出期间持续落底跟随；undefined = 不跟随）。 */
   let followTailSession: string | undefined = undefined
+  let lastOrderLog = ''
   let records = new Map<number, TurnRecord>()
   let stopObserving: (() => void) | undefined
   let composerObserver: ResizeObserver | undefined
@@ -1006,6 +1007,12 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     if (rows.length === 0) return
     const groups = groupTurnsByNumber(rows)
     if (groups.length === 0) return
+    // 自报状态：行序变化时输出当前轮次序列（判断宿主加载旧消息时插到头部还是尾部）。
+    const orderSignature = groups.map(group => group.number).join(',')
+    if (orderSignature !== lastOrderLog) {
+      lastOrderLog = orderSignature
+      console.info('[chat-power] turn fold: 轮次序列（文档顺序）[' + orderSignature + ']，总行数 ' + rows.length)
+    }
     for (const group of groups) {
       const existing = records.get(group.number)
       if (existing === undefined) {
