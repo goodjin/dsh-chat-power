@@ -140,20 +140,31 @@ describe('快捷信息面板', () => {
     expect(panel.querySelector('[data-chat-power-quick-edit]')).toBeNull()
   })
 
-  it('点底部「新增」：进草稿编辑态；保存后入库；空草稿取消不入库', () => {
+  it('点底部「新增」：进独立编辑态；保存入库、回到列表；空草稿取消不入库', () => {
     buildConversation()
     quickButtonOf()!.click()
-    const before = panelOf()!.querySelectorAll('[data-chat-power-quick-row]').length
+    // 内置三条只是展示默认值：未保存前 localStorage 仍是空的。
+    const rowsBefore = panelOf()!.querySelectorAll('[data-chat-power-quick-row]').length
+    expect(rowsBefore).toBeGreaterThanOrEqual(3)
+    expect(JSON.parse(localStorage.getItem(QUICK_MESSAGES_KEY) ?? '[]')).toHaveLength(0)
     ;(panelOf()!.querySelector('[data-chat-power-quick-add]') as HTMLElement).click()
-    // 新条目处于编辑态（草稿），列表条目数不变。
+    // 独立编辑态：已有记录全部隐藏，只有编辑框与按钮区。
     const editor = panelOf()!.querySelector('[data-chat-power-quick-edit]') as HTMLTextAreaElement
     expect(editor).not.toBeNull()
-    expect(panelOf()!.querySelectorAll('[data-chat-power-quick-row]').length).toBe(before)
-    editor.value = '新加的一条'
+    expect(panelOf()!.querySelectorAll('[data-chat-power-quick-row]').length).toBe(0)
+    // 取消：不入库（存储仍空），回到列表态。
+    const cancelBtn = panelOf()!.querySelectorAll('[data-chat-power-quick-actions] button')[1] as HTMLElement
+    cancelBtn.click()
+    expect(JSON.parse(localStorage.getItem(QUICK_MESSAGES_KEY) ?? '[]')).toHaveLength(0)
+    expect(panelOf()!.querySelectorAll('[data-chat-power-quick-row]').length).toBe(rowsBefore)
+    // 再走一次：保存入库，回到列表态，条数加一。
+    ;(panelOf()!.querySelector('[data-chat-power-quick-add]') as HTMLElement).click()
+    const editor2 = panelOf()!.querySelector('[data-chat-power-quick-edit]') as HTMLTextAreaElement
+    editor2.value = '新加的一条'
     ;(panelOf()!.querySelector('[data-chat-power-quick-actions] button') as HTMLElement).click()
     const stored = JSON.parse(localStorage.getItem(QUICK_MESSAGES_KEY) ?? '[]') as { text: string }[]
     expect(stored.some(item => item.text === '新加的一条')).toBe(true)
-    expect(panelOf()!.querySelectorAll('[data-chat-power-quick-row]').length).toBe(before + 1)
+    expect(panelOf()!.querySelectorAll('[data-chat-power-quick-row]').length).toBe(rowsBefore + 1)
   })
 
   it('面板打开时点面板外关闭', () => {
@@ -162,5 +173,35 @@ describe('快捷信息面板', () => {
     expect(panelOf()).not.toBeNull()
     document.body.dispatchEvent(new MouseEvent('click', { bubbles: true, bubblesPhase: true } as MouseEventInit))
     expect(panelOf()).toBeNull()
+  })
+
+  it('面板挂在 body 下（宿主重渲染消息区不冲掉面板）', () => {
+    buildConversation()
+    quickButtonOf()!.click()
+    const panel = panelOf()!
+    // 面板的父级是 body：宿主把点赞行整块重画也碰不到它。
+    expect(panel.parentElement).toBe(document.body)
+  })
+
+  it('面板内点击不冒泡出面板（宿主监听不到面板内部交互）', () => {
+    buildConversation()
+    quickButtonOf()!.click()
+    const panel = panelOf()!
+    let escaped = false
+    document.addEventListener('click', () => { escaped = true }, { once: true })
+    // 模拟点击面板本体（编辑框内点击同样路径：面板容器拦截传播）。
+    panel.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(escaped).toBe(false)
+  })
+
+  it('点「新增」：切换到独立编辑界面（列表隐藏，只有编辑框与保存/取消）', () => {
+    buildConversation()
+    quickButtonOf()!.click()
+    ;(panelOf()!.querySelector('[data-chat-power-quick-add]') as HTMLElement).click()
+    const panel = panelOf()!
+    // 独立编辑界面：没有已有记录的条目，只有编辑框和按钮区。
+    expect(panel.querySelectorAll('[data-chat-power-quick-row]').length).toBe(0)
+    expect(panel.querySelector('[data-chat-power-quick-edit]')).not.toBeNull()
+    expect(panel.querySelector('[data-chat-power-quick-actions]')).not.toBeNull()
   })
 })

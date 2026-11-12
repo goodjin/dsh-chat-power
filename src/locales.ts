@@ -57,7 +57,9 @@ export type ChatPowerLocaleKey =
   | 'turnFold.frameContext' | 'turnFold.frameLimit' | 'turnFold.frameQuestion'
   | 'turnFold.frameWorkflow' | 'turnFold.frameRunning'
   | 'turnFold.frameResizeTitle' | 'turnFold.composerResizeTitle'
-  | 'turnFold.quickMessagesTitle'
+  | 'turnFold.quickMessagesTitle' | 'turnFold.quickMessagesPlaceholder'
+  | 'turnFold.quickSave' | 'turnFold.quickCancel' | 'turnFold.quickEdit'
+  | 'turnFold.quickRemove' | 'turnFold.quickAdd'
   | 'turnFold.collapseAria' | 'turnFold.expandAria'
   | 'tools.chat' | 'tools.files' | 'tools.browser' | 'tools.terminal'
   | 'tools.openLocalFile' | 'settings.title' | 'settings.linkOpenDefault' | 'settings.linkOpenRight' | 'settings.linkOpenBrowser'
@@ -172,6 +174,12 @@ export const zh: Record<ChatPowerLocaleKey, string> = {
   'turnFold.labelWithSummary': '第 {turn} 轮 · {clock} · {summary}',
   'turnFold.collapseAria': '收起这一轮',
   'turnFold.quickMessagesTitle': '快捷信息',
+  'turnFold.quickMessagesPlaceholder': '输入要发送的内容…',
+  'turnFold.quickSave': '保存',
+  'turnFold.quickCancel': '取消',
+  'turnFold.quickEdit': '编辑',
+  'turnFold.quickRemove': '删除',
+  'turnFold.quickAdd': '新增',
   'turnFold.expandAria': '展开这一轮',
   'tools.chat': '会话',
   'tools.files': '工作区文件',
@@ -297,6 +305,12 @@ export const en: Record<ChatPowerLocaleKey, string> = {
   'turnFold.labelWithSummary': 'Turn {turn} · {clock} · {summary}',
   'turnFold.collapseAria': 'Collapse this turn',
   'turnFold.quickMessagesTitle': 'Quick messages',
+  'turnFold.quickMessagesPlaceholder': 'Type what to send…',
+  'turnFold.quickSave': 'Save',
+  'turnFold.quickCancel': 'Cancel',
+  'turnFold.quickEdit': 'Edit',
+  'turnFold.quickRemove': 'Remove',
+  'turnFold.quickAdd': 'Add',
   'turnFold.expandAria': 'Expand this turn',
   'tools.chat': 'Chat',
   'tools.files': 'Workspace files',
