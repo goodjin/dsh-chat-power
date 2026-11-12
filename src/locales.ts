@@ -60,6 +60,9 @@ export type ChatPowerLocaleKey =
   | 'turnFold.quickMessagesTitle' | 'turnFold.quickMessagesPlaceholder'
   | 'turnFold.quickSave' | 'turnFold.quickCancel' | 'turnFold.quickEdit'
   | 'turnFold.quickRemove' | 'turnFold.quickAdd'
+  | 'turnFold.turnTitle' | 'turnFold.turnTitleWithDuration'
+  | 'turnFold.tabRequest' | 'turnFold.tabProcess' | 'turnFold.tabResult'
+  | 'turnFold.filesTab' | 'turnFold.showMore'
   | 'turnFold.collapseAria' | 'turnFold.expandAria'
   | 'tools.chat' | 'tools.files' | 'tools.browser' | 'tools.terminal'
   | 'tools.openLocalFile' | 'settings.title' | 'settings.linkOpenDefault' | 'settings.linkOpenRight' | 'settings.linkOpenBrowser'
@@ -180,6 +183,13 @@ export const zh: Record<ChatPowerLocaleKey, string> = {
   'turnFold.quickEdit': '编辑',
   'turnFold.quickRemove': '删除',
   'turnFold.quickAdd': '新增',
+  'turnFold.turnTitle': '第 {turn} 轮',
+  'turnFold.turnTitleWithDuration': '第 {turn} 轮 · 用时 {duration}',
+  'turnFold.tabRequest': '请求',
+  'turnFold.tabProcess': '过程',
+  'turnFold.tabResult': '结果',
+  'turnFold.filesTab': '文件',
+  'turnFold.showMore': '展示更多（余 {count} 条）',
   'turnFold.expandAria': '展开这一轮',
   'tools.chat': '会话',
   'tools.files': '工作区文件',
@@ -311,6 +321,13 @@ export const en: Record<ChatPowerLocaleKey, string> = {
   'turnFold.quickEdit': 'Edit',
   'turnFold.quickRemove': 'Remove',
   'turnFold.quickAdd': 'Add',
+  'turnFold.turnTitle': 'Turn {turn}',
+  'turnFold.turnTitleWithDuration': 'Turn {turn} · took {duration}',
+  'turnFold.tabRequest': 'Request',
+  'turnFold.tabProcess': 'Process',
+  'turnFold.tabResult': 'Result',
+  'turnFold.filesTab': 'Files',
+  'turnFold.showMore': 'Show more ({count} left)',
   'turnFold.expandAria': 'Expand this turn',
   'tools.chat': 'Chat',
   'tools.files': 'Workspace files',

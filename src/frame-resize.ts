@@ -129,36 +129,35 @@ function applyStoredComposerHeight(seat: HTMLElement): void {
 }
 
 /**
- * 给一轮里所有插件输出框补上底边拖拽把手（已有就跳过；宿主重渲染冲掉了会补回）。
- * 只处理插件自己的框（`[data-chat-power-frame-box]`），不碰裸的宿主行。
- * @param record - 这一轮的状态（只用 rows）。
+ * 给本轮统一框补上底边拖拽把手（已有就跳过；宿主重渲染冲掉了会补回）。
+ * 每轮一框后把手只挂统一框（`record.frame`），不再逐行找内嵌框。
+ * @param record - 这一轮的状态（只用 frame 与 rows 的形状）。
  * @param title - 把手悬停提示（已按当前语言翻译）。
  */
 export function ensureFrameResizeHandles(
-  record: { readonly rows: readonly HTMLElement[] },
+  record: { readonly frame?: HTMLElement },
   title: string,
 ): void {
-  for (const row of record.rows) {
-    const box = row.querySelector<HTMLElement>('[data-chat-power-frame-box]')
-    if (box === null) continue
-    if (box.querySelector(`[${FRAME_RESIZE_ATTR}]`) !== null) continue
+  // 每轮一框：把手只挂本轮的统一框（行内嵌框是答案卡等历史形态，不挂）。
+  const frame = (record as { frame?: HTMLElement }).frame
+  if (frame !== undefined && frame.isConnected && frame.querySelector(`[${FRAME_RESIZE_ATTR}]`) === null) {
     const handle = document.createElement('div')
     handle.setAttribute(FRAME_RESIZE_ATTR, '')
     if (title !== '') handle.title = title
     handle.addEventListener('dblclick', (event: Event) => {
       event.preventDefault()
       event.stopPropagation()
-      applyFrameHeight(box, undefined)
+      applyFrameHeight(frame, undefined)
     })
     attachDrag(handle, {
       direction: 1,
       minHeight: MIN_FRAME_HEIGHT,
-      startHeight: () => box.getBoundingClientRect().height,
+      startHeight: () => frame.getBoundingClientRect().height,
       apply: next => {
-        applyFrameHeight(box, next)
+        applyFrameHeight(frame, next)
       },
     })
-    box.appendChild(handle)
+    frame.appendChild(handle)
   }
 }
 
