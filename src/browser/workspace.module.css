@@ -5,7 +5,9 @@
 .workspace button:hover,.bookmarkBar button:hover { background:var(--dsw-alias-interactive-bg-hover); }
 .workspace button:focus-visible,.bookmarkBar button:focus-visible { outline:2px solid var(--dsw-alias-state-business-primary); }
 .workspace button:disabled { opacity:.45; cursor:default; }
-.tabs { display:flex; flex:none; align-items:center; gap:4px; padding:4px 8px; overflow-x:auto; border-bottom:1px solid var(--dsw-alias-border-l2); }
+.tabsRow { display:flex; flex:none; align-items:center; min-width:0; border-bottom:1px solid var(--dsw-alias-border-l2); }
+.menuButton { flex:none; margin:0 8px 0 auto; font-size:20px !important; }
+.tabs { display:flex; flex:1; min-width:0; align-items:center; gap:4px; padding:4px 8px; overflow-x:auto; }
 .tab { display:flex; flex:none; align-items:center; border-radius:6px; background:var(--dsw-alias-interactive-bg-hover); max-width:220px; }
 .tab[data-active=true] { color:var(--dsw-alias-state-business-primary); box-shadow:inset 0 -2px currentColor; }
 .tab button[role=tab] { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -24,5 +26,5 @@
 .operation small { margin-left:8px; overflow-wrap:anywhere; color:var(--dsw-alias-label-secondary); }
 .empty { margin:auto; text-align:center; padding:24px; }
 .dismiss { position:absolute; inset:0; z-index:29; cursor:default !important; background:transparent !important; }
-.menu { position:absolute; right:12px; top:4px; z-index:30; display:flex; flex-direction:column; min-width:180px; padding:5px; border:1px solid var(--dsw-alias-border-l2); border-radius:8px; background:var(--dsw-alias-bg-layer-1); box-shadow:0 4px 16px #0003; }
+.menu { position:absolute; right:8px; top:40px; z-index:30; display:flex; flex-direction:column; min-width:180px; padding:5px; border:1px solid var(--dsw-alias-border-l2); border-radius:8px; background:var(--dsw-alias-bg-layer-1); box-shadow:0 4px 16px #0003; }
 .menu button { text-align:left; }

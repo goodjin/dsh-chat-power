@@ -13,13 +13,16 @@ import {
   frameBudgetHeight,
   frameKindOf,
   groupTurnsByNumber,
+  loadQuickMessages,
   middleFoldRange,
   MIDDLE_FOLD_THRESHOLD,
+  saveQuickMessages,
   scrollTopForTurnTop,
   summarizeTurn,
   turnStripText,
   USER_ROW_SELECTOR,
 } from '../src/turn-fold.ts'
+import type { QuickMessage } from '../src/turn-fold.ts'
 
 /** 最小行面：只要轮次号与文本，便于构造假行。 */
 function row(turn: number | null, text = ''): { getAttribute(name: string): string | null; textContent: string | null } {
@@ -406,36 +409,48 @@ describe('会话区排布', () => {
   })
 })
 
-describe('git 快捷按钮', () => {
-  it('点赞行里挂上 Commit / Merge / Push 三个按钮', () => {
+describe('快捷信息按钮', () => {
+  it('点赞行里挂一个快捷信息按钮（快捷方式图标），三个 git 按钮删掉', () => {
     const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
-    expect(source).toContain('data-chat-power-git-actions')
-    expect(source).toContain('data-chat-power-git-btn')
-    expect(source).toContain('GIT_LABELS')
+    expect(source).toContain('data-chat-power-quick-btn')
+    expect(source).toContain('QUICK_BTN_SVG')
+    // 三个 git 按钮及其指令库彻底移除
+    expect(source).not.toContain('data-chat-power-git-')
+    expect(source).not.toContain('GIT_LABELS')
+    expect(source).not.toContain('gitInstructionStore')
+    expect(source).not.toContain('onGitAction')
     const index = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
-    expect(index).toContain('onGitAction')
-    expect(index).toContain('sendToSession')
+    expect(index).not.toContain('onGitAction')
+    expect(index).not.toContain('getGitInstruction')
   })
 })
 
-describe('git 快捷按钮的提示与编辑', () => {
-  it('悬停 tooltip 展示指令内容；铅笔钮打开编辑浮层；Push 改为 Sync', () => {
-    const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
-    expect(source).toContain('getGitInstruction')
-    expect(source).toContain('data-chat-power-git-tip')
-    expect(source).toContain('data-chat-power-git-tip-edit')
-    expect(source).toContain('showGitTip(bar, btn, kind)')
-    expect(source).toContain("sync: '请将本地仓库与远程同步：")
-    expect(source).toContain("data-chat-power-git-btn")
+describe('快捷信息库（纯逻辑）', () => {
+  it('loadQuickMessages：无存储时返回内置三条，均为非空文本', () => {
+    const messages = loadQuickMessages(() => null)
+    expect(messages.length).toBeGreaterThanOrEqual(3)
+    expect(messages.every(m => m.id !== '' && m.text.trim() !== '')).toBe(true)
   })
-  it('编辑态不会自动关闭（输入到一半不丢）', () => {
-    const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
-    expect(source).toContain("tip.getAttribute('data-mode') === 'edit'")
+  it('readStore 合法 JSON 时原样返回', () => {
+    const stored = [{ id: 'a', text: '测试' }]
+    const messages = loadQuickMessages(() => JSON.stringify(stored))
+    expect(messages).toEqual(stored)
   })
-  it('发送使用可编辑后的指令（index 接线）', () => {
-    const index = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
-    expect(index).toContain('getGitInstruction(action)')
-    expect(index).toContain('sendToSession(sessionId, text)')
+  it('readStore 坏 JSON / 结构不对时退回内置', () => {
+    expect(loadQuickMessages(() => 'not json').length).toBeGreaterThanOrEqual(3)
+    expect(loadQuickMessages(() => JSON.stringify([{ id: '', text: 1 }])).length).toBeGreaterThanOrEqual(3)
+  })
+  it('saveQuickMessages 写回存储并剔除空文本', () => {
+    let saved: string | null = null
+    const write = (_key: string, value: string): void => { saved = value }
+    saveQuickMessages([
+      { id: 'a', text: '保留' },
+      { id: 'b', text: '   ' },
+      { id: 'c', text: '也保留' },
+    ], write)
+    const parsed = JSON.parse(saved as unknown as string) as QuickMessage[]
+    expect(parsed.map(m => m.text)).toEqual(['保留', '也保留'])
+    expect(parsed.every(m => m.id !== '')).toBe(true)
   })
 })
 

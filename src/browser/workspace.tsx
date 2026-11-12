@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom'
 import { browserState, folders, selectedBookmarks, type Bookmark, type Page } from './state.ts'
 import css from './workspace.module.css'
 const useBrowser = () => useSyncExternalStore(browserState.subscribe, browserState.get, browserState.get)
-export function browserMenu() { window.dispatchEvent(new Event('chat-power:browser-menu')) }
 function BookmarkItems({ nodes, onOpen }: { nodes: Bookmark[]; onOpen: (url: string) => void }) {
   return <>{nodes.map(n => n.children ? <details key={n.id} className={css.folder}><summary>{n.name || '未命名文件夹'}</summary><div><BookmarkItems nodes={n.children} onOpen={onOpen} />{n.children.length === 0 && <span>空文件夹</span>}</div></details> : <span key={n.id} className={css.bookmark}><button title={n.url} onClick={() => { if (n.url) onOpen(n.url) }}>{n.name || n.url}</button><button aria-label={`在新标签打开 ${n.name}`} title="在新标签打开" onClick={() => browserState.open('page', n.url)}>↗</button></span>)}</>
 }
@@ -28,7 +27,7 @@ export function BrowserChrome({ hostProps, children }: { hostProps: any; childre
   const current = native?.frame?.address === 'unknown' ? undefined : target?.url ?? snapshot.pages.find(p => p.id === tab.id)?.url
   return <div ref={root} className={css.native}>{children}
     {seats && createPortal(<button type="button" aria-label="添加当前页面到书签" title="添加书签" disabled={!current} onClick={() => window.dispatchEvent(new CustomEvent('chat-power:add-bookmark', { detail: { name: target?.title || current, url: current } }))}>☆</button>, seats.star)}
-    {seats && createPortal(snapshot.bookmarks.length ? <BookmarkItems nodes={snapshot.bookmarks} onOpen={url => hostProps.loadUrl(tab.id, url)} /> : <span>暂无书签，可通过浏览器 ⋯ 菜单导入</span>, seats.bookmarks)}
+    {seats && createPortal(snapshot.bookmarks.length ? <BookmarkItems nodes={snapshot.bookmarks} onOpen={url => hostProps.loadUrl(tab.id, url)} /> : null, seats.bookmarks)}
   </div>
 }
 function allIds(nodes: Bookmark[]): string[] { return nodes.flatMap(n => [n.id, ...allIds(n.children ?? [])]) }
@@ -93,11 +92,10 @@ export function BrowserWorkspace({ renderPage }: { renderPage: (page: Page, visi
   const [menu, setMenu] = useState(false)
   const [draft, setDraft] = useState<{ name: string; url: string }>()
   useEffect(() => {
-    const open = () => setMenu(v => !v)
     const add = (e: Event) => { setDraft((e as CustomEvent).detail); browserState.open('bookmarks') }
     const dismiss = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenu(false) }
-    window.addEventListener('chat-power:browser-menu', open); window.addEventListener('chat-power:add-bookmark', add); window.addEventListener('keydown', dismiss)
-    return () => { window.removeEventListener('chat-power:browser-menu', open); window.removeEventListener('chat-power:add-bookmark', add); window.removeEventListener('keydown', dismiss) }
+    window.addEventListener('chat-power:add-bookmark', add); window.addEventListener('keydown', dismiss)
+    return () => { window.removeEventListener('chat-power:add-bookmark', add); window.removeEventListener('keydown', dismiss) }
   }, [])
   return <div className={css.workspace}>
     {menu && <><button className={css.dismiss} aria-label="关闭浏览器菜单" onClick={() => setMenu(false)} /><div className={css.menu} role="menu" aria-label="浏览器设置">{[
@@ -106,7 +104,7 @@ export function BrowserWorkspace({ renderPage }: { renderPage: (page: Page, visi
       ['导入 Chrome 书签', () => browserState.open('import')],
       ['管理书签', () => { setDraft(undefined); browserState.open('bookmarks') }],
     ].map(([label, action]) => <button key={label as string} role="menuitem" onClick={() => { (action as () => void)(); setMenu(false) }}>{label as string}</button>)}</div></>}
-    <div className={css.tabs} role="tablist" aria-label="网页标签">{snapshot.pages.map(p => <span key={p.id} className={css.tab} data-active={snapshot.active === p.id}><button role="tab" aria-selected={snapshot.active === p.id} aria-controls={`browser-panel-${p.id}`} title={p.title} onClick={() => browserState.select(p.id)}>{p.title}</button><button aria-label={`关闭 ${p.title}`} onClick={() => browserState.close(p.id)}>×</button></span>)}<button aria-label="新建网页" onClick={() => browserState.open()}>＋</button></div>
+    <div className={css.tabsRow}><div className={css.tabs} role="tablist" aria-label="网页标签">{snapshot.pages.map(p => <span key={p.id} className={css.tab} data-active={snapshot.active === p.id}><button role="tab" aria-selected={snapshot.active === p.id} aria-controls={`browser-panel-${p.id}`} title={p.title} onClick={() => browserState.select(p.id)}>{p.title}</button><button aria-label={`关闭 ${p.title}`} onClick={() => browserState.close(p.id)}>×</button></span>)}<button aria-label="新建网页" onClick={() => browserState.open()}>＋</button></div><button className={css.menuButton} aria-label="浏览器设置" aria-haspopup="menu" aria-expanded={menu} onClick={() => setMenu(v => !v)}>⋯</button></div>
     {snapshot.pages.length === 0 && <div className={css.empty}><p>打开网页，或从 Chrome 导入书签</p><button onClick={() => browserState.open()}>新建网页</button><button onClick={() => browserState.open('import')}>导入 Chrome 书签</button></div>}
     {snapshot.pages.map(p => <div id={`browser-panel-${p.id}`} role="tabpanel" key={p.id} hidden={snapshot.active !== p.id} className={css.page}>{p.type === 'import' ? <ImportBookmarks /> : p.type === 'bookmarks' ? <BookmarkManager draft={draft} /> : renderPage(p, snapshot.active === p.id)}</div>)}
   </div>

@@ -1,7 +1,7 @@
 import { createPortal } from 'react-dom'
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { browserState } from './browser/state.ts'
-import { BrowserWorkspace, browserMenu } from './browser/workspace.tsx'
+import { BrowserWorkspace } from './browser/workspace.tsx'
 import { toolsState } from './tools-state.ts'
 import { createToolsAdapter, toolSlot, browserBodySlot } from './tools-adapter.tsx'
 import { attachToolsRow } from './tools-tabs.ts'
@@ -347,7 +347,6 @@ export function registerConversationTools(ctx: any) {
     activateChat: id => toolsState.activateChat(id),
     selectTab: (id, tabId) => toolsState.select(id, tabId),
     openKind,
-    openBrowserMenu: id => { openKind(id, 'browser'); browserMenu() },
     closeTab: (id, tabId) => {
       const tab = toolsState.get(id).tabs.find(t => t.id === tabId)
       if (tab !== undefined && (tab.kind === 'local' || tab.kind === 'text')) { closeDocument(id, tabId); return }
