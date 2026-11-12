@@ -2,6 +2,8 @@
  * The host sidebar's registrations, stores, navigation and layout are untouched.
  */
 import { createElement } from 'react'
+import { browserState } from './browser/state.ts'
+import { BrowserChrome } from './browser/workspace.tsx'
 import * as files from '@deepseek-ai/dsh-client-ui-sidebar-files'
 import * as browser from '@deepseek-ai/dsh-client-ui-sidebar-browser'
 import * as terminal from '@deepseek-ai/dsh-client-ui-sidebar-terminal'
@@ -10,6 +12,7 @@ import { readDefaultLinkOpenMode, openInBrowser } from './link-open.ts'
 import { toolsState, type ToolTab } from './tools-state.ts'
 import { privateFactory, privateSlot, toolSlot } from './slot-names.ts'
 export { toolSlot }
+export const browserBodySlot = 'chat-power.browser.pane.tab'
 export const features = [files, browser, terminal, documentPreview]
 
 export function createToolsAdapter(ctx: any) {
@@ -17,11 +20,20 @@ export function createToolsAdapter(ctx: any) {
   const closeHandlers = new Map<string, any>()
   const privateServices = new Map<string, any>()
   const facadeCache = new WeakMap<object, any>()
+  const browserFacadeCache = new WeakMap<object, any>()
   const hostSidebar = ctx.get('sidebarRight')
-  const inventory = { subscribe: toolsState.subscribe, getSnapshot: () => toolsState.inventory() }
+  let browserSession: string | undefined
+  const inventory = {
+    subscribe: (fn: () => void) => { const a = toolsState.subscribe(fn); const b = browserState.subscribe(fn); return () => { a(); b() } },
+    getSnapshot: () => [...toolsState.inventory().filter(t => t.kind !== 'browser'), ...browserState.get().pages.filter(p => p.type === 'page').map(p => ({ ...browserState.tab(p), sessionId: browserSession, tabId: p.id }))],
+  }
   const open = (sessionId: string, kind: string, options?: any) => {
     const definition = definitions.get(kind)
     if (!definition) throw new Error(`会话工具未加载：${kind}`)
+    if (kind === 'browser') {
+      if (options?.params?.url || options?.revealIfOpened === false || !browserState.get().pages.length) browserState.open('page', options?.params?.url)
+      return toolsState.open(sessionId, kind, '浏览器')
+    }
     return toolsState.open(sessionId, kind, definition.title(`sidebar://${kind}`), `sidebar://${kind}`, options?.params,
       definition.multiple === true || options?.revealIfOpened === false)
   }
@@ -50,7 +62,7 @@ export function createToolsAdapter(ctx: any) {
   })
   const occurrences = new Map<string, any>()
   const occurrence = (sessionId: string, { id }: { id: string }) => {
-    const tab = toolsState.get(sessionId).tabs.find(t => t.id === id)
+    const tab = toolsState.get(sessionId).tabs.find(t => t.id === id) ?? browserState.get().pages.filter(p => p.type === 'page').map(p => browserState.tab(p)).find(t => t.id === id)
     if (!tab) throw new Error(`会话工具标签已关闭：${id}`)
     if (!occurrences.has(id)) {
       const navigation = { address: tab.contentId, params: tab.params, revision: 0 }
@@ -86,17 +98,21 @@ export function createToolsAdapter(ctx: any) {
   // （面板只剩一个路径标题，没有条目）。这里原样传键：每个特性自己
   // 持有 store 实例，内存互不串味；落盘的键与宿主同名，存的是每面板
   // 自己的展开状态，互不影响。
-  function facade(scope: any): any {
-    if (facadeCache.has(scope)) return facadeCache.get(scope)
+  function facade(scope: any, browserFeature = false): any {
+    const cache = browserFeature ? browserFacadeCache : facadeCache
+    if (cache.has(scope)) return cache.get(scope)
+    const seat = (name: string): string => browserFeature ? toolSlot(name).replace('chat-power.tools.', 'chat-power.browser.') : toolSlot(name)
     const slots = new Proxy(scope.slots, { get(target, key) {
       if (key === 'register') return (options: any, Component: any) => {
-        const children = options.children && Object.fromEntries(Object.entries(options.children).map(([name, spec]) => [toolSlot(name), spec]))
-        return target.register({ ...options, name: toolSlot(options.name), children, store: options.store }, (props: any) => {
+        const children = options.children && Object.fromEntries(Object.entries(options.children).map(([name, spec]) => [seat(name), spec]))
+        return target.register({ ...options, name: seat(options.name), children, store: options.store }, (props: any) => {
           const shares = { ...props }
           for (const method of ['renderSlot', 'renderSlotChain', 'renderFactorySlot']) {
             if (props[method]) shares[method] = (name: string, ...args: any[]) => props[method](privateSlot(name), ...args)
           }
-          return createElement(Component, shares)
+          const element = createElement(Component, shares)
+          return options.name === 'sidebar.right.pane.tab' && options.key === '@deepseek-ai/dsh-client-ui-sidebar-browser'
+            ? createElement(BrowserChrome, { hostProps: shares, children: element }) : element
         })
       }
       if (key === 'registerFactory') return (options: any, Component: any) => {
@@ -110,7 +126,7 @@ export function createToolsAdapter(ctx: any) {
           throw error
         }
       }
-      if (['inject', 'entries', 'entriesOfSlot', 'subscribe', 'specDynamic'].includes(String(key))) return (name: string, ...args: any[]) => target[key](toolSlot(name), ...args)
+      if (['inject', 'entries', 'entriesOfSlot', 'subscribe', 'specDynamic'].includes(String(key))) return (name: string, ...args: any[]) => target[key](seat(name), ...args)
       const value = target[key]; return typeof value === 'function' ? value.bind(target) : value
     } })
     const proxy = new Proxy(scope, { get(target, key) {
@@ -124,15 +140,14 @@ export function createToolsAdapter(ctx: any) {
         if (prop === 'retainTabs') return (tabs: any[]) => terminals.retainTabs([...(hostSidebar?.openTabs?.getSnapshot?.() ?? []).filter((t: any) => t.kind === 'terminal'), ...tabs])
         const value = terminals[prop]; return typeof value === 'function' ? value.bind(terminals) : value
       } })
-      if (key === 'inject') return (names: string[], callback: any) => target.inject(names.filter(name => !privateServices.has(name)), (child: any) => callback(facade(child)))
+      if (key === 'inject') return (names: string[], callback: any) => target.inject(names.filter(name => !privateServices.has(name)), (child: any) => callback(facade(child, browserFeature)))
       const value = target[key]; return typeof value === 'function' ? value.bind(target) : value
     } })
-    facadeCache.set(scope, proxy)
+    cache.set(scope, proxy)
     return proxy
   }
   const install = () => {
-    const privateCtx = facade(ctx)
-    for (const feature of features) privateCtx.inject(feature.inject, (scope: any) => {
+    for (const feature of features) facade(ctx, feature === browser).inject(feature.inject, (scope: any) => {
       // 一个面板装载失败不该拖垮整条挂载行：记下原因，其余面板照常。
       try { feature.apply(scope) } catch (error: unknown) { console.error(`[chat-power] 会话工具面板装载失败：${feature.inject.join(', ')}`, error) }
     })
@@ -147,6 +162,7 @@ export function createToolsAdapter(ctx: any) {
     }, 'chat-power: independent tools lifetime')
   }
   return { install, definitions, open, close, openResource, occurrence,
+    setBrowserSession(id: string) { browserSession = id },
     tabInfo(sessionId: string, tab: ToolTab, visible: boolean) {
       const held = occurrence(sessionId, tab)
       return { sidebar: { expanded: true, fullscreen: false }, panel: { id: 'chat-power-tools' },

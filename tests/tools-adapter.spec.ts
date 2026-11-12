@@ -18,9 +18,17 @@ vi.mock('@deepseek-ai/dsh-client-ui-sidebar-files', () => ({
     }, () => null)
   },
 }))
+vi.mock('@deepseek-ai/dsh-client-ui-sidebar-browser', () => ({
+  inject: ['slots', 'sidebarRight', 'sidebarRightTabs'],
+  apply(ctx: any) {
+    ctx.sidebarRightTabs.register({ kind: 'browser', id: '@deepseek-ai/dsh-client-ui-sidebar-browser', title: () => '浏览器' })
+    ctx.slots.register({ name: 'sidebar.right.pane.tab', key: '@deepseek-ai/dsh-client-ui-sidebar-browser' }, () => null)
+  },
+}))
 import { createToolsAdapter } from '../src/tools-adapter.tsx'
+import { browserState } from '../src/browser/state.ts'
 import { toolsState } from '../src/tools-state.ts'
-afterEach(() => { toolsState.dispose(); fixture.scopes.length = 0 })
+afterEach(() => { for (const p of browserState.get().pages) browserState.close(p.id); toolsState.dispose(); fixture.scopes.length = 0 })
 function host() {
   const register = vi.fn(() => () => {})
   const nativeOpen = vi.fn()
@@ -40,6 +48,18 @@ function host() {
   return { ctx, register, nativeOpen, registry }
 }
 describe('private feature adapter', () => {
+  it('不同会话的浏览器入口共用网页集合，网页正文使用独立插槽', () => {
+    const h = host(); const adapter = createToolsAdapter(h.ctx); adapter.install()
+    adapter.open('one', 'browser', { params: { url: 'https://example.com' } })
+    const page = browserState.get().pages[0]!
+    adapter.open('two', 'browser')
+    expect(browserState.get().pages).toHaveLength(1)
+    expect(browserState.get().active).toBe(page.id)
+    const occurrence = adapter.occurrence('one', browserState.tab(page))
+    expect(occurrence.navigation.getSnapshot().params.url).toBe('https://example.com/')
+    expect((h.register.mock.calls as unknown as [any][]).some(call => call[0].name === 'chat-power.browser.pane.tab')).toBe(true)
+    expect(h.nativeOpen).not.toHaveBeenCalled()
+  })
   it('私有标签登记表答得上宿主的新问法（没有它，文件面板整个起不来）', () => {
     const h = host(); const adapter = createToolsAdapter(h.ctx); adapter.install()
     expect(fixture.registry.entries.map((d: any) => d.kind)).toEqual(['textpreview'])

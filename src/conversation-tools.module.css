@@ -173,3 +173,8 @@
   flex: 1 1 auto;
   min-height: 0;
 }
+
+.tools[hidden],.browserWorkspace[hidden] { display:none; }
+.browserWorkspace { display:flex; flex:1; min-height:0; min-width:0; }
+[data-chat-browser-menu] { align-self:flex-start; margin:-5px -18px 0 -24px; padding:0 4px; border:0; background:transparent; color:var(--dsw-alias-label-secondary); font-size:18px; cursor:pointer; -webkit-app-region:no-drag; }
+[data-chat-browser-menu]:focus-visible { outline:2px solid var(--dsw-alias-state-business-primary); }

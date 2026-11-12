@@ -26,6 +26,10 @@
     "./session-id-bar": {
       "types": "./src/session-id-bar/index.ts",
       "default": "./src/session-id-bar/index.ts"
+    },
+    "./chrome-bookmarks": {
+      "types": "./src/chrome-bookmarks.ts",
+      "default": "./src/chrome-bookmarks.ts"
     }
   },
   "files": [
