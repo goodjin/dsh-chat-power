@@ -57,9 +57,12 @@ describe('lib/client.js 是页面能装的产物', () => {
       slots: {
         inject: (key: string, callback: () => unknown) => { injected.push(key); return callback() },
         register: (options: Record<string, unknown>) => { registered.push(options); return () => {} },
-        // 文件阅读区与答案卡片 wrap 要在订阅回调里抓原生渲染器再重注册；
-        // 假座位立即回调，并喂一个原生 assistant-step 渲染器。
-        entries: () => [{ options: { key: 'assistant-step', priority: 0 }, component: () => null }],
+        // 节点帧 wrap 要在订阅回调里抓原生渲染器再重注册；假座位立即回调，
+        // 喂原生 assistant-step（不应被接管）与 turn-error（应被接管成帧）。
+        entries: () => [
+          { options: { key: 'assistant-step', priority: 0 }, component: () => null },
+          { options: { key: 'turn-error', priority: 0 }, component: () => null },
+        ],
         subscribe: (_key: string, callback: () => void) => { callback(); return () => {} },
       },
       logger: () => ({ info: () => {}, warn: () => {} }),
@@ -71,6 +74,9 @@ describe('lib/client.js 是页面能装的产物', () => {
     expect(injected).toContain('conversation.chat.turnTail')
     const registeredIds = registered.map(options => options.id)
     expect(registeredIds).toContain(MARKDOWN_TAIL_ID)
-    expect(registered.some(options => options.key === 'assistant-step')).toBe(true)
+    // assistant-step 原生带子座位（reasoning.body / message.images），遮蔽 wrap
+    // 无法合法渲染（2026-11-13 拆除）；产物里只应有其余节点帧（如 turn-error）。
+    expect(registered.some(options => options.key === 'assistant-step')).toBe(false)
+    expect(registered.some(options => options.key === 'turn-error')).toBe(true)
   })
 })
