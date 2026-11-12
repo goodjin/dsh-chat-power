@@ -43,6 +43,7 @@ export type ChatPowerLocaleKey =
   | 'compose.copy' | 'compose.save' | 'compose.saveSaved' | 'compose.saveFailed'
   | 'selection.sendToChat'
   | 'selection.quote' | 'selection.toolbarLabel'
+  | 'selection.copy' | 'selection.copied' | 'selection.copyFailed'
   | 'selection.edit' | 'selection.multiAdd' | 'selection.editCount'
   | 'selection.removeItem'
   | 'selection.multiAdded' | 'selection.editTitle' | 'selection.multiEditTitle'
@@ -135,6 +136,9 @@ export const zh: Record<ChatPowerLocaleKey, string> = {
   'selection.sendToChat': '发送会话',
   'selection.quote': '引用',
   'selection.toolbarLabel': '选区操作',
+  'selection.copy': '复制',
+  'selection.copied': '已复制',
+  'selection.copyFailed': '复制失败，请手动复制',
   'selection.edit': '编辑',
   'selection.multiAdd': '多选',
   'selection.editCount': '编辑 ({count})',
@@ -256,6 +260,9 @@ export const en: Record<ChatPowerLocaleKey, string> = {
   'selection.sendToChat': 'Send to chat',
   'selection.quote': 'Quote',
   'selection.toolbarLabel': 'Selection actions',
+  'selection.copy': 'Copy',
+  'selection.copied': 'Copied',
+  'selection.copyFailed': 'Copy failed; select the text to copy manually',
   'selection.edit': 'Edit',
   'selection.multiAdd': 'Multi-select',
   'selection.editCount': 'Edit ({count})',

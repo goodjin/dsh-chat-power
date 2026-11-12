@@ -109,16 +109,16 @@ describe('组件形状（不渲染，只验证产出的元素结构）', () => {
     expect(props['data-dshcaSelbar']).toBe('')
   })
 
-  it('四个按钮按序排列：引用（官方同位）在前，其后发送/编辑/多选', () => {
+  it('五个按钮按序排列：引用、复制在前，其后发送/编辑/多选', () => {
     const element = render()
     const props = element.props as { children: unknown[] }
     const actions = (props.children as ReactElement[])
       .flatMap(child => (child as { props?: { 'data-action'?: string } }).props?.['data-action'] ? [child] : [])
       .map(child => (child as { props: { 'data-action': string } }).props['data-action'])
-    expect(actions).toEqual(['quote', 'send-to-chat', 'edit-selection', 'multi-add'])
+    expect(actions).toEqual(['quote', 'copy-selection', 'send-to-chat', 'edit-selection', 'multi-add'])
   })
 
-  it('引用钮与其余功能之间有一道分隔线', () => {
+  it('引用/复制与其余功能之间有一道分隔线', () => {
     const element = render()
     const props = element.props as { children: unknown[] }
     const divider = (props.children as ReactElement[]).find(
