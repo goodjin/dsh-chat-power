@@ -17,6 +17,11 @@ it.each([false, true])('restores the original composer and its expanded state (%
   document.body.append(style)
   const input = document.querySelector<HTMLElement>('[data-composer-input]')!
   document.querySelector('[data-composer-card]')!.classList.toggle(BIG_CLASS, wasExpanded)
+  const card = input.closest<HTMLElement>('[data-composer-card]')!
+  let available = 800
+  vi.spyOn(document.querySelector('[data-conversation-content]')!, 'getBoundingClientRect').mockImplementation(() => ({ height: available }) as DOMRect)
+  vi.spyOn(card, 'getBoundingClientRect').mockReturnValue({ height: 400 } as DOMRect)
+  vi.spyOn(document.querySelector('[data-composer-seat]')!, 'getBoundingClientRect').mockReturnValue({ height: 440 } as DOMRect)
   let draft = { text: '原草稿', references: [] }
   const host = {
     get draftSnapshot() { return draft },
@@ -48,7 +53,10 @@ it.each([false, true])('restores the original composer and its expanded state (%
     expect(cardStyle.width).toBe('720px')
     expect(cardStyle.padding).toBe('12px')
     expect(cardStyle.borderRadius).toBe('24px')
-    expect(Number.parseFloat(cardStyle.height)).toBeCloseTo(window.innerHeight * 0.6)
+    expect(card.style.getPropertyValue('--compose-edit-height')).toBe('760px')
+    available = 600
+    act(() => window.dispatchEvent(new Event('resize')))
+    expect(card.style.getPropertyValue('--compose-edit-height')).toBe('560px')
     expect(document.getElementById('native-send')).toBe(nativeSend)
     expect(document.getElementById('info')?.textContent).toBe('输入框信息')
     act(() => nativeSend.click())
@@ -70,6 +78,8 @@ it.each([false, true])('restores the original composer and its expanded state (%
     expect(reveal).toHaveBeenCalledTimes(1)
     act(() => (document.querySelector('[data-compose-cancel]') as HTMLElement).click())
     expect(input.textContent).toBe('原草稿')
+    expect(card.style.getPropertyValue('--compose-edit-height')).toBe('')
+    expect(card.hasAttribute('data-compose-edit-file')).toBe(false)
     expect(document.querySelector('[data-compose-edit]')).toBeNull()
     expect(document.querySelector('[data-composer-card]')?.classList.contains(BIG_CLASS)).toBe(wasExpanded)
     expect(document.querySelector('[data-compose-edit-head]')).toBeNull()

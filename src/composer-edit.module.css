@@ -12,3 +12,8 @@
 }
 [data-compose-edit-head], [data-compose-edit-actions] { flex: none; }
 [data-compose-edit] :global(.dshcp-composer-toggle) { display: none; }
+
+[data-conversation-content] [data-composer-card][data-compose-edit-file] {
+  height: var(--compose-edit-height, 60vh) !important;
+  min-height: 0 !important;
+}

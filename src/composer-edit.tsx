@@ -28,6 +28,19 @@ export function ComposerEditSurface({ sessionId, shellOf }: { sessionId: string;
     const wasExpanded = card.classList.contains(BIG_CLASS)
     card.classList.add(BIG_CLASS)
     card.dataset.composeEdit = ''
+    // File editing fills the available conversation height. Measure the seat's
+    // native chrome as well so its footer and padding remain inside the page.
+    const resizeFile = () => {
+      if (!request.save) return
+      const available = content.getBoundingClientRect().height
+      const chrome = Math.max(0, seat.getBoundingClientRect().height - card.getBoundingClientRect().height)
+      if (available > chrome) card.style.setProperty('--compose-edit-height', `${available - chrome}px`)
+    }
+    if (request.save) card.dataset.composeEditFile = ''
+    resizeFile()
+    const resize = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(resizeFile)
+    if (request.save) { resize?.observe(content); resize?.observe(seat) }
+    window.addEventListener('resize', resizeFile)
     setMounts({ head, actions })
     try {
       const shell = shellOf(sessionId)
@@ -41,6 +54,10 @@ export function ComposerEditSurface({ sessionId, shellOf }: { sessionId: string;
       try { detachComposerEdit(sessionId) } catch (error) { console.warn('[chat-power] restore draft:', error) }
       head.remove(); actions.remove()
       card.classList.toggle(BIG_CLASS, wasExpanded)
+      resize?.disconnect()
+      window.removeEventListener('resize', resizeFile)
+      card.style.removeProperty('--compose-edit-height')
+      delete card.dataset.composeEditFile
       delete card.dataset.composeEdit
       setMounts(null); setReady(false)
     }
