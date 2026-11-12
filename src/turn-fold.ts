@@ -517,7 +517,11 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
   const ensureComposerBar = (container: Element): void => {
     const seat = container.querySelector('[data-composer-seat]')
     if (seat === null) return
-    let bar = seat.querySelector(`[${COMPOSER_BAR_ATTR}]`)
+    // 宿主输入栈：composer seat 的第一层子元素是 composerStack（flex 列，
+    // 输入卡在里面）——标题栏插进这根列的最顶上，与输入卡同宽、同宽窄变化。
+    const stack = seat.firstElementChild
+    if (stack === null) return
+    let bar = stack.querySelector(`:scope > [${COMPOSER_BAR_ATTR}]`)
     if (bar === null) {
       bar = document.createElement('div')
       bar.setAttribute(COMPOSER_BAR_ATTR, '')
@@ -525,16 +529,15 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
       // 快捷信息按钮（会话号从会话根节点取）。
       const sessionId = container.closest('[data-conversation-session]')?.getAttribute('data-conversation-session') ?? ''
       if (sessionId !== '') bar.append(buildQuickButton(sessionId))
-      seat.insertBefore(bar, seat.firstChild)
+      stack.insertBefore(bar, stack.firstChild)
     }
-    // 宿主的点赞行（答案框外的 aria-pressed 按钮排）搬进标题栏。
-    for (const like of Array.from(container.querySelectorAll('button[aria-pressed]'))) {
-      if (like.closest('[data-chat-power-frame-box]') !== null) continue
-      const holder = like.parentElement
-      if (holder === null || holder.parentElement === bar) continue
-      if (holder.hasAttribute(COMPOSER_BAR_ATTR) || holder.closest(`[${COMPOSER_BAR_ATTR}]`) !== null) continue
-      holder.setAttribute('data-chat-power-feedback', '')
-      bar.append(holder)
+    // 宿主的点赞行容器（`[data-turn-tail]`，含 IconActions 那排）整体搬进标题栏：
+    // tail 行还是宿主的元素，只是换了父级；宿主重渲染重建后观察器再搬回来。
+    for (const tail of Array.from(container.querySelectorAll('[data-turn-tail]'))) {
+      if (tail.parentElement === bar) continue
+      if (tail.closest(`[${COMPOSER_BAR_ATTR}]`) === tail) continue
+      tail.setAttribute('data-chat-power-feedback', '')
+      bar.append(tail)
     }
   }
 
@@ -850,8 +853,35 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
       record.frame = frame
       console.info(`[chat-power] turn frame: 轮 ${record.number} 框已插入（行数 ${record.rows.length}）`)
     }
+    // 行真正装进框：该轮所有行 + 本轮的文件尾行（turn-tail，不带轮次号所以
+    // rowsOf 抓不到——按相邻轮次号补抓）按文档顺序移入框内（引用迁移，不复制）。
+    // 宿主重渲染重建行后，观察器会在下一轮 sync 里把它们重新搬回来。
+    for (const row of turnRowsWithTail(record, parent)) {
+      if (row.parentElement !== frame) frame.append(row)
+    }
     frame.dataset['turn'] = String(record.number)
     applyCapsToFrame(record, container)
+  }
+
+  /**
+   * 这一轮应装进框的全部行：轮次行 + 紧随其后的文件尾行。
+   *
+   * 文件尾行（`[data-turn-tail]`）不带轮次号，宿主把它画在该轮最后一行之后；
+   * 从第一行的下一个兄弟开始，连续收集 turn-tail 行（遇到下一轮的行就停）。
+   */
+  const turnRowsWithTail = (record: TurnRecord, parent: Element): readonly HTMLElement[] => {
+    const rows = [...record.rows]
+    const last = rows.at(-1)
+    if (last === undefined) return rows
+    let next = last.nextElementSibling
+    while (next !== null) {
+      if (next.hasAttribute(TURN_ATTR)) break
+      if (next.hasAttribute(TURN_FRAME_ATTR)) break
+      if (next.matches('[data-turn-tail]')) rows.push(next as HTMLElement)
+      else break
+      next = next.nextElementSibling
+    }
+    return rows
   }
 
   /**

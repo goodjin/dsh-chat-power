@@ -40,10 +40,17 @@ function buildConversation(sessionId = 's-q', onSendQuick?: (text: string) => vo
   answerRow.appendChild(holder)
   flow.append(row, answerRow)
   scroller.appendChild(flow)
-  // 宿主结构里 composer seat 在滚动层末尾（快捷信息按钮与点赞行的新家）。
+  // 宿主结构：composer seat → composerStack（flex 列，输入卡在里面）。
   const seat = document.createElement('div')
   seat.setAttribute('data-composer-seat', '')
+  const stack = document.createElement('div')
+  seat.appendChild(stack)
   scroller.appendChild(seat)
+  // 点赞行容器：宿主画在答案下面的 turn-tail 行（不带轮次号）。
+  const tail = document.createElement('div')
+  tail.setAttribute('data-turn-tail', '1')
+  tail.appendChild(holder)
+  flow.append(tail)
   session.appendChild(scroller)
   document.body.appendChild(session)
   Object.defineProperty(scroller, 'clientHeight', { value: 800, configurable: true })
