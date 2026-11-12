@@ -28,3 +28,19 @@
 .dismiss { position:absolute; inset:0; z-index:29; cursor:default !important; background:transparent !important; }
 .menu { position:absolute; right:8px; top:40px; z-index:30; display:flex; flex-direction:column; min-width:180px; padding:5px; border:1px solid var(--dsw-alias-border-l2); border-radius:8px; background:var(--dsw-alias-bg-layer-1); box-shadow:0 4px 16px #0003; }
 .menu button { text-align:left; }
+.managerToolbar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:12px 0; }
+.managerToolbar input { flex:1; min-width:200px; background:var(--dsw-alias-bg-layer-1); color:inherit; border:1px solid var(--dsw-alias-border-l2); border-radius:5px; padding:6px; }
+.managerLayout { display:flex; gap:16px; align-items:stretch; min-height:0; }
+.managerLayout nav { flex:none; width:200px; overflow:auto; border-right:1px solid var(--dsw-alias-border-l2); padding-right:10px; }
+.managerLayout nav ul { list-style:none; margin:0; padding:0; }
+.managerLayout nav li { margin:2px 0; }
+.managerLayout > div[aria-label=书签列表] { flex:1; overflow:auto; }
+.managerLayout ul[role=list] { list-style:none; margin:0; padding:0; }
+.managerLayout li[role=listitem] { display:flex; gap:6px; align-items:center; padding:4px 6px; border-radius:5px; }
+.managerLayout li[role=listitem]:hover { background:var(--dsw-alias-interactive-bg-hover); }
+.folderRow { font-weight:600; }
+.urlPreview { color:var(--dsw-alias-label-secondary); font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.dialog { position:fixed; z-index:40; top:50%; left:50%; transform:translate(-50%,-50%); min-width:320px; max-width:480px; padding:18px; border:1px solid var(--dsw-alias-border-l2); border-radius:10px; background:var(--dsw-alias-bg-layer-1); box-shadow:0 8px 28px #0004; }
+.dialog form { display:flex; flex-direction:column; gap:10px; margin:0; }
+.dialog label { display:flex; flex-direction:column; gap:4px; }
+.dialog input,.dialog select { background:var(--dsw-alias-bg-layer-1); color:inherit; border:1px solid var(--dsw-alias-border-l2); border-radius:5px; padding:6px; }
