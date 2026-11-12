@@ -46,10 +46,10 @@ export type SelectionSend = (sessionId: string, text: string) => void
 /** 「引用」图标（描边，与官方引用卡引号同一语汇；颜色随文字）。 */
 const ICON_QUOTE = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M6 3.5c-2 0-3.5 1.6-3.5 3.7 0 2 1.4 3.3 3.1 3.3.3 0 .6 0 .7-.1-.3 1.3-1.4 2.4-2.8 2.7l.6 1.1c2.7-.7 4.6-3 4.6-6.1 0-2.6-1.4-4.6-3.7-4.6Zm6.4 0c-2 0-3.5 1.6-3.5 3.7 0 2 1.4 3.3 3.1 3.3.3 0 .6 0 .7-.1-.3 1.3-1.4 2.4-2.8 2.7l.6 1.1c2.7-.7 4.6-3 4.6-6.1 0-2.6-1.4-4.6-3.7-4.6Z" fill="currentColor"/></svg>'
 
-/** 「多选」图标（叠层，与旧弹条同名；颜色随文字）。 */
-const ICON_LAYERS = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M3 10.5V3.8C3 3.4 3.4 3 3.8 3h6.7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>'
+/** 「多选」图标：复选框（圆角方框里一道勾），表达「把这段勾进收藏、可多段累积」。 */
+const ICON_LAYERS = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true" data-icon="checkbox"><rect x="2.5" y="2.5" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.3"/><path d="M4.8 8.2 l2.2 2.2 l4.2 -4.6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>'
 
-/** 「复制」图标（两张叠放的纸，与多选的叠层区分开；颜色随文字）。 */
+/** 「复制」图标（两张叠放的纸，与上面的复选框一眼分开；颜色随文字）。 */
 const ICON_COPY = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M10.5 3.5H4.3c-.4 0-.8.4-.8.8v6.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>'
 
 /** 工具栏按钮定义：动作 id、图标（空串表示用 primitives 组件）、文案键。 */
