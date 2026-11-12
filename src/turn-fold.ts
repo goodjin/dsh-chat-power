@@ -427,6 +427,10 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     container.closest('[data-conversation-session]')?.getAttribute('data-conversation-session') ?? undefined
 
   const resetSession = (key: string | undefined): void => {
+    for (const attr of document.querySelectorAll('[data-chat-power-tail-attached]')) {
+      attr.removeAttribute(TURN_ATTR)
+      attr.removeAttribute('data-chat-power-tail-attached')
+    }
     for (const record of records.values()) {
       record.frame?.remove()
       for (const row of record.rows) row.removeAttribute(REQUEST_HIDDEN_ATTR)
@@ -853,35 +857,28 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
       record.frame = frame
       console.info(`[chat-power] turn frame: 轮 ${record.number} 框已插入（行数 ${record.rows.length}）`)
     }
-    // 行真正装进框：该轮所有行 + 本轮的文件尾行（turn-tail，不带轮次号所以
-    // rowsOf 抓不到——按相邻轮次号补抓）按文档顺序移入框内（引用迁移，不复制）。
-    // 宿主重渲染重建行后，观察器会在下一轮 sync 里把它们重新搬回来。
-    for (const row of turnRowsWithTail(record, parent)) {
-      if (row.parentElement !== frame) frame.append(row)
+    // 行**不搬进框**：flow 行是宿主 React 渲染树的位置本身，挪走会破坏宿主的
+    // 调和与锚点测量（2026-11-13 现场：搬进行后整个会话区只剩「加载更早」）。
+    // 框只承载标题行（页签/文件钮），与行保持相邻；视觉合成靠 CSS 兄弟选择器。
+    // 文件尾行（turn-tail）不带轮次号、rowsOf 抓不到：按相邻规则给它也标上轮次，
+    // 让页签的显示/隐藏与限高把它当作本轮成员。
+    let next = lastSiblingOf(firstRow)
+    while (next !== null && next.matches('[data-turn-tail]')) {
+      if (!next.hasAttribute(TURN_ATTR)) {
+        next.setAttribute(TURN_ATTR, String(record.number))
+        next.setAttribute('data-chat-power-tail-attached', '')
+      }
+      next = next.nextElementSibling
     }
     frame.dataset['turn'] = String(record.number)
     applyCapsToFrame(record, container)
   }
 
-  /**
-   * 这一轮应装进框的全部行：轮次行 + 紧随其后的文件尾行。
-   *
-   * 文件尾行（`[data-turn-tail]`）不带轮次号，宿主把它画在该轮最后一行之后；
-   * 从第一行的下一个兄弟开始，连续收集 turn-tail 行（遇到下一轮的行就停）。
-   */
-  const turnRowsWithTail = (record: TurnRecord, parent: Element): readonly HTMLElement[] => {
-    const rows = [...record.rows]
-    const last = rows.at(-1)
-    if (last === undefined) return rows
-    let next = last.nextElementSibling
-    while (next !== null) {
-      if (next.hasAttribute(TURN_ATTR)) break
-      if (next.hasAttribute(TURN_FRAME_ATTR)) break
-      if (next.matches('[data-turn-tail]')) rows.push(next as HTMLElement)
-      else break
-      next = next.nextElementSibling
-    }
-    return rows
+  /** 第一行在宿主流里的最后一个兄弟（含文件尾行的收集起点）。 */
+  const lastSiblingOf = (firstRow: HTMLElement): Element | null => {
+    let node: Element | null = firstRow
+    while (node.nextElementSibling !== null) node = node.nextElementSibling
+    return node
   }
 
   /**
@@ -1280,6 +1277,10 @@ export function startTurnFold(options: TurnFoldOptions = {}): () => void {
     // 快捷信息面板与按钮：一并摘掉（宿主重渲染后由新控制器重挂）。
     closeQuickPanel()
     for (const stale of document.querySelectorAll(`[${QUICK_BTN_ATTR}]`)) stale.remove()
+    for (const attr of document.querySelectorAll('[data-chat-power-tail-attached]')) {
+      attr.removeAttribute(TURN_ATTR)
+      attr.removeAttribute('data-chat-power-tail-attached')
+    }
     for (const record of records.values()) {
       record.frame?.remove()
       for (const row of record.rows) {

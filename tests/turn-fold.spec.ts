@@ -427,6 +427,13 @@ describe('每轮一框（turn-frame-redesign）', () => {
     expect(source).toContain("frame.setAttribute('data-chat-power-frame'")
   })
 
+  it('flow 行不搬进框（宿主 React 拥有行位置，挪走会清空会话区）', () => {
+    const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
+    // 框只承载标题行；行留在宿主原位，文件尾行靠附加轮次标记纳入。
+    expect(source).not.toContain('frame.append(row)')
+    expect(source).toContain("data-chat-power-tail-attached")
+  })
+
   it('框标题行有 请求/过程/结果 三个页签，默认结果', () => {
     const source = readFileSync(new URL('../src/turn-fold.ts', import.meta.url), 'utf8')
     expect(source).toContain('TURN_TAB_ATTR')
