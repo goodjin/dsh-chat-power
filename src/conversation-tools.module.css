@@ -176,3 +176,14 @@
 
 .tools[hidden],.browserWorkspace[hidden] { display:none; }
 .browserWorkspace { display:flex; flex:1; min-height:0; min-width:0; }
+
+/* 文件编辑与回答列同宽，左右对称留白；文件树等工具保留原布局。 */
+.content:has(> [data-chat-tools-editor]:not([hidden])) {
+  padding-inline: 16px;
+}
+.body[data-chat-tools-editor] {
+  flex: 1 1 auto;
+  width: 100%;
+  max-width: var(--dsh-chat-content-width, 748px);
+  margin-inline: auto;
+}

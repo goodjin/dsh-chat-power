@@ -135,7 +135,7 @@ export function registerConversationTools(ctx: any) {
           const definition = adapter.definitions.get(tab.kind)
           const info = adapter.tabInfo(id, tab, visible)
           const doc = docs.get(docKey(id, tab.contentId))
-          return <div key={tab.id} hidden={!visible} className={css.body}>
+          return <div key={tab.id} hidden={!visible} className={css.body} data-chat-tools-editor={tab.kind === 'local' ? '' : undefined}>
             {tab.kind === 'local' && doc !== undefined
               ? <LocalFileComposerCard variant="tab" doc={doc} readers={readers} t={fallbackT} sessionId={id}
                   onReveal={tab.contentId.startsWith('edit://') ? () => {

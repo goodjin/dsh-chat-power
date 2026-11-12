@@ -1,10 +1,8 @@
 /**
  * 选区编辑卡：弹条「编辑」/ 多选浮动「编辑」钮打开的编辑框。
  *
- * 展示形态（2026-11-05 用户要求）：**占满整个会话区域**——外层用 fixed
- * 定位覆盖 `[data-conversation-scroll]` 的客户区（含 16px 内边距），不随
- * 消息滚动移动；窗口尺寸变化时重新对位。高度天然远超 10 行的下限。
- * 内部走 ComposeCard 统一外壳（标题、发送副本说明、头部取消、底部动作行）。
+ * 编辑卡进入会话正文的正常布局，位于输入框前，与回答列使用同一宽度。
+ * 内部走 ComposeCard 统一外壳。
  *
  * 文本来自 selection-actions.ts 的编辑卡 store：
  * - 单选编辑：初始为选中的文字，关闭/发送不影响多选收藏；
@@ -16,6 +14,7 @@
  */
 import { useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { IconWarningOutlineRegular, Toast } from '@deepseek-ai/dsh-client-ui-primitives'
 import { closeSelectionEdit, currentSessionIdFromDom, getSelectionEdit, selectionEditVisible, subscribeSelectionEdit } from './selection-actions.ts'
 import type { SelectionEditState } from './selection-actions.ts'
@@ -29,9 +28,6 @@ import css from './markdown-turn.module.css'
 
 export const SELECTION_EDIT_ID = 'chat-power-selection-edit'
 
-/** 编辑卡覆盖会话区域时的内边距。 */
-const COVER_PADDING = 16
-
 function SelectionEditCard(props: {
   readonly state: SelectionEditState
   readonly readers: MarkdownTurnReaders
@@ -42,46 +38,29 @@ function SelectionEditCard(props: {
   const [toast, setToast] = useState<{ seq: number; text: string } | null>(null)
   const [hasText, setHasText] = useState(props.state.text.trim() !== '')
   const inputRef = useRef<HTMLTextAreaElement>(null)
-  const coverRef = useRef<HTMLDivElement>(null)
+  const [mount, setMount] = useState<HTMLDivElement | null>(null)
   const modeRef = useRef<'current' | 'new'>('current')
   const propsRef = useRef(props)
   propsRef.current = props
   const t = props.t
 
-  // 覆盖层对位：占满会话滚动区域，但**下边界不越过 composer**（composerSeat
-  // 在 scrollBody 内部，直接取 scroller 矩形会把输入框盖住）；composer 高度
-  // 变化（草稿增行）经 ResizeObserver 重新对位，窗口尺寸变化同样重算。
+  // 自己的挂载点进入正文流，不移动宿主节点，也不覆盖消息和输入框。
   useLayoutEffect(() => {
-    const cover = coverRef.current
-    if (cover === null) return
-    const align = (): void => {
-      const scroller = document.querySelector('[data-conversation-scroll]')
-      if (scroller === null) return
-      const rect = scroller.getBoundingClientRect()
-      const composerSeat = document.querySelector('[data-composer-seat]')
-      let bottom = rect.bottom
-      if (composerSeat !== null) bottom = Math.min(bottom, composerSeat.getBoundingClientRect().top - 8)
-      const top = rect.top + COVER_PADDING
-      const left = rect.left + COVER_PADDING
-      cover.style.left = `${left}px`
-      cover.style.top = `${top}px`
-      cover.style.width = `${rect.width - COVER_PADDING * 2}px`
-      // 高度保底 224px（10 行），上限不越 composer。
-      cover.style.height = `${Math.max(bottom - top, 224)}px`
-    }
-    align()
-    const composerSeat = document.querySelector('[data-composer-seat]')
-    let observer: ResizeObserver | undefined
-    if (composerSeat !== null) {
-      observer = new ResizeObserver(align)
-      observer.observe(composerSeat)
-    }
-    window.addEventListener('resize', align)
-    return () => {
-      observer?.disconnect()
-      window.removeEventListener('resize', align)
-    }
+    const scroller = document.querySelector('[data-conversation-scroll]')
+    if (scroller === null) return
+    const node = document.createElement('div')
+    node.className = css.coverHost ?? ''
+    node.setAttribute('data-selection-edit-cover', '')
+    const composer = scroller.querySelector('[data-composer-seat]')
+    if (composer?.parentElement === scroller) scroller.insertBefore(node, composer)
+    else scroller.append(node)
+    setMount(node)
+    return () => { node.remove() }
   }, [])
+
+  useLayoutEffect(() => {
+    mount?.scrollIntoView?.({ block: 'nearest' })
+  }, [mount])
 
   const controller = useMemo(() => createSendController({
     send: (body: string): Promise<void> => {
@@ -118,7 +97,9 @@ function SelectionEditCard(props: {
 
   const title = t(props.state.multi ? 'selection.multiEditTitle' : 'selection.editTitle')
 
-  return (
+  if (mount === null) return null
+
+  return createPortal(
     <>
       {toast !== null && <Toast
         key={toast.seq}
@@ -126,13 +107,6 @@ function SelectionEditCard(props: {
         icon={<IconWarningOutlineRegular />}
         onDone={() => { setToast(null) }}
       />}
-      {/* fixed 覆盖会话区域：占满整个聊天视口，不随消息滚动移动。 */}
-      <div
-        ref={coverRef}
-        className={css.coverHost}
-        data-selection-edit-cover=""
-        style={{ position: 'fixed', zIndex: 40 }}
-      >
         <ComposeCard
           className={css.coverFill}
           title={title}
@@ -157,8 +131,8 @@ function SelectionEditCard(props: {
           />
           {notice !== null && <p key={notice.seq} className={statusNoticeClass} data-variant="error" role="alert">{notice.text}</p>}
         </ComposeCard>
-      </div>
-    </>
+    </>,
+    mount,
   )
 }
 
