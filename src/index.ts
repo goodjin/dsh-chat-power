@@ -38,7 +38,7 @@ export const name = 'dsh-chat-power'
  * 不声明的话会抢在它注册之前启动，拿到 undefined 直接抛错（2026-11-05 现场：
  * 桌面版启动时把整条 entry 弄成 failed）。
  */
-export const inject = ['slots', 'locale', 'remote', 'remote.session', 'remote.workspaceFiles', 'sidebarRight', 'uiSession', 'sessions'] as const
+export const inject = ['slots', 'locale', 'remote', 'remote.session', 'remote.workspaceFiles', 'sidebarRight', 'uiSession', 'sessions', 'conversation'] as const
 
 export interface PluginContext {
   logger(name: string): { info(message: string): void; warn(message: string): void }

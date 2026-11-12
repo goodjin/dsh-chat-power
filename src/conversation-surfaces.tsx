@@ -361,6 +361,9 @@ export function registerConversationSurfaces(ctx: Surface): void {
       readers,
       dshT,
       sessionKey,
+      id => {
+        try { return (ctx.get('conversation') as any)?.input?.shell(id) } catch { return undefined }
+      },
     )
   } catch (error) {
     if (typeof console !== 'undefined') console.warn(`[dsh-chat-power] local file composer: registration failed — ${error instanceof Error ? error.message : String(error)}`)

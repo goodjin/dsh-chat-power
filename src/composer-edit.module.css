@@ -1,0 +1,30 @@
+/* The host editor stays in place; only our own header/actions nodes are added. */
+[data-compose-edit] {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 !important;
+  min-height: 0 !important;
+  height: 100%;
+}
+[data-compose-edit] > :not([data-input-scroll]):not([data-compose-edit-head]):not([data-compose-edit-actions]) { display: none !important; }
+[data-compose-edit] [data-input-scroll] { flex: 1; min-height: 0; max-height: none !important; overflow: auto; }
+[data-compose-edit] [data-composer-input] { min-height: 100%; white-space: pre-wrap; tab-size: 4; }
+[data-compose-edit-head], [data-compose-edit-actions] { flex: none; }
+[data-conversation-content][data-compose-editing] [data-conversation-scroll] > :not([data-composer-seat]) { display: none !important; }
+[data-compose-editing-seat] {
+  position: relative !important;
+  flex: 1 !important;
+  min-height: 320px !important;
+  width: calc(100% - 32px) !important;
+  max-width: var(--dsh-chat-content-width, 748px) !important;
+  margin: 10px auto !important;
+  padding: 0 !important;
+}
+[data-compose-editing-seat] > div { height: 100%; max-width: none !important; }
+
+[data-compose-edit-wrap] {
+  display: flex !important; flex-direction: column !important; flex: 1 !important;
+  width: 100% !important; max-width: none !important; min-height: 0 !important;
+  padding: 0 !important; margin: 0 !important;
+}
+[data-compose-edit-wrap] > :not([data-compose-edit-wrap]):not([data-compose-edit]) { display: none !important; }

@@ -605,21 +605,3 @@
   border-radius: var(--dsw-radius-xs, 2px);
   background: var(--dsw-alias-interactive-bg-hover, rgba(127, 127, 127, 0.2));
 }
-
-/* 选区编辑卡参与正文布局，沿用宿主回答列宽与居中方式。 */
-.coverHost {
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  flex: none;
-  width: calc(100% - 32px);
-  max-width: var(--dsh-chat-content-width, 748px);
-  margin: 10px auto;
-  min-height: 320px;
-  height: 55dvh;
-}
-
-.coverFill {
-  flex: 1;
-  min-height: 0;
-}

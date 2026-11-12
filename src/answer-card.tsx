@@ -1,15 +1,4 @@
-/**
- * 一轮最终答案的卡片（统一编辑链路）。
- *
- * 阅读态：轻量标题「回答」+ 右侧编辑 / 复制两个图标按钮；正文沿用原生渲染
- * （思考的折叠留在卡内）。编辑态换成 ComposeCard 统一外壳：标题「编辑回答副本」、
- * 说明「发送副本」、取消在头部、新建会话与发送在底部动作行。
- *
- * 发送走统一控制器：空白禁用、在途防重复、成功才退出编辑、失败保留正文并
- * 在编辑器下方给出可重试提示。草稿值经本卡的 ref 读取——同一会话多张答案卡
- * 同时编辑不会经全局 DOM 查询串值（2026-11 现场：readEditValue 用全局选择器，
- * 多卡同开可能读到别卡的输入）。
- */
+/** Answer cards keep their read view; editing is owned by the host composer. */
 import { useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   IconCheckOutlineRegular,
@@ -21,9 +10,9 @@ import {
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { linkedFilePathsFromText, type MarkdownTurnReaders } from './markdown-turn-sources.ts'
 import { answerFileLinksAttr, ANSWER_FILE_LINKS_ATTR } from './answer-file-links.ts'
-import { ComposeCard } from './compose-card.tsx'
-import { copyTextToClipboard, createSendController } from './send-actions.ts'
-import { inputClass, statusNoticeClass, uiButtonClass } from './ui-theme.ts'
+import { openComposerEdit } from './composer-edit-state.ts'
+import { copyTextToClipboard } from './send-actions.ts'
+import { uiButtonClass } from './ui-theme.ts'
 import styles from './answer-card.module.css'
 
 /** Plain-prose copyable text from the answer's text/reasoning blocks. */
@@ -67,14 +56,7 @@ export function AnswerCard(props: {
   readonly status?: string
 }): ReactNode {
   const [copied, setCopied] = useState(false)
-  const [editing, setEditing] = useState(false)
-  const [pending, setPending] = useState(false)
-  // draft 为 null 表示还没动过键，显示原文；一旦输入就完全受控（清空即空，不回弹原文）。
-  const [draft, setDraft] = useState<string | null>(null)
-  const [notice, setNotice] = useState<{ seq: number; text: string } | null>(null)
   const [toast, setToast] = useState<{ seq: number; text: string } | null>(null)
-  const inputRef = useRef<HTMLTextAreaElement>(null)
-  const modeRef = useRef<'current' | 'new'>('current')
   const propsRef = useRef(props)
   propsRef.current = props
   const text = answerText(props.blocks)
@@ -82,31 +64,6 @@ export function AnswerCard(props: {
   const t = props.t
   // 还在流式输出时先不给编辑/复制按钮——回答完成了才出现。
   const settled = props.status !== 'running'
-
-  // 发送控制器挂一次；props 经 ref 取最新值，避免闭包捕获旧会话号。
-  const controller = useMemo(() => createSendController({
-    send: (body: string): Promise<void> => {
-      const { sessionId, readers } = propsRef.current
-      if (readers === undefined) return Promise.reject(new Error('readers unavailable'))
-      if (modeRef.current === 'new') {
-        const prompt = `${NEW_SESSION_HEADER}\n\n${body}`
-        return (sessionId === undefined
-          ? readers.createSession({})
-          : readers.createSession({ inheritCwdFrom: sessionId }))
-          .then(newId => readers.sendToSession(newId, prompt))
-      }
-      if (sessionId === undefined) return Promise.reject(new Error('sessionId unavailable'))
-      return readers.sendToSession(sessionId, body)
-    },
-    onPendingChange: setPending,
-    onSuccess: () => { setEditing(false); setNotice(null) },
-    onFailure: () => {
-      const message = modeRef.current === 'new'
-        ? propsRef.current.t('markdownTurn.newSessionFailed')
-        : propsRef.current.t('markdownTurn.sendFailed')
-      setNotice(current => ({ seq: (current?.seq ?? 0) + 1, text: message }))
-    },
-  }), [])
 
   const run = (): void => {
     void copyTextToClipboard(text).then(ok => {
@@ -118,46 +75,11 @@ export function AnswerCard(props: {
       setToast({ seq: Date.now(), text: propsRef.current.t('markdownTurn.copyFailed') })
     })
   }
-  const submitEdit = (mode: 'current' | 'new'): void => {
-    modeRef.current = mode
-    controller.submit(inputRef.current?.value ?? '')
-  }
-  const copyEdit = (): void => {
-    void copyTextToClipboard(inputRef.current?.value ?? editValue).then(ok => {
-      if (!ok) setToast({ seq: Date.now(), text: propsRef.current.t('markdownTurn.copyFailed') })
-    })
-  }
-  const editValue = draft ?? text
   // 正文里的文件链接清单：写进 DOM，拦截层据此认出宿主渲染的文件链接按钮。
   const fileLinks = useMemo(() => answerFileLinks(props.blocks), [props.blocks])
 
   return (
     <div data-acp-answer-card>
-      {editing ? (
-        <ComposeCard
-          title={t('answerCard.editAnswer')}
-          subtitle={t('compose.copyHint')}
-          onCancel={() => { if (!pending) setEditing(false) }}
-          onCopy={copyEdit}
-          onSend={() => { submitEdit('current') }}
-          onSendNewSession={() => { submitEdit('new') }}
-          sendDisabled={editValue.trim() === ''}
-          pending={pending}
-          labels={{ cancel: t('markdownTurn.cancel'), send: t('compose.sendCurrent'), newSession: t('compose.sendNewSession'), copy: t('compose.copy') }}
-        >
-          <textarea
-            ref={inputRef}
-            className={inputClass}
-            data-answer-edit-input=""
-            value={editValue}
-            onChange={event => { setDraft(event.target.value) }}
-            autoFocus
-            aria-label={t('answerCard.edit')}
-            style={{ minHeight: '50dvh' }}
-          />
-          {notice !== null && <p key={notice.seq} className={statusNoticeClass} data-variant="error" role="alert">{notice.text}</p>}
-        </ComposeCard>
-      ) : (
         <div className={styles.answerCard} data-answer-card="" data-chat-power-frame-box="" data-chat-power-kind="answer" data-answer-status={props.status ?? 'settled'}>
           <div className={styles.answerCardHeader} data-answer-header="" data-chat-power-frame-header="">
             <span className={styles.answerCardTitle} data-answer-title="">{t('answerCard.title')}</span>
@@ -171,7 +93,16 @@ export function AnswerCard(props: {
                     data-action="edit-answer"
                     aria-label={t('answerCard.edit')}
                     title={t('answerCard.edit')}
-                    onClick={() => { setDraft(null); setNotice(null); setEditing(true) }}
+                    onClick={() => {
+                      if (!props.sessionId || !props.readers) return
+                      const id = props.sessionId, readers = props.readers
+                      if (!openComposerEdit({ sessionId: id, title: t('answerCard.editAnswer'), text,
+                        send: async (body, target) => {
+                          const destination = target === 'new' ? await readers.createSession({ inheritCwdFrom: id }) : id
+                          await readers.sendToSession(destination, target === 'new' ? `${NEW_SESSION_HEADER}\n\n${body}` : body)
+                        },
+                      })) setToast({ seq: Date.now(), text: '请先完成当前编辑' })
+                    }}
                   >
                     <IconEditOutlineRegular size={16} className={styles.answerCardIcon} />
                   </button>
@@ -200,7 +131,6 @@ export function AnswerCard(props: {
             {...{ [ANSWER_FILE_LINKS_ATTR]: fileLinks.length > 0 ? answerFileLinksAttr(fileLinks) : undefined }}
           >{props.children}</div>
         </div>
-      )}
       {toast !== null && <Toast
         key={toast.seq}
         text={toast.text}

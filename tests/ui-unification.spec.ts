@@ -125,41 +125,18 @@ describe('统一编辑链路', () => {
     expect(source).toContain('useRef')
   })
 
-  it('四处编辑器全部接统一发送控制器与统一外壳', () => {
+  it('编辑入口共用宿主输入框，不再创建独立 textarea', () => {
     for (const file of EDITORS) {
       const source = read(file)
-      expect(source).toContain('createSendController')
-      expect(source).toContain('ComposeCard')
+      expect(source).toContain('openComposerEdit')
+      expect(source).not.toContain('<textarea')
     }
-    expect(read('../src/conversation-tools.tsx')).toContain('LocalFileComposerCard')
-  })
-
-  it('发送动作文案统一：发送到当前会话 / 新建会话并发送', () => {
-    for (const file of EDITORS) {
-      const source = read(file)
-      expect(source).toContain('compose.sendCurrent')
-      expect(source).toContain('compose.sendNewSession')
-    }
-  })
-
-  it('只有发送成功才收起：收起逻辑落在 onSuccess 回调里', () => {
-    for (const file of EDITORS) {
-      expect(read(file)).toContain('onSuccess')
-    }
-  })
-
-  it('发送副本语义有提示：编辑卡带 copyHint 说明', () => {
-    for (const file of EDITORS) {
-      expect(read(file)).toContain('compose.copyHint')
-    }
-  })
-
-  it('答案、选区和文件编辑全部使用统一顶栏复制，不在底栏另放复制', () => {
-    for (const file of EDITORS) {
-      const source = read(file)
-      expect(source).toContain('onCopy=')
-      expect(source).not.toContain('data-local-collapse')
-    }
+    const surface = read('../src/composer-edit.tsx')
+    expect(surface).toContain('ComposeCard')
+    expect(surface).toContain('compose.sendCurrent')
+    expect(surface).toContain('compose.sendNewSession')
+    expect(surface).toContain('compose.copyHint')
+    expect(surface).toContain('data-local-reveal')
   })
 
   it('工具标签并入宿主「对话 / 轨迹」行：不再画第二排，改在宿主行上补挂自己的标签', () => {

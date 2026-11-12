@@ -13,6 +13,7 @@
  * 样式全部来自 ui-theme.ts 的共享类；深浅主题随宿主 token。
  */
 import type { ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { IconCheckOutlineRegular, IconCloseOutlineRegular, IconCopyOutlineRegular, IconNewChatOutlineRegular, IconSendOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import {
   btnClass,
@@ -39,6 +40,8 @@ export interface ComposeCardLabels {
 }
 
 export function ComposeCard(props: {
+  /** 挂入宿主输入框的两个自有节点，不移动宿主编辑器。 */
+  readonly mounts?: { head: Element; actions: Element }
   /** 标题：内容来源（如文件名、「编辑回答副本」）。 */
   readonly title: ReactNode
   /** 标题下的辅助说明（如「发送副本」提示）。 */
@@ -70,8 +73,7 @@ export function ComposeCard(props: {
   readonly labels: ComposeCardLabels
 }): ReactNode {
   const sendDisabled = props.sendDisabled === true || props.pending === true
-  return (
-    <div className={props.className === undefined ? panelClass : `${panelClass} ${props.className}`} data-compose-card="">
+  const head = (
       <div className={panelHeadClass}>
         {props.headExtra}
         <div className={panelTitleWrapClass}>
@@ -104,8 +106,9 @@ export function ComposeCard(props: {
           </button>
         )}
       </div>
-      {props.children}
-      {(props.onSend !== undefined || props.onSendNewSession !== undefined || props.onSave !== undefined || props.actions !== undefined) && (
+  )
+  const actions = (
+    (props.onSend !== undefined || props.onSendNewSession !== undefined || props.onSave !== undefined || props.actions !== undefined) && (
         <div className={panelActionsClass}>
           {props.actions}
           <span className={panelSpacerClass} aria-hidden="true" />
@@ -116,7 +119,7 @@ export function ComposeCard(props: {
               data-compose-save=""
               aria-label={props.labels.save ?? ''}
               title={props.labels.save ?? ''}
-              disabled={sendDisabled}
+              disabled={props.pending === true}
               onClick={props.onSave}
             >
               <IconCheckOutlineRegular size={15} /> {props.labels.save ?? ''}
@@ -149,7 +152,10 @@ export function ComposeCard(props: {
             </button>
           )}
         </div>
-      )}
-    </div>
+      )
   )
+  if (props.mounts) return <>{createPortal(head, props.mounts.head)}{createPortal(<>{props.children}{actions}</>, props.mounts.actions)}</>
+  return <div className={props.className === undefined ? panelClass : `${panelClass} ${props.className}`} data-compose-card="">
+    {head}{props.children}{actions}
+  </div>
 }

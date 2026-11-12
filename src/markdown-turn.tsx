@@ -15,7 +15,7 @@ import { Fragment, useEffect, useMemo, useRef, useState, useSyncExternalStore } 
 import type { ReactNode } from 'react'
 import { CodeBlock, FileTypeIcon, HoverCard, IconChevronDownOutlineRegular, IconChevronUpOutlineRegular, IconCloseOutlineRegular, IconEditOutlineRegular, IconNewChatOutlineRegular, IconSendOutlineRegular, IconWarningOutlineRegular, MarkdownText, Toast, classifyFileType, languageForPath } from '@deepseek-ai/dsh-client-ui-primitives'
 import { FileOpenSplit } from './markdown-turn-open.tsx'
-import { getFileState, getFilesOpen, setActiveFilePath, setFilesCount, subscribeActiveFilePath, subscribeFilesOpen, toggleFileEditing, toggleFileOpen } from './markdown-turn-active.ts'
+import { getFileState, getFilesOpen, setActiveFilePath, setFilesCount, subscribeActiveFilePath, subscribeFilesOpen, toggleFileOpen } from './markdown-turn-active.ts'
 import type { MarkdownLabels } from '@deepseek-ai/dsh-client-ui-primitives'
 import { fallbackT, NAMESPACE } from './locales.ts'
 import type { RuntimeT } from './locales.ts'
@@ -362,7 +362,6 @@ function MarkdownDocument({ sessionId, path, readers, t, onNotify, changed, seq 
   // 按钮和这里的内联按钮改同一份，两处才能同步。按 path 取值，多个文件各自独立。
   const fileUi = useSyncExternalStore(subscribeActiveFilePath, () => getFileState(path), () => getFileState(path))
   const open = fileUi.open
-  const editing = fileUi.editing
   const [attempt, setAttempt] = useState(0)
   const [body, setBody] = useState<DocumentBody>({ kind: 'loading' })
   const barRef = useRef<HTMLDivElement>(null)
@@ -378,7 +377,6 @@ function MarkdownDocument({ sessionId, path, readers, t, onNotify, changed, seq 
   const [composeOpen, setComposeOpen] = useState(false)
   const [toast, setToast] = useState<{ seq: number; text: string; ok: boolean } | null>(null)
   const toastSeq = useRef(0)
-  const editRef = useRef<HTMLTextAreaElement>(null)
   const labels = useMemo(() => labelsFor(t), [t])
   // 失败提示既走外部 onNotify（若接了宿主 toast），也在文档框内自消一条，确保发送/复制
   // 失败在生产里不会静默无反馈。
@@ -461,7 +459,7 @@ function MarkdownDocument({ sessionId, path, readers, t, onNotify, changed, seq 
       document.removeEventListener('selectionchange', update)
       document.removeEventListener('mousedown', onDown, true)
     }
-  }, [open, editing])
+  }, [open])
   useEffect(() => () => { releaseHeldFileTop(barRef.current) }, [])
   useEffect(() => {
     if (!open) return
@@ -513,38 +511,11 @@ function MarkdownDocument({ sessionId, path, readers, t, onNotify, changed, seq 
         </span>
         {fileDir !== '' && <span className={css.nameDir}>{fileDir}</span>}
       </span>
-      {/* 编辑态：取消钮占住编辑钮的位置（同一枚图标按钮换掉图标），退出编辑
-          不必再跑到正文下方的动作行里找取消。 */}
-      {editing
-        ? <button
-          type="button"
-          className={css.iconButton}
-          data-edit-cancel=""
-          aria-label={t('markdownTurn.cancel')}
-          title={t('markdownTurn.cancel')}
-          onClick={() => {
-            holdFileTop(barRef.current)
-            toggleFileEditing(path)
-          }}
-        >
-          <IconCloseOutlineRegular size={16} />
-        </button>
-        : <button
-          type="button"
-          className={css.iconButton}
-          data-edit-toggle=""
-          aria-label={t('markdownTurn.edit')}
-          title={t('markdownTurn.edit')}
-          onClick={() => {
-            holdFileTop(barRef.current)
-            if (!open) setActiveFilePath(path)
-            // 编辑按钮在折叠态点也先把文档展开，再进编辑态（与内联按钮原行为一致）。
-            if (!open) toggleFileOpen(path)
-            toggleFileEditing(path)
-          }}
-        >
-          <IconEditOutlineRegular size={16} />
-        </button>}
+      <button type="button" className={css.iconButton} data-edit-toggle=""
+        aria-label={t('markdownTurn.edit')} title={t('markdownTurn.edit')}
+        onClick={() => window.dispatchEvent(new CustomEvent('chat-power:edit-workspace', { detail: { sessionId, path } }))}>
+        <IconEditOutlineRegular size={16} />
+      </button>
       <ExpandButton open={open} label={toggleLabel} onClick={toggleOpen} />
       <FileOpenSplit sessionId={sessionId} path={path} readers={readers} t={t} />
     </div>
@@ -598,42 +569,7 @@ function MarkdownDocument({ sessionId, path, readers, t, onNotify, changed, seq 
       </p>}
       {body.kind === 'ready' && <>
         {body.truncated && <p className={css.status}>{t('markdownTurn.truncated')}</p>}
-        {editing
-          ? (
-            <div className={css.editCard} data-editing="">
-              <textarea
-                ref={editRef}
-                className={css.editInput}
-                data-markdown-body=""
-                defaultValue={body.text}
-                style={{ minHeight: '50dvh' }}
-                aria-label={t('markdownTurn.edit')}
-              />
-              <div className={css.editActions}>
-                <button
-                  type="button"
-                  className={css.editNewSession}
-                  data-edit-new-session=""
-                  aria-label={t('markdownTurn.newSession')}
-                  title={t('markdownTurn.newSession')}
-                  onClick={() => { sendToNewSession(editRef.current?.value ?? ''); if (editing) toggleFileEditing(path) }}
-                >
-                  <IconNewChatOutlineRegular size={15} /> {t('markdownTurn.newSession')}
-                </button>
-                <button
-                  type="button"
-                  className={css.editSend}
-                  data-edit-send=""
-                  aria-label={t('markdownTurn.send')}
-                  title={t('markdownTurn.send')}
-                  onClick={() => { sendText(editRef.current?.value ?? ''); if (editing) toggleFileEditing(path) }}
-                >
-                  <IconSendOutlineRegular size={16} />
-                </button>
-              </div>
-            </div>
-          )
-          : isMarkdownPath(path)
+        {isMarkdownPath(path)
             ? <div className={css.markdownBody} data-markdown-flow="">
                 {segmentWithComments(body.text, comments).map((seg, si) => (
                   <Fragment key={si}>
@@ -660,18 +596,18 @@ function MarkdownDocument({ sessionId, path, readers, t, onNotify, changed, seq 
                   unwrapLabel: t('markdownTurn.unwrap'),
                 }}
               />}
-        {!editing && <div className={css.lineTools} data-line-tools="" role="toolbar" aria-label={t('markdownTurn.sendToSession')}>
+        {<div className={css.lineTools} data-line-tools="" role="toolbar" aria-label={t('markdownTurn.sendToSession')}>
           <button type="button" className={css.lineTool} data-line-action="send" title={t('markdownTurn.sendToSession')} aria-label={t('markdownTurn.sendToSession')}><IconSendOutlineRegular size={15} /></button>
           <button type="button" className={css.lineTool} data-line-action="direct" title={t('markdownTurn.send')} aria-label={t('markdownTurn.send')}><IconEditOutlineRegular size={15} /></button>
         </div>}
-        {!editing && selBar !== null && !commenting && (
+        {selBar !== null && !commenting && (
           <div ref={selBarRef} className={css.selBar} data-selection-bar="" role="toolbar">
             <button type="button" className={css.selBtn} data-sel-action="add" onClick={() => { setCommenting(false); setSelBar(null); openCompose() }}>{t('markdownTurn.sendToSession')}</button>
             <button type="button" className={css.selBtn} data-sel-action="direct" onClick={() => { sendText(selBar.text); setSelBar(null) }}>{t('markdownTurn.send')}</button>
             <button type="button" className={css.selBtn} data-sel-action="comment" onClick={() => { openComment() }}>{t('markdownTurn.comment')}</button>
           </div>
         )}
-        {!editing && commenting && (
+        {commenting && (
           <div className={css.commentBox} data-comment-box="">
             <textarea className={css.commentInput} data-comment-input="" placeholder={t('markdownTurn.commentPlaceholder')} rows={3} />
             <div className={css.commentActions}>

@@ -12,6 +12,7 @@ import { registerPromptView } from './prompt-view.tsx'
 import { checkedFiles, toolsNotice } from './checked-files.ts'
 import { createReferenceApplier } from './composer-references.ts'
 import { readEntireWorkspaceText } from './workspace-text.ts'
+import { openComposerEdit } from './composer-edit-state.ts'
 import { saveWorkspaceText } from './workspace-save.ts'
 import { startSendWatch, USER_NODE_SELECTOR } from './send-watch.ts'
 import { LOCAL_FILE_ACCEPT, LOCAL_FILE_MAX_BYTES, LocalFileComposerCard } from './local-file.tsx'
@@ -75,12 +76,16 @@ export function registerConversationTools(ctx: any) {
       controller.signal,
     ).then(text => {
       const name = path.split('/').at(-1) ?? path
-      // contentId 里的路径做过编码：读取侧要对称解码（带 % 或非 ASCII 的文件名）。
-      const tab = toolsState.open(sessionId, 'local', name, `edit://${encodeURIComponent(path)}`)
-      docs.set(docKey(sessionId, tab.contentId), { name, text, seq: Date.now() })
-      toolsState.select(sessionId, tab.id)
+      if (!openComposerEdit({ sessionId, title: name, text,
+        send: async (body, target) => {
+          const destination = target === 'new' ? await readers.createSession({ inheritCwdFrom: sessionId }) : sessionId
+          await readers.sendToSession(destination, `${fallbackT('markdownTurn.localFileHeader', { name })}\n\n${body}`)
+        },
+        save: body => saveWorkspaceText(sessionId, path, body),
+        reveal: () => readers.revealFile(sessionId, path),
+      })) { toolsNotice.set(sessionId, '请先完成当前编辑'); return }
       toolsNotice.clear(sessionId)
-    }, error => {
+    }).catch(error => {
       toolsNotice.set(sessionId, `读取失败：${String(error)}`)
     })
   }
@@ -177,8 +182,6 @@ export function registerConversationTools(ctx: any) {
     const s = useSyncExternalStore(toolsState.subscribe, () => toolsState.get(id ?? ''), () => toolsState.get(id ?? ''))
     const activeTab = s.tabs.find(t => t.id === s.active)
     const toolActive = activeTab !== undefined && activeTab.kind !== 'chat'
-    // 编辑标签（edit://）打开：连输入框一起隐藏，编辑卡距底 20px。
-    const editorActive = toolActive && activeTab !== undefined && activeTab.kind === 'local' && activeTab.contentId.startsWith('edit://')
     const [mounts, setMounts] = useState<{ button: HTMLElement | null; body: HTMLElement; content: Element | null } | null>(null)
     const [reference, setReference] = useState<any>(null)
     const [browserReference, setBrowserReference] = useState<any>(null)
@@ -284,15 +287,9 @@ export function registerConversationTools(ctx: any) {
         : toolHiddenNodes(scroll, body, toolActive).filter((node): node is HTMLElement =>
             node instanceof HTMLElement)
       let guard: MutationObserver | undefined
-      let hiddenComposer: HTMLElement | undefined
       if (toolActive && id) {
         for (const node of messages) hider.hide(node)
         body.dataset.chatStripLive = ''
-        if (editorActive) {
-          body.dataset.chatEditorLive = ''
-          const composer = content?.querySelector<HTMLElement>('[data-composer-seat]') ?? null
-          if (composer !== null) { composer.style.display = 'none'; hiddenComposer = composer }
-        }
         // 兜底：工具标签激活期间宿主补渲染的新视图节点也要收起。
         if (scroll !== null && typeof MutationObserver !== 'undefined') {
           guard = new MutationObserver(records => {
@@ -310,11 +307,10 @@ export function registerConversationTools(ctx: any) {
       }
       return () => {
         guard?.disconnect()
-        hiddenComposer?.style.removeProperty('display')
         delete body.dataset.chatEditorLive
         hider.restore()
       }
-    }, [mounts, toolActive, id, editorActive])
+    }, [mounts, toolActive, id])
     if (!mounts) return null
     return <>
       {reference && reference.id === id && createPortal(
@@ -373,16 +369,10 @@ export function registerConversationTools(ctx: any) {
       const signal = lifetime.current.signal
       setBusy(true); setStatus('')
       try {
+        if (edit) { openWorkspaceEditor(sessionId, absolutePath); return }
         const text = await readEntireWorkspaceText(sessionId, absolutePath,
           offset => readers.readPage(sessionId, absolutePath, offset, signal), signal)
-        if (edit) {
-          const name = absolutePath.split('/').at(-1) ?? absolutePath
-          // 暂存键位与 openWorkspaceEditor 同一套：docKey(sessionId, contentId)，
-          // 路径编码对称，标签里才能取到这份正文。
-          const contentId = `edit://${encodeURIComponent(absolutePath)}`
-          const tab = toolsState.open(sessionId, 'local', name, contentId)
-          docs.set(docKey(sessionId, tab.contentId), { name, text, seq: Date.now() }); toolsState.select(sessionId, tab.id)
-        } else { await navigator.clipboard.writeText(text); setStatus('已复制全文') }
+        await navigator.clipboard.writeText(text); setStatus('已复制全文')
       } catch (error) { if (!signal.aborted) setStatus(`操作失败：${String(error)}`) }
       finally { if (!signal.aborted) setBusy(false) }
     }
@@ -477,6 +467,14 @@ export function registerConversationTools(ctx: any) {
       document.removeEventListener('click', onOpen, true)
     }
   }, 'chat-power: answer link open')
+  ctx.effect(() => {
+    const edit = (event: Event) => {
+      const detail = (event as CustomEvent).detail
+      if (typeof detail?.sessionId === 'string' && typeof detail?.path === 'string') openWorkspaceEditor(detail.sessionId, detail.path)
+    }
+    window.addEventListener('chat-power:edit-workspace', edit)
+    return () => window.removeEventListener('chat-power:edit-workspace', edit)
+  }, 'chat-power: edit workspace in composer')
   ctx.effect(() => attachFilesTreeAugment(augmentHandlers), 'chat-power: files tree augment')
   // 选区编辑卡打开时：若正处于编辑标签（输入框隐藏 ✓），切回聊天，
   // 让输入框恢复、选区卡锚回输入框上方（否则卡片会掉到输入框下面）。
