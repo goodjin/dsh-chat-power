@@ -44,7 +44,7 @@ describe('浏览器工作台真实 DOM', () => {
     expect(star.closest('form')!.nextElementSibling!.hasAttribute('hidden')).toBe(true)
   })
   it('导入预览支持选择配置、保留目录和重复导入去重', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce({ ok: true, json: async () => ({ root: '/chrome', profiles: [{ id: 'Default', name: '测试' }] }) }).mockResolvedValueOnce({ ok: true, json: async () => ({ bookmarks: [{ id: 'folder', name: '研究', children: [{ id: 'leaf', name: '文档', url: 'https://example.com/' }] }] }) }))
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({ root: '/chrome', profiles: [{ id: 'Default', name: '测试' }] }))).mockResolvedValueOnce(new Response(JSON.stringify({ bookmarks: [{ id: 'folder', name: '研究', children: [{ id: 'leaf', name: '文档', url: 'https://example.com/' }] }] }))))
     await act(async () => { browserState.open('import') })
     await act(async () => { host.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })) })
     await click(button('预览书签'))
