@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { IconFolderOpenOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
+import { BIG_CLASS } from './expand-editor.tsx'
 import { ComposeCard } from './compose-card.tsx'
 import { copyTextToClipboard } from './send-actions.ts'
 import { statusNoticeClass, uiButtonClass } from './ui-theme.ts'
@@ -25,11 +26,9 @@ export function ComposerEditSurface({ sessionId, shellOf }: { sessionId: string;
     const actions = document.createElement('div')
     head.dataset.composeEditHead = ''; actions.dataset.composeEditActions = ''
     card.prepend(head); card.append(actions)
-    card.dataset.composeEdit = ''; content.dataset.composeEditing = ''; seat.dataset.composeEditingSeat = ''
-    const wrappers: HTMLElement[] = []
-    for (let node = card.parentElement; node && node !== seat; node = node.parentElement) {
-      node.dataset.composeEditWrap = ''; wrappers.push(node)
-    }
+    const wasExpanded = card.classList.contains(BIG_CLASS)
+    card.classList.add(BIG_CLASS)
+    card.dataset.composeEdit = ''
     setMounts({ head, actions })
     try {
       const shell = shellOf(sessionId)
@@ -61,8 +60,8 @@ export function ComposerEditSurface({ sessionId, shellOf }: { sessionId: string;
       input.removeEventListener('compositionend', compositionEnd)
       try { detachComposerEdit(sessionId) } catch (error) { console.warn('[chat-power] restore draft:', error) }
       head.remove(); actions.remove()
-      for (const node of wrappers) delete node.dataset.composeEditWrap
-      delete card.dataset.composeEdit; delete content.dataset.composeEditing; delete seat.dataset.composeEditingSeat
+      card.classList.toggle(BIG_CLASS, wasExpanded)
+      delete card.dataset.composeEdit
       setMounts(null); setReady(false)
     }
   }, [request, sessionId, shellOf])

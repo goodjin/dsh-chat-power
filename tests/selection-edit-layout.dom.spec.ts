@@ -6,11 +6,13 @@ vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({
   IconCloseOutlineRegular: () => null, IconCopyOutlineRegular: () => null,
   IconNewChatOutlineRegular: () => null, IconSendOutlineRegular: () => null,
 }))
+import { BIG_CLASS } from '../src/expand-editor.tsx'
 import { ComposerEditSurface } from '../src/composer-edit.tsx'
 import { openComposerEdit, closeComposerEdit } from '../src/composer-edit-state.ts'
-it('adds title/actions to the original composer, keeps folder action, and restores on exit', async () => {
+it.each([false, true])('restores the original composer and its expanded state (%s) on exit', async (wasExpanded) => {
   document.body.innerHTML = '<main data-conversation-content><div data-conversation-scroll><article>回答</article><footer data-composer-seat><div data-composer-card><div id="overlay"></div><div data-input-scroll><div data-composer-input contenteditable="true"></div></div></div></footer></div></main>'
   const input = document.querySelector<HTMLElement>('[data-composer-input]')!
+  document.querySelector('[data-composer-card]')!.classList.toggle(BIG_CLASS, wasExpanded)
   let draft = { text: '原草稿', references: [] }
   const host = {
     get draftSnapshot() { return draft },
@@ -24,6 +26,9 @@ it('adds title/actions to the original composer, keeps folder action, and restor
     act(() => root.render(createElement(ComposerEditSurface, { sessionId: 'dom-edit', shellOf: () => host })))
     expect(document.querySelector('[data-composer-input]')).toBe(input)
     expect(document.querySelector('textarea')).toBeNull()
+    expect(document.querySelector('[data-composer-card]')?.classList.contains(BIG_CLASS)).toBe(true)
+    expect(document.querySelector('[data-compose-edit-wrap]')).toBeNull()
+    expect(document.querySelector('[data-compose-editing-seat]')).toBeNull()
     expect(input.textContent).toBe('\tconst n = 1\n')
     expect(document.querySelector('[data-compose-edit-head]')?.textContent).toContain('example.ts')
     expect(document.querySelector('[data-compose-send]')).not.toBeNull()
@@ -45,6 +50,7 @@ it('adds title/actions to the original composer, keeps folder action, and restor
     act(() => (document.querySelector('[data-compose-cancel]') as HTMLElement).click())
     expect(input.textContent).toBe('原草稿')
     expect(document.querySelector('[data-compose-edit]')).toBeNull()
+    expect(document.querySelector('[data-composer-card]')?.classList.contains(BIG_CLASS)).toBe(wasExpanded)
     expect(document.querySelector('[data-compose-edit-head]')).toBeNull()
   } finally {
     act(() => root.unmount()); closeComposerEdit('dom-edit'); document.body.replaceChildren()
