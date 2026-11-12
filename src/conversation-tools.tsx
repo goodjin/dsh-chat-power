@@ -1,6 +1,5 @@
 import { createPortal } from 'react-dom'
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { IconChevronDownOutlineRegular, IconFolderOpenOutlineRegular, IconRightUpOutlineRegular, Menu } from '@deepseek-ai/dsh-client-ui-primitives'
 import { toolsState } from './tools-state.ts'
 import { createToolsAdapter, toolSlot } from './tools-adapter.tsx'
 import { attachToolsRow } from './tools-tabs.ts'
@@ -18,7 +17,7 @@ import { createMarkdownTurnReaders } from './markdown-turn-sources.ts'
 import { answerFileLinkPathAt } from './answer-file-links.ts'
 import { sessionFileAddressOf } from './file-address.ts'
 import { fallbackT } from './locales.ts'
-import { readDefaultLinkOpenMode, writeDefaultLinkOpenMode, openInBrowser } from './link-open.ts'
+import { readDefaultLinkOpenMode, openInBrowser } from './link-open.ts'
 import { statusNoticeClass } from './ui-theme.ts'
 import css from './conversation-tools.module.css'
 const ROOT = 'chat-power.tools'
@@ -314,43 +313,6 @@ export function registerConversationTools(ctx: any) {
     [toolSlot('sidebar.right.pane.tab.title')]: { kind: 'keyed', scope: 'session', inject: { hooks: { tabInfo: (_: any, hook: any) => hook } } },
     [toolSlot('sidebar.right.tab.guide.entry')]: { kind: 'keyed', scope: 'session' },
   } }, ToolArea))
-  // 会话头部动作槽位：打开本机文件 + 链接偏好「更多」菜单。
-  // 工具标签并进宿主标签行后，这两个入口不再占标签行的位置。
-  function HeaderToolsEntry(props: { readonly sessionId?: string }) {
-    const id = props.sessionId
-    const [mode, setMode] = useState(readDefaultLinkOpenMode)
-    const [moreOpen, setMoreOpen] = useState(false)
-    if (id === undefined || id === '') return null
-    return <>
-      <Menu
-        open={moreOpen}
-        portal
-        dense
-        align="end"
-        onClose={() => { setMoreOpen(false) }}
-        items={[
-          { type: 'label', id: 'link-mode-label', text: fallbackT('tools.linkOpenDefault') },
-          { id: 'link-right', icon: <IconRightUpOutlineRegular />, label: fallbackT('markdownTurn.linkOpenRight') },
-          { id: 'link-browser', icon: <IconFolderOpenOutlineRegular />, label: fallbackT('markdownTurn.linkOpenBrowser') },
-        ]}
-        selectedId={mode === 'browser' ? 'link-browser' : 'link-right'}
-        anchor={<button type="button" className={css.iconEntry} aria-haspopup="menu" aria-expanded={moreOpen}
-          aria-label={fallbackT('tools.more')} title={fallbackT('tools.more')} onClick={() => { setMoreOpen(value => !value) }}>
-          <IconChevronDownOutlineRegular size={14} />
-        </button>}
-        onSelect={(selected: string | number) => {
-          if (selected === 'link-right') { writeDefaultLinkOpenMode('right'); setMode('right') }
-          else if (selected === 'link-browser') { writeDefaultLinkOpenMode('browser'); setMode('browser') }
-          setMoreOpen(false)
-        }}
-      />
-    </>
-  }
-  ctx.slots.inject('conversation.session.header.actions', () => ctx.slots.register({
-    name: 'conversation.session.header.actions',
-    id: 'chat-power-tools-entry',
-    inject: (sessionId: string) => ({ sessionId }),
-  }, HeaderToolsEntry))
   // 工具标签并入宿主「对话 / 轨迹」行：在宿主渲染出来的标签行上补挂自己的标签。
   // 文件标签的关闭走丢弃草稿的关闭；其余标签直接关。
   ctx.effect(() => attachToolsRow({

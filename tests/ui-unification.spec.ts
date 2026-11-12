@@ -176,8 +176,10 @@ describe('统一编辑链路', () => {
     expect(row).toContain('data-chat-tools-live')
   })
 
-  it('打开本机文件与链接偏好入口挂进宿主会话头部动作槽位', () => {
-    expect(read('../src/conversation-tools.tsx')).toContain("name: 'conversation.session.header.actions'")
+  it('链接偏好迁到设置段，会话头部不再挂更多入口', () => {
+    expect(read('../src/conversation-tools.tsx')).not.toContain("conversation.session.header.actions")
+    expect(read('../src/link-settings.tsx')).toContain("name: 'settings.section'")
+    expect(read('../src/index.ts')).toContain('registerLinkSettings(ctx.slots)')
   })
 
   it('工具标签 Chrome 风格：框线分隔、当前标签突出、关闭钮在标签框内、过多时横向滚动', () => {
@@ -214,8 +216,9 @@ describe('统一编辑链路', () => {
     expect(tools).toMatch(/contentId\.startsWith\('edit:\/\/'\)/)
   })
 
-  it('链接偏好收进更多菜单：工具栏不再有 select，文件打开菜单不再写全局偏好', () => {
-    expect(read('../src/conversation-tools.tsx')).not.toContain('<select')
+  it('链接偏好只在设置段写入，文件打开菜单不写全局偏好', () => {
+    expect(read('../src/conversation-tools.tsx')).not.toContain('writeDefaultLinkOpenMode')
+    expect(read('../src/link-settings.tsx')).toContain('writeDefaultLinkOpenMode')
     expect(read('../src/markdown-turn-open.tsx')).not.toContain('writeDefaultLinkOpenMode')
   })
 })

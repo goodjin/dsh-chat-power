@@ -58,7 +58,7 @@ export type ChatPowerLocaleKey =
   | 'turnFold.frameWorkflow' | 'turnFold.frameRunning'
   | 'turnFold.collapseAria' | 'turnFold.expandAria'
   | 'tools.chat' | 'tools.files' | 'tools.browser' | 'tools.terminal'
-  | 'tools.openLocalFile' | 'tools.more' | 'tools.linkOpenDefault'
+  | 'tools.openLocalFile' | 'settings.title' | 'settings.linkOpenDefault' | 'settings.linkOpenRight' | 'settings.linkOpenBrowser'
   | 'fileTree.reference' | 'fileTree.editCopy' | 'fileTree.loadMore'
   | 'promptView.title' | 'fileTree.empty'
 
@@ -173,8 +173,10 @@ export const zh: Record<ChatPowerLocaleKey, string> = {
   'tools.browser': '浏览器',
   'tools.terminal': '终端',
   'tools.openLocalFile': '打开本机文件',
-  'tools.more': '更多',
-  'tools.linkOpenDefault': '网页链接打开方式',
+  'settings.title': '会话增强',
+  'settings.linkOpenDefault': '网页链接默认打开方式',
+  'settings.linkOpenRight': '右侧预览',
+  'settings.linkOpenBrowser': '外部浏览器',
   'fileTree.reference': '引用 {path}',
   'fileTree.loadMore': '加载更多（还有 {count} 条）',
   'promptView.title': '提示词',
@@ -293,8 +295,10 @@ export const en: Record<ChatPowerLocaleKey, string> = {
   'tools.browser': 'Browser',
   'tools.terminal': 'Terminal',
   'tools.openLocalFile': 'Open a local file',
-  'tools.more': 'More',
-  'tools.linkOpenDefault': 'Default link opening',
+  'settings.title': 'Chat enhancements',
+  'settings.linkOpenDefault': 'Default web link opening',
+  'settings.linkOpenRight': 'Preview on the right',
+  'settings.linkOpenBrowser': 'External browser',
   'fileTree.reference': 'Reference {path}',
   'fileTree.loadMore': 'Load more ({count} left)',
   'promptView.title': 'Prompts',
