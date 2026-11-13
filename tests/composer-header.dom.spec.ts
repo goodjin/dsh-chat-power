@@ -17,7 +17,7 @@ it('卡内共享标题、快捷新增删除持久化、发送与分叉绑定当�
   const send = vi.fn(async () => {})
   const fork = vi.fn(async () => {})
   const click = async (text: string) => {
-    const button = [...card.querySelectorAll('button')].find(el => el.textContent === text)!
+    const button = [...card.querySelectorAll('button')].find(el => (el.getAttribute('aria-label') ?? el.textContent) === text)!
     expect(button).toBeDefined()
     await act(async () => button.click())
   }
@@ -25,8 +25,8 @@ it('卡内共享标题、快捷新增删除持久化、发送与分叉绑定当�
     await act(async () => root.render(createElement(ComposerHeader, { sessionId: 's', actions: { send, fork }, canSend: true, canFork: true })))
     expect(card.firstElementChild?.hasAttribute('data-chat-power-composer-header')).toBe(true)
     expect(card.querySelector('time')).not.toBeNull()
-    await click('快捷发送 ▾')
-    await click('＋ 新增快捷方式')
+    await click('快捷发送')
+    await click('新增快捷方式')
     const textarea = card.querySelector('textarea')!
     await act(async () => Simulate.change(textarea, { target: { value: '我的快捷内容' } } as any))
     await click('保存')
@@ -39,7 +39,7 @@ it('卡内共享标题、快捷新增删除持久化、发送与分叉绑定当�
     await click('分叉')
     expect(fork).toHaveBeenCalledTimes(1)
     expect(fork).toHaveBeenCalledWith('s')
-    await click('快捷发送 ▾')
+    await click('快捷发送')
     while (card.querySelector('button[aria-label^="删除："]')) {
       const button = card.querySelector<HTMLButtonElement>('button[aria-label^="删除："]')!
       await act(async () => button.click())

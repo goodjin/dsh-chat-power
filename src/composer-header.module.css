@@ -12,3 +12,6 @@
 :global(.chat-power-shortcut-row) > button:last-child { flex: none; }
 :global(.chat-power-shortcuts) textarea { box-sizing: border-box; width: 100%; min-height: 76px; resize: vertical; color: inherit; background: var(--dsw-alias-bg-layer-1, transparent); border: 1px solid var(--dsw-alias-border-l2, #8884); padding: 8px; border-radius: 6px; font: inherit; }
 :global(.chat-power-composer-notice) { font-size: 12px; padding: 4px 0; }
+
+:global(.chat-power-composer-tools) button[data-composer-icon] { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 4px; flex: none; }
+:global(.chat-power-composer-tools) button:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary, #5685df); outline-offset: 2px; }

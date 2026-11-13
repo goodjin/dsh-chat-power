@@ -7,6 +7,18 @@ import type { PluginContext } from './index.ts'
 import { createMarkdownTurnReaders } from './markdown-turn-sources.ts'
 import './composer-header.module.css'
 
+const HEADER_ICONS = {
+  fork: 'M6 3v12m0-6h8a4 4 0 0 0 4-4V3M3 18a3 3 0 1 0 6 0 3 3 0 1 0-6 0M15 3a3 3 0 1 0 6 0',
+  quick: 'm13 2-9 12h7l-1 8 10-13h-7Z',
+  add: 'M12 5v14M5 12h14',
+  remove: 'M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7',
+  save: 'm5 12 4 4L19 6',
+  cancel: 'm6 6 12 12M18 6 6 18',
+} as const
+function HeaderIcon({ name }: { name: keyof typeof HEADER_ICONS }) {
+  return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false"><path d={HEADER_ICONS[name]} /></svg>
+}
+
 export interface ComposerHeaderActions {
   send(id: string, text: string): Promise<void>
   fork(id: string): Promise<void>
@@ -69,8 +81,8 @@ export function ComposerHeader({ sessionId, actions, canSend = false, canFork = 
     <div className="chat-power-composer-title">
       <span>输入</span>
       <time dateTime={now.toISOString()} title={now.toLocaleString()}>{now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}</time>
-      <button type="button" disabled={pending || !canFork} title="从最后一个已完成轮次分叉并打开；不发送草稿" onClick={() => run(() => actions.fork(sessionId), '已创建分支')}>分叉</button>
-      <button type="button" aria-expanded={open} disabled={pending} onClick={() => setOpen(!open)}>快捷发送 ▾</button>
+      <button type="button" disabled={pending || !canFork} data-composer-icon="" aria-label="分叉" title="从最后一个已完成轮次分叉并打开；不发送草稿" onClick={() => run(() => actions.fork(sessionId), '已创建分支')}><HeaderIcon name="fork" /></button>
+      <button type="button" data-composer-icon="" aria-label="快捷发送" title="快捷发送" aria-expanded={open} disabled={pending} onClick={() => setOpen(!open)}><HeaderIcon name="quick" /></button>
     </div>
     {notice && <div role="status" className="chat-power-composer-notice">{notice}</div>}
     {open && <div className="chat-power-shortcuts">
@@ -78,16 +90,16 @@ export function ComposerHeader({ sessionId, actions, canSend = false, canFork = 
         {entries.length === 0 && <p>暂无快捷方式</p>}
         {entries.map(item => <div key={item.id} className="chat-power-shortcut-row">
           <button type="button" disabled={pending || !canSend} title={item.text} onClick={() => run(() => actions.send(sessionId, item.text), '已发送')}>{item.text}</button>
-          <button type="button" aria-label={`删除：${item.text}`} disabled={pending} onClick={() => save(entries.filter(entry => entry.id !== item.id))}>删除</button>
+          <button type="button" data-composer-icon="" title="删除快捷方式" aria-label={`删除：${item.text}`} disabled={pending} onClick={() => save(entries.filter(entry => entry.id !== item.id))}><HeaderIcon name="remove" /></button>
         </div>)}
       </div>
       {adding ? <div>
         <textarea aria-label="快捷发送内容" value={draft} onChange={event => setDraft(event.target.value)} placeholder="输入要直接发送的内容" />
-        <button type="button" disabled={!draft.trim() || pending} onClick={() => {
+        <button type="button" data-composer-icon="" title="保存快捷方式" aria-label="保存" disabled={!draft.trim() || pending} onClick={() => {
           if (save([...entries, { id: crypto.randomUUID(), text: draft.trim() }])) { setDraft(''); setAdding(false) }
-        }}>保存</button>
-        <button type="button" onClick={() => { setAdding(false); setDraft('') }}>取消</button>
-      </div> : <button type="button" disabled={pending} onClick={() => setAdding(true)}>＋ 新增快捷方式</button>}
+        }}><HeaderIcon name="save" /></button>
+        <button type="button" data-composer-icon="" title="取消新增" aria-label="取消" onClick={() => { setAdding(false); setDraft('') }}><HeaderIcon name="cancel" /></button>
+      </div> : <button type="button" data-composer-icon="" title="新增快捷方式" aria-label="新增快捷方式" disabled={pending} onClick={() => setAdding(true)}><HeaderIcon name="add" /></button>}
     </div>}
   </div>, head)}</>
 }
