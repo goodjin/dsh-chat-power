@@ -4,6 +4,9 @@ import { fallbackT } from './locales.ts'
 export const ANSWER_FRAME_SELECTOR = '[data-chat-flow-kind="assistant-step"]:not([data-chat-group-part="reasoning"]):not([data-turn-process-member])'
 const HEIGHT = '--chat-power-answer-height'
 export const ANSWER_FRAME_CSS = `
+/* 耗时已在回答标题中展示，隐藏对应的原生完成提示行。 */
+[data-chat-power-completed-hidden] { display: none !important; }
+
 ${ANSWER_FRAME_SELECTOR} {
   box-sizing: border-box;
   min-width: 0;
@@ -62,6 +65,7 @@ export function installAnswerFrame(doc?: Document, onEdit?: (sessionId: string, 
   target.head.append(style)
   const managed = new Map<HTMLElement, { value: string; priority: string }>()
   const headers = new Map<HTMLElement, HTMLElement>()
+  const completedRows = new Set<HTMLElement>()
   const updateTitle = (row: HTMLElement, header: HTMLElement): void => {
     const title = header.querySelector('[data-chat-power-answer-title]')
     if (!title) return
@@ -73,6 +77,20 @@ export function installAnswerFrame(doc?: Document, onEdit?: (sessionId: string, 
       try { text = readTitle(sessionId, turn) } catch { /* 会话已卸载或历史未加载，保留未知提示。 */ }
     }
     if (title.textContent !== text) title.textContent = text
+    const container = row.closest('[data-conversation-scroll]')
+    // 只在本轮已有成功结算的标题时隐藏重复提示；停止、错误及缺失数据保留原生提示。
+    const completed = text.includes(' · 用时 ')
+    for (const control of container?.querySelectorAll<HTMLElement>('[data-turn-process]') ?? []) {
+      if (control.getAttribute('data-turn-process') !== rawTurn) continue
+      const nativeRow = control.closest<HTMLElement>('[data-chat-flow-kind="turn-process"]') ?? control
+      if (completed) {
+        nativeRow.setAttribute('data-chat-power-completed-hidden', '')
+        completedRows.add(nativeRow)
+      } else {
+        nativeRow.removeAttribute('data-chat-power-completed-hidden')
+        completedRows.delete(nativeRow)
+      }
+    }
   }
   const ensureHeader = (row: HTMLElement): void => {
     if (!onEdit || headers.get(row)?.parentElement === row) return
@@ -213,6 +231,8 @@ export function installAnswerFrame(doc?: Document, onEdit?: (sessionId: string, 
     resize?.disconnect()
     win.removeEventListener('resize', schedule)
     for (const row of managed.keys()) restore(row)
+    for (const row of completedRows) row.removeAttribute('data-chat-power-completed-hidden')
+    completedRows.clear()
     style.remove()
   }
 }
