@@ -81,3 +81,27 @@ it('历史整页、最后一轮扣输入框；输入框变化、新轮开始和�
     vi.useRealTimers()
   }
 })
+
+it('标题栏编辑绑定所在会话和节点，保留原生子树，失败就地提示并可清理', () => {
+  document.body.innerHTML = `<section data-conversation-session="s1"><main data-conversation-scroll>
+    <div data-chat-flow-kind="assistant-step" data-chat-node-key="answer-1" id="answer"><div data-slot="conversation.chat.node">正文</div></div>
+  </main></section>`
+  Object.defineProperty(document.querySelector('main'), 'clientHeight', { value: 800 })
+  const row = document.getElementById('answer')!
+  const native = row.firstElementChild!
+  const calls: string[][] = []
+  const stop = installAnswerFrame(document, (sessionId, key) => {
+    calls.push([sessionId, key])
+    throw new Error('请先完成当前编辑')
+  })
+  const button = row.querySelector<HTMLButtonElement>('[data-chat-power-answer-edit]')!
+  expect(button.type).toBe('button')
+  button.click()
+  expect(calls).toEqual([['s1', 'answer-1']])
+  expect(row.querySelector('[role="status"]')?.textContent).toBe('请先完成当前编辑')
+  expect(native.parentElement).toBe(row)
+  expect(native.textContent).toBe('正文')
+  stop()
+  expect(row.firstElementChild).toBe(native)
+  expect(row.querySelector('button')).toBeNull()
+})

@@ -18,6 +18,7 @@ import { startMermaidDiagrams } from './mermaid.ts'
 import { injectTablePadCss } from './table-pad.ts'
 import { injectUiThemeCss } from './ui-theme.ts'
 import { installAnswerFrame } from './answer-frame.ts'
+import { editAnswerCopy, type AnswerSource } from './answer-edit.ts'
 import { createMarkdownTurnReaders } from './markdown-turn-sources.ts'
 import { registerSelectionToolbar } from './selection-toolbar.tsx'
 import { startMultiSelectPanel } from './selection-actions.ts'
@@ -37,7 +38,7 @@ export const name = 'dsh-chat-power'
  * 不声明的话会抢在它注册之前启动，拿到 undefined 直接抛错（2026-11-05 现场：
  * 桌面版启动时把整条 entry 弄成 failed）。
  */
-export const inject = ['slots', 'locale', 'remote', 'remote.session', 'remote.workspaceFiles', 'sidebarRight', 'uiSession', 'sessions', 'conversation'] as const
+export const inject = ['slots', 'locale', 'remote', 'remote.session', 'remote.workspaceFiles', 'sidebarRight', 'uiSession', 'sessions', 'conversation', 'uiConversation'] as const
 
 export interface PluginContext {
   logger(name: string): { info(message: string): void; warn(message: string): void }
@@ -84,7 +85,10 @@ export function apply(ctx: PluginContext): void {
   }
   try {
     // 只装饰原生回答；工作步骤折叠、节点和滚动都由宿主管理。
-    const disposeAnswerFrame = installAnswerFrame()
+    const answerReaders = createMarkdownTurnReaders(() => ctx.get('remote'))
+    const disposeAnswerFrame = installAnswerFrame(undefined, (sessionId, nodeKey) => {
+      editAnswerCopy(ctx.get('uiConversation') as AnswerSource, answerReaders, sessionId, nodeKey)
+    })
     ctx.effect(() => disposeAnswerFrame, 'dsh-chat-power: answer frame')
   } catch (error: unknown) {
     log.warn(`answer frame: start failed — ${error instanceof Error ? error.message : String(error)}`)

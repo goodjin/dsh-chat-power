@@ -14,7 +14,8 @@ ${ANSWER_FRAME_SELECTOR} {
   border-radius: 10px;
   background: var(--dsw-alias-bg-layer-1, transparent);
 }
-${ANSWER_FRAME_SELECTOR}::before {
+${ANSWER_FRAME_SELECTOR}::before,
+[data-chat-power-answer-header] {
   content: ${JSON.stringify(fallbackT('answerCard.title'))};
   display: block;
   position: sticky;
@@ -29,6 +30,14 @@ ${ANSWER_FRAME_SELECTOR}::before {
   line-height: 20px;
   font-weight: 600;
 }
+${ANSWER_FRAME_SELECTOR}:has(> [data-chat-power-answer-header])::before { display: none; }
+[data-chat-power-answer-header] { display: flex; align-items: center; gap: 12px; }
+[data-chat-power-answer-edit] {
+  margin-left: auto; border: 0; border-radius: 4px; padding: 3px 8px;
+  color: inherit; background: transparent; font: inherit; cursor: pointer;
+}
+[data-chat-power-answer-edit]:hover { background: var(--dsw-alias-interactive-bg-hover, rgba(127,127,127,.1)); }
+[data-chat-power-answer-error] { font-weight: 400; font-size: 12px; }
 `
 
 /** 页内留 24px 呼吸空间；极小窗口保留标题及最小正文区。 */
@@ -37,10 +46,10 @@ export function answerFrameHeight(page: number, composer: number, latest: boolea
 }
 
 /**
- * 标题用伪元素，既不插入也不搬运 React 拥有的子节点。
+ * 标题只插入插件自己的元素，不搬运 React 拥有的子节点。
  * 只测量会话视口/输入框，绝不改外层 scrollTop 或工作步骤 hidden 状态。
  */
-export function installAnswerFrame(doc?: Document): () => void {
+export function installAnswerFrame(doc?: Document, onEdit?: (sessionId: string, nodeKey: string) => void): () => void {
   const target = doc ?? (typeof document === 'undefined' ? undefined : document)
   const win = target?.defaultView
   if (!target || !win) return () => {}
@@ -49,6 +58,38 @@ export function installAnswerFrame(doc?: Document): () => void {
   style.textContent = ANSWER_FRAME_CSS
   target.head.append(style)
   const managed = new Map<HTMLElement, { value: string; priority: string }>()
+  const headers = new Map<HTMLElement, HTMLElement>()
+  const ensureHeader = (row: HTMLElement): void => {
+    if (!onEdit || headers.get(row)?.parentElement === row) return
+    headers.get(row)?.remove()
+    const header = target.createElement('div')
+    header.setAttribute('data-chat-power-answer-header', '')
+    const title = target.createElement('span')
+    title.textContent = fallbackT('answerCard.title')
+    const error = target.createElement('span')
+    error.setAttribute('data-chat-power-answer-error', '')
+    error.setAttribute('role', 'status')
+    const edit = target.createElement('button')
+    edit.type = 'button'
+    edit.setAttribute('data-chat-power-answer-edit', '')
+    edit.textContent = fallbackT('answerCard.edit')
+    edit.title = fallbackT('answerCard.editAnswer')
+    edit.addEventListener('click', event => {
+      event.stopPropagation()
+      try {
+        const sessionId = row.closest('[data-conversation-session]')?.getAttribute('data-conversation-session')
+        const nodeKey = row.getAttribute('data-chat-node-key')
+        if (!sessionId || !nodeKey) throw new Error('无法定位这条回答，请重新打开会话')
+        onEdit(sessionId, nodeKey)
+        error.textContent = ''
+      } catch (cause) {
+        error.textContent = cause instanceof Error ? cause.message : String(cause)
+      }
+    })
+    header.append(title, error, edit)
+    row.prepend(header)
+    headers.set(row, header)
+  }
   let stopped = false
   let pending: number | undefined
   const observed = new Set<Element>()
@@ -63,6 +104,8 @@ export function installAnswerFrame(doc?: Document): () => void {
     if (old.value) row.style.setProperty(HEIGHT, old.value, old.priority)
     else row.style.removeProperty(HEIGHT)
     managed.delete(row)
+    headers.get(row)?.remove()
+    headers.delete(row)
   }
   const sync = (): void => {
     const active = new Set<HTMLElement>()
@@ -81,6 +124,7 @@ export function installAnswerFrame(doc?: Document): () => void {
       for (const row of rows) {
         if (page <= 0) continue // 隐藏视图不写入错误的最小高度。
         active.add(row)
+        ensureHeader(row)
         if (!managed.has(row)) managed.set(row, {
           value: row.style.getPropertyValue(HEIGHT), priority: row.style.getPropertyPriority(HEIGHT),
         })
