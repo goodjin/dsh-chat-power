@@ -1,4 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest'
+import { compactTokens } from '../src/answer-usage.ts'
 import { installAnswerFrame } from '../src/answer-frame.ts'
 import { answerTurnUsage, type AnswerSource } from '../src/answer-edit.ts'
 
@@ -37,7 +38,9 @@ it('标题展示并更新用量，隐藏原生操作但保留文件和节点，�
   await vi.advanceTimersByTimeAsync(1000)
   expect(read).toHaveBeenCalledWith('s', 2)
   expect(details.textContent).toContain('120 tok')
-  expect(details.textContent).toContain('其中思考：5 tok')
+  expect(details.querySelector('dl')!.textContent).toContain('其中思考5 tok')
+  expect(details.querySelector('summary svg')).not.toBeNull()
+  expect(details.querySelector('summary')!.textContent).toBe('用量 120 tok')
   expect(details.open).toBe(true)
   expect(native.parentElement).toBe(parent)
   details.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
@@ -45,4 +48,8 @@ it('标题展示并更新用量，隐藏原生操作但保留文件和节点，�
   stop()
   expect(document.querySelector('details')).toBeNull()
   expect(getComputedStyle(native).display).not.toBe('none')
+})
+
+it('与原生一样缩写 K/M，明细仍保留精确数字', () => {
+  expect([517, 12200, 517234, 1200000].map(compactTokens)).toEqual(['517', '12.2K', '517K', '1.2M'])
 })

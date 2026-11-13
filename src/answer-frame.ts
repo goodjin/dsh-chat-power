@@ -8,14 +8,31 @@ const HEIGHT = '--chat-power-answer-height'
 export const ANSWER_FRAME_CSS = `
 /* 只隐藏原生操作栏，保留 turnTail 文件扩展和 React 节点原位。 */
 [data-turn-tail] > [data-clock="end"] { display: none !important; }
-[data-chat-power-answer-usage] { position: relative; font-size: 12px; font-weight: 400; }
-[data-chat-power-answer-usage] summary { cursor: pointer; white-space: nowrap; }
-[data-chat-power-answer-usage] > div {
-  position: absolute; top: 28px; right: 0; width: min(300px, 65vw); max-height: 50vh; overflow: auto;
-  padding: 12px; border: 1px solid var(--dsw-alias-border-l2, #ccc); border-radius: 8px;
-  background: var(--dsw-alias-bg-layer-1, #fff); box-shadow: 0 4px 16px #0002;
-  white-space: pre-line; overflow-wrap: anywhere;
+[data-chat-power-answer-usage] { position: relative; min-width: 0; font-size: 12px; font-weight: 400; }
+[data-chat-power-answer-usage] summary {
+  display:inline-flex; align-items:center; gap:4px; box-sizing:border-box; height:calc(28px + var(--dsh-content-font-delta, 0px));
+  padding:6px 8px; border-radius:var(--dsw-radius-sm, 5px); color:var(--dsw-alias-label-tertiary, inherit);
+  font-size:calc(var(--dsh-content-font-size-secondary, 13px) - 1px); line-height:24px;
+  font-variant-numeric:tabular-nums; white-space:nowrap; cursor:pointer; list-style:none;
 }
+[data-chat-power-answer-usage] summary::-webkit-details-marker { display:none; }
+[data-chat-power-answer-usage] summary svg { width:15px; height:15px; flex:none; }
+[data-chat-power-answer-usage] summary:hover,
+[data-chat-power-answer-usage][open] summary { background:var(--dsw-alias-interactive-bg-hover, #8882); }
+[data-chat-power-answer-usage] > div {
+  box-sizing:border-box; position:absolute; top:36px; right:0; width:min(340px, calc(100vw - 24px)); max-height:50vh; overflow:auto;
+  margin:0; padding:16px; border:0; border-radius:var(--dsw-radius-lg, 12px);
+  background:var(--dsw-specific-menu, #fff); backdrop-filter:var(--dsw-menu-backdrop-filter, none);
+  --dsw-elevation-stroke-color:var(--dsw-alias-border-l1); box-shadow:var(--dsw-elevation-prominent, 0 4px 16px #0003);
+  color:var(--dsw-alias-label-secondary, inherit); font-size:12px; line-height:18px; cursor:default;
+}
+[data-chat-power-answer-usage] > div[popover] { position:fixed; inset:auto; }
+[data-chat-power-usage-title] { display:flex; justify-content:space-between; gap:16px; font-weight:500; color:var(--dsw-alias-label-primary, inherit); border-bottom:.5px solid var(--dsw-alias-border-l2, #8884); padding-bottom:8px; margin-bottom:10px; }
+[data-chat-power-answer-usage] dl { display:grid; grid-template-columns:minmax(76px,auto) minmax(0,1fr); gap:6px 16px; margin:0; }
+[data-chat-power-answer-usage] dt { color:var(--dsw-alias-label-tertiary, inherit); }
+[data-chat-power-answer-usage] dd { text-align:right; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+[data-chat-power-answer-usage] dt, [data-chat-power-answer-usage] dd { margin:0; min-width:0; }
+@media (max-width:480px) { [data-chat-power-answer-usage] summary span { display:none; } }
 /* 耗时已在回答标题中展示，隐藏对应的原生完成提示行。 */
 [data-chat-power-completed-hidden] { display: none !important; }
 

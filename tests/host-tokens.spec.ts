@@ -48,6 +48,11 @@ const HOST_TOKENS: readonly string[] = [
   '--dsw-radius-sm',
   '--dsw-radius-xs',
   '--dsw-specific-input-major',
+  // 原生 TurnUsagePanel / ui-theme 0.2.2-rc.1 的菜单表面与阴影（2026-11-13 核对）。
+  '--dsw-specific-menu',
+  '--dsw-menu-backdrop-filter',
+  '--dsw-elevation-stroke-color',
+  '--dsw-elevation-prominent',
 ]
 
 /** 收集 src 下所有样式与源码里用到的 --dsw-* token。 */

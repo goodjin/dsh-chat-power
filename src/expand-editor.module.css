@@ -14,3 +14,5 @@
 }
 .toggle:hover { background: var(--dsw-alias-interactive-bg-hover, #8882); }
 .toggle:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary, #5685df); outline-offset: 2px; }
+
+.toggle svg { width: 18px; height: 18px; flex: none; }

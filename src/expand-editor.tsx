@@ -137,6 +137,10 @@ export function installEnterInterceptor(): () => void {
  * 与 table-pad.ts / ui-theme.ts 同一套 data 标记去重约定。
  */
 export const COMPOSER_SIZE_CSS = `
+/* 默认输入卡（含标题和工具行）约 144px，增加 50% 到 216px。 */
+[data-conversation-content]:not([data-content-phase="hero"]) [data-composer-card]:not(.${BIG_CLASS}):not([data-compose-edit]) { min-height:216px; }
+[data-composer-card]:not(.${BIG_CLASS}):not([data-compose-edit]) [data-input-scroll] { flex:1 1 auto; }
+
 [data-conversation-content][data-content-phase="hero"] [data-conversation-scroll]{justify-content:flex-end !important}
 [data-conversation-content][data-content-phase="hero"] [data-composer-card]{min-height:50vh !important;display:flex !important;flex-direction:column !important}
 [data-conversation-content][data-content-phase="hero"] [data-composer-card] [data-input-scroll]{flex:1 1 auto !important;max-height:none !important;min-height:0 !important}
@@ -223,6 +227,7 @@ export function ExpandEditor(props: { readonly t: RuntimeT; readonly inHeader?: 
   const button = (
     <button
       type="button"
+      data-composer-icon=""
       className={`${css.toggle} ${TOGGLE_CLASS}`}
       data-expand-toggle=""
       data-big={big ? '' : undefined}
