@@ -32,13 +32,14 @@ ${ANSWER_FRAME_SELECTOR}::before,
 }
 ${ANSWER_FRAME_SELECTOR}:has(> [data-chat-power-answer-header])::before { display: none; }
 [data-chat-power-answer-header] { display: flex; align-items: center; gap: 12px; }
-[data-chat-power-answer-edit] {
+[data-chat-power-answer-edit], [data-chat-power-answer-copy] {
   margin-left: auto; border: 0; border-radius: 4px; padding: 4px;
   width: 28px; height: 28px; flex: none; display: inline-flex; align-items: center; justify-content: center;
   color: inherit; background: transparent; font: inherit; cursor: pointer;
 }
-[data-chat-power-answer-edit] svg { width: 16px; height: 16px; }
-[data-chat-power-answer-edit]:hover { background: var(--dsw-alias-interactive-bg-hover, rgba(127,127,127,.1)); }
+[data-chat-power-answer-copy] { margin-left: 0; }
+[data-chat-power-answer-edit] svg, [data-chat-power-answer-copy] svg { width: 16px; height: 16px; }
+[data-chat-power-answer-edit]:hover, [data-chat-power-answer-copy]:hover { background: var(--dsw-alias-interactive-bg-hover, rgba(127,127,127,.1)); }
 [data-chat-power-answer-error] { font-weight: 400; font-size: 12px; }
 `
 
@@ -51,7 +52,7 @@ export function answerFrameHeight(page: number, composer: number, latest: boolea
  * 标题只插入插件自己的元素，不搬运 React 拥有的子节点。
  * 只测量会话视口/输入框，绝不改外层 scrollTop 或工作步骤 hidden 状态。
  */
-export function installAnswerFrame(doc?: Document, onEdit?: (sessionId: string, nodeKey: string) => void, readTitle?: (sessionId: string, turn: number) => string): () => void {
+export function installAnswerFrame(doc?: Document, onEdit?: (sessionId: string, nodeKey: string) => void, readTitle?: (sessionId: string, turn: number) => string, onCopy?: (sessionId: string, nodeKey: string) => Promise<void>): () => void {
   const target = doc ?? (typeof document === 'undefined' ? undefined : document)
   const win = target?.defaultView
   if (!target || !win) return () => {}
@@ -102,6 +103,32 @@ export function installAnswerFrame(doc?: Document, onEdit?: (sessionId: string, 
       }
     })
     header.append(title, error, edit)
+    if (onCopy) {
+      const copy = target.createElement('button')
+      copy.type = 'button'
+      copy.setAttribute('data-chat-power-answer-copy', '')
+      copy.setAttribute('aria-label', fallbackT('answerCard.copy'))
+      copy.title = fallbackT('answerCard.copy')
+      copy.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg>'
+      copy.addEventListener('click', event => {
+        event.stopPropagation()
+        if (copy.disabled) return
+        copy.disabled = true
+        // 同步数据读取失败与异步剪贴板拒绝都在此收口。
+        void (async () => {
+          try {
+            const sessionId = row.closest('[data-conversation-session]')?.getAttribute('data-conversation-session')
+            const nodeKey = row.getAttribute('data-chat-node-key')
+            if (!sessionId || !nodeKey) throw new Error('无法定位这条回答，请重新打开会话')
+            await onCopy(sessionId, nodeKey)
+            error.textContent = fallbackT('answerCard.copied')
+          } catch (cause) {
+            error.textContent = cause instanceof Error ? cause.message : String(cause)
+          } finally { copy.disabled = false }
+        })().catch(cause => { console.warn('[chat-power] copy feedback:', cause) })
+      })
+      header.append(copy)
+    }
     row.prepend(header)
     headers.set(row, header)
     updateTitle(row, header)

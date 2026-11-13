@@ -109,3 +109,30 @@ it('标题栏编辑绑定所在会话和节点，保留原生子树，失败就�
   expect(row.firstElementChild).toBe(native)
   expect(row.querySelector('button')).toBeNull()
 })
+
+it('复制图标反馈成功及剪贴板拒绝，始终恢复按钮可用状态', async () => {
+  document.body.innerHTML = `<section data-conversation-session="s1"><main data-conversation-scroll>
+    <div data-chat-flow-kind="assistant-step" data-chat-node-key="answer-1" id="answer">正文</div>
+  </main></section>`
+  Object.defineProperty(document.querySelector('main'), 'clientHeight', { value: 800 })
+  const calls: string[][] = []
+  let denied = false
+  const stop = installAnswerFrame(document, () => {}, undefined, async (id, key) => {
+    calls.push([id, key])
+    if (denied) throw new Error('剪贴板访问被拒绝')
+  })
+  try {
+    const copy = document.querySelector<HTMLButtonElement>('[data-chat-power-answer-copy]')!
+    expect(copy.querySelector('svg')).not.toBeNull()
+    copy.click()
+    await Promise.resolve()
+    expect(calls).toEqual([['s1', 'answer-1']])
+    expect(document.querySelector('[role="status"]')?.textContent).toBe('已复制')
+    expect(copy.disabled).toBe(false)
+    denied = true
+    copy.click()
+    await Promise.resolve()
+    expect(document.querySelector('[role="status"]')?.textContent).toBe('剪贴板访问被拒绝')
+    expect(copy.disabled).toBe(false)
+  } finally { stop() }
+})
