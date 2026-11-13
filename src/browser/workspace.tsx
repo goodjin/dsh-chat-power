@@ -5,7 +5,7 @@ import css from './workspace.module.css'
 import { requestChrome } from './chrome-request.ts'
 const useBrowser = () => useSyncExternalStore(browserState.subscribe, browserState.get, browserState.get)
 function BookmarkItems({ nodes, onOpen }: { nodes: Bookmark[]; onOpen: (url: string) => void }) {
-  return <>{nodes.map(n => n.children ? <details key={n.id} className={css.folder}><summary>{n.name || '未命名文件夹'}</summary><div><BookmarkItems nodes={n.children} onOpen={onOpen} />{n.children.length === 0 && <span>空文件夹</span>}</div></details> : <span key={n.id} className={css.bookmark}><button title={n.url} onClick={() => { if (n.url) onOpen(n.url) }}>{n.name || n.url}</button><button aria-label={`在新标签打开 ${n.name}`} title="在新标签打开" onClick={() => browserState.open('page', n.url)}>↗</button></span>)}</>
+  return <>{nodes.map(n => n.children ? <details key={n.id} className={css.folder}><summary>{n.name || '未命名文件夹'}</summary><div><BookmarkItems nodes={n.children} onOpen={onOpen} />{n.children.length === 0 && <span>空文件夹</span>}</div></details> : <span key={n.id} className={css.bookmark}><button title={n.url} onClick={event => { if (n.url) { if (event.metaKey || event.ctrlKey) browserState.open('page', n.url); else onOpen(n.url) } }}>{n.name || n.url}</button></span>)}</>
 }
 /** Keep folder popovers outside the measured row so they never increase its height. */
 export function BookmarkBar({ nodes, onOpen }: { nodes: Bookmark[]; onOpen: (url: string) => void }) {
@@ -45,7 +45,7 @@ export function BookmarkBar({ nodes, onOpen }: { nodes: Bookmark[]; onOpen: (url
     <div ref={measureRow} className={css.bookmarkMeasure} aria-hidden="true"><BookmarkItems nodes={nodes} onOpen={() => {}} /></div>
     <BookmarkItems nodes={nodes.slice(0, count)} onOpen={onOpen} />
     {count < nodes.length && <details ref={more} className={`${css.folder} ${css.bookmarkMore}`} onKeyDown={event => { if (event.key === 'Escape' && more.current) { more.current.open = false; more.current.querySelector('summary')?.focus() } }}>
-      <summary aria-label="更多书签">更多 »</summary>
+      <summary aria-label="更多书签">更多</summary>
       <div onClick={event => { if ((event.target as HTMLElement).closest('button') && more.current) more.current.open = false }}><BookmarkItems nodes={nodes.slice(count)} onOpen={onOpen} /></div>
     </details>}
   </div>
