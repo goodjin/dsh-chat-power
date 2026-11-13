@@ -10,7 +10,7 @@ vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({
 import { BIG_CLASS } from '../src/expand-editor.tsx'
 import { ComposerEditSurface, ComposerEditNewSession } from '../src/composer-edit.tsx'
 import { openComposerEdit, closeComposerEdit } from '../src/composer-edit-state.ts'
-it.each([false, true])('restores the original composer and its expanded state (%s) on exit', async (wasExpanded) => {
+it.each([[false, false], [true, false], [false, true], [true, true]])('fills viewport and restores draft (expanded=%s, file=%s)', async (wasExpanded, file) => {
   document.body.innerHTML = '<main data-conversation-content><div data-conversation-scroll><article>回答</article><footer data-composer-seat><div data-composer-card><div id="overlay"></div><div data-input-scroll><div data-composer-input contenteditable="true"></div></div><div id="native-row"><button id="model">模型</button><span id="right"></span><button id="native-send">发送</button><span id="info">输入框信息</span></div></div></footer></div></main>'
   const style = document.createElement('style')
   style.textContent = '[data-composer-card]{width:720px;padding:12px;border-radius:24px}#native-row{display:flex}' + readFileSync('src/composer-edit.module.css', 'utf8').replace(/:global\(([^)]+)\)/g, '$1')
@@ -19,7 +19,8 @@ it.each([false, true])('restores the original composer and its expanded state (%
   document.querySelector('[data-composer-card]')!.classList.toggle(BIG_CLASS, wasExpanded)
   const card = input.closest<HTMLElement>('[data-composer-card]')!
   let available = 800
-  vi.spyOn(document.querySelector('[data-conversation-content]')!, 'getBoundingClientRect').mockImplementation(() => ({ height: available }) as DOMRect)
+  Object.defineProperty(document.querySelector('[data-conversation-scroll]'), 'clientHeight', { get: () => available })
+  vi.spyOn(document.querySelector('[data-conversation-content]')!, 'getBoundingClientRect').mockReturnValue({ height: 999 } as DOMRect)
   vi.spyOn(card, 'getBoundingClientRect').mockReturnValue({ height: 400 } as DOMRect)
   vi.spyOn(document.querySelector('[data-composer-seat]')!, 'getBoundingClientRect').mockReturnValue({ height: 440 } as DOMRect)
   let draft = { text: '原草稿', references: [] }
@@ -36,7 +37,7 @@ it.each([false, true])('restores the original composer and its expanded state (%
   nativeSend.addEventListener('click', nativeClick)
   const reveal = vi.fn()
   try {
-    openComposerEdit({ sessionId: 'dom-edit', title: 'example.ts', text: '\tconst n = 1\n', send: vi.fn(), save: vi.fn(), reveal })
+    openComposerEdit({ sessionId: 'dom-edit', title: 'example.ts', text: '\tconst n = 1\n', send: vi.fn(), ...(file ? { save: vi.fn(), reveal } : {}) })
     act(() => root.render(createElement(ComposerEditSurface, { sessionId: 'dom-edit', shellOf: () => host })))
     expect(document.querySelector('[data-composer-input]')).toBe(input)
     expect(document.querySelector('textarea')).toBeNull()
@@ -74,8 +75,10 @@ it.each([false, true])('restores the original composer and its expanded state (%
     input.dispatchEvent(imeEnter)
     expect(imeEnter.defaultPrevented).toBe(false)
     input.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }))
-    await act(async () => { (document.querySelector('[data-local-reveal]') as HTMLElement).click() })
-    expect(reveal).toHaveBeenCalledTimes(1)
+    if (file) {
+      await act(async () => { (document.querySelector('[data-local-reveal]') as HTMLElement).click() })
+      expect(reveal).toHaveBeenCalledTimes(1)
+    }
     act(() => (document.querySelector('[data-compose-cancel]') as HTMLElement).click())
     expect(input.textContent).toBe('原草稿')
     expect(card.style.getPropertyValue('--compose-edit-height')).toBe('')

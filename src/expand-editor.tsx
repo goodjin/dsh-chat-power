@@ -138,13 +138,17 @@ export function installEnterInterceptor(): () => void {
  */
 export const COMPOSER_SIZE_CSS = `
 /* 默认输入卡（含标题和工具行）约 144px，增加 50% 到 216px。 */
-[data-conversation-content]:not([data-content-phase="hero"]) [data-composer-card]:not(.${BIG_CLASS}):not([data-compose-edit]) { min-height:216px; }
-[data-composer-card]:not(.${BIG_CLASS}):not([data-compose-edit]) [data-input-scroll] { flex:1 1 auto; }
+[data-conversation-content]:not([data-content-phase="hero"]) [data-composer-card]:not(.${BIG_CLASS}):not([data-compose-edit]) { min-height:216px !important; }
+[data-composer-card]:not(.${BIG_CLASS}):not([data-compose-edit]) [data-input-scroll] { flex:1 1 auto; min-height:108px; }
+[data-composer-card]:not([data-compose-edit]) [data-composer-input] { min-height:108px; }
+[data-composer-card]:not([data-compose-edit]) [data-input-scroll] { display:flex; flex-direction:column; }
+[data-composer-card]:not([data-compose-edit]) [data-input-scroll] > div { flex:1; }
+[data-composer-card]:not([data-compose-edit]) [data-composer-input] { height:100%; }
 
 [data-conversation-content][data-content-phase="hero"] [data-conversation-scroll]{justify-content:flex-end !important}
-[data-conversation-content][data-content-phase="hero"] [data-composer-card]{min-height:50vh !important;display:flex !important;flex-direction:column !important}
+[data-conversation-content][data-content-phase="hero"] [data-composer-card]:not([data-compose-edit]){min-height:75vh !important;display:flex !important;flex-direction:column !important}
 [data-conversation-content][data-content-phase="hero"] [data-composer-card] [data-input-scroll]{flex:1 1 auto !important;max-height:none !important;min-height:0 !important}
-[data-composer-card].${BIG_CLASS}{min-height:50vh !important;display:flex !important;flex-direction:column !important}
+[data-composer-card].${BIG_CLASS}:not([data-compose-edit]){min-height:50vh !important;display:flex !important;flex-direction:column !important}
 [data-composer-card].${BIG_CLASS} [data-input-scroll]{flex:1 1 auto !important;max-height:none !important;min-height:0 !important}
 [data-content-phase="hero"] .${TOGGLE_CLASS}{display:none}
 `.trim()
@@ -156,7 +160,8 @@ export const COMPOSER_SIZE_TAG = 'dsh-chat-power/composer-size'
 export function injectComposerSizeCss(doc?: Document): void {
   const target = doc ?? (typeof document === 'undefined' ? undefined : document)
   if (target === undefined) return
-  if (target.querySelector(`style[data-plugin-css="${COMPOSER_SIZE_TAG}"]`) !== null) return
+  const existing = target.querySelector<HTMLStyleElement>(`style[data-plugin-css="${COMPOSER_SIZE_TAG}"]`)
+  if (existing) { if (existing.textContent !== COMPOSER_SIZE_CSS) existing.textContent = COMPOSER_SIZE_CSS; return }
   const style = target.createElement('style')
   style.dataset.plugin = 'dsh-chat-power'
   style.dataset.pluginCss = COMPOSER_SIZE_TAG

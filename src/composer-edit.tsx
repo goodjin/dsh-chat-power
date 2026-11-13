@@ -20,6 +20,7 @@ export function ComposerEditSurface({ sessionId, shellOf }: { sessionId: string;
     const card = anchor.current?.closest<HTMLElement>('[data-composer-card]')
     const content = card?.closest<HTMLElement>('[data-conversation-content]')
     const seat = card?.closest<HTMLElement>('[data-composer-seat]')
+    const viewport = card?.closest<HTMLElement>('[data-conversation-scroll]')
     const input = card?.querySelector<HTMLElement>('[data-composer-input]')
     if (!card || !content || !seat || !input) return
     const headerMount = acquireComposerHeader(card)
@@ -30,19 +31,21 @@ export function ComposerEditSurface({ sessionId, shellOf }: { sessionId: string;
     const wasExpanded = card.classList.contains(BIG_CLASS)
     card.classList.add(BIG_CLASS)
     card.dataset.composeEdit = ''
-    // File editing fills the available conversation height. Measure the seat's
-    // native chrome as well so its footer and padding remain inside the page.
-    const resizeFile = () => {
-      if (!request.save) return
-      const available = content.getBoundingClientRect().height
+    // 回答、选区和文件编辑都按会话视口计算，扣除输入座位的工具栏/页脚。
+    const oldHeight = card.style.getPropertyValue('--compose-edit-height')
+    const oldPriority = card.style.getPropertyPriority('--compose-edit-height')
+    const resizeEditor = () => {
+      const available = viewport?.clientHeight || content.getBoundingClientRect().height
       const chrome = Math.max(0, seat.getBoundingClientRect().height - card.getBoundingClientRect().height)
-      if (available > chrome) card.style.setProperty('--compose-edit-height', `${available - chrome}px`)
+      if (available <= chrome) return
+      const height = `${Math.floor(available - chrome)}px`
+      if (card.style.getPropertyValue('--compose-edit-height') !== height) card.style.setProperty('--compose-edit-height', height)
     }
     if (request.save) card.dataset.composeEditFile = ''
-    resizeFile()
-    const resize = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(resizeFile)
-    if (request.save) { resize?.observe(content); resize?.observe(seat) }
-    window.addEventListener('resize', resizeFile)
+    resizeEditor()
+    const resize = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(resizeEditor)
+    for (const node of new Set([content, seat, card, viewport].filter((node): node is HTMLElement => !!node))) resize?.observe(node)
+    window.addEventListener('resize', resizeEditor)
     setMounts({ head, actions })
     try {
       const shell = shellOf(sessionId)
@@ -51,15 +54,21 @@ export function ComposerEditSurface({ sessionId, shellOf }: { sessionId: string;
       setReady(true)
     } catch (error) { setComposerEditNotice(sessionId, String(error)) }
     // Reuse the existing expanded-input keyboard behavior.
-    input.focus()
+    input.focus({ preventScroll: true })
+    const align = window.requestAnimationFrame(() => {
+      resizeEditor()
+      if (viewport) viewport.scrollTop = viewport.scrollHeight
+    })
     return () => {
       try { detachComposerEdit(sessionId) } catch (error) { console.warn('[chat-power] restore draft:', error) }
       delete head.dataset.composeEditHead
       headerMount.release(); actions.remove()
       card.classList.toggle(BIG_CLASS, wasExpanded)
       resize?.disconnect()
-      window.removeEventListener('resize', resizeFile)
-      card.style.removeProperty('--compose-edit-height')
+      window.removeEventListener('resize', resizeEditor)
+      window.cancelAnimationFrame(align)
+      if (oldHeight) card.style.setProperty('--compose-edit-height', oldHeight, oldPriority)
+      else card.style.removeProperty('--compose-edit-height')
       delete card.dataset.composeEditFile
       delete card.dataset.composeEdit
       setMounts(null); setReady(false)

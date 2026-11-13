@@ -184,3 +184,21 @@ it('展开按钮挂进卡内标题栏，标题栏重建后重新接入，原生�
   expect(replacement.querySelector('[data-expand-toggle]')).not.toBeNull()
   expect(document.querySelectorAll('[data-expand-toggle]')).toHaveLength(1)
 })
+
+it('普通、新会话及重新激活都使用新高度，实际可编辑区域同步撑高', () => {
+  document.querySelectorAll(`style[data-plugin-css="${COMPOSER_SIZE_TAG}"]`).forEach(node => node.remove())
+  const stale = document.createElement('style')
+  stale.dataset.pluginCss = COMPOSER_SIZE_TAG
+  stale.textContent = '[data-composer-card]{min-height:36px}'
+  document.head.append(stale)
+  injectComposerSizeCss()
+  expect(document.querySelectorAll(`style[data-plugin-css="${COMPOSER_SIZE_TAG}"]`)).toHaveLength(1)
+  content.dataset.contentPhase = 'active'
+  expect(getComputedStyle(card).minHeight).toBe('216px')
+  expect(getComputedStyle(input).minHeight).toBe('108px')
+  content.dataset.contentPhase = 'hero'
+  expect(getComputedStyle(card).minHeight).toBe(`${window.innerHeight * .75}px`)
+  card.dataset.composeEdit = ''
+  expect(getComputedStyle(card).minHeight).not.toBe(`${window.innerHeight * .75}px`)
+  stale.remove()
+})

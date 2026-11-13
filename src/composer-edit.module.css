@@ -2,8 +2,10 @@
 [data-composer-card][data-compose-edit] {
   display: flex !important;
   flex-direction: column !important;
-  height: 60vh !important;
-  min-height: 50vh !important;
+  height: var(--compose-edit-height, 80vh) !important;
+  min-height: 0 !important;
+  max-height: var(--compose-edit-height, 80vh) !important;
+  overflow: hidden;
 }
 [data-compose-edit] [data-input-scroll] {
   flex: 1 1 auto !important;
@@ -13,7 +15,6 @@
 [data-compose-edit-head], [data-compose-edit-actions] { flex: none; }
 [data-compose-edit] :global(.dshcp-composer-toggle) { display: none; }
 
-[data-conversation-content] [data-composer-card][data-compose-edit-file] {
-  height: var(--compose-edit-height, 60vh) !important;
-  min-height: 0 !important;
-}
+[data-composer-seat]:has([data-compose-edit]) { position: sticky !important; top: 0; bottom: 0; }
+[data-compose-edit] [data-compose-edit-head] { position: sticky; top: 0; z-index: 1; }
+[data-compose-edit] [data-composer-input] { min-height: 100%; }
