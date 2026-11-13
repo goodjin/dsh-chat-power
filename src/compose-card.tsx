@@ -35,6 +35,7 @@ export interface ComposeCardLabels {
   readonly newSession: string
   /** 顶栏复制钮的文案。 */
   readonly copy: string
+  readonly copied?: string
   /** 底部「仅保存」钮的文案；只在文件编辑（有写回目标）时需要。 */
   readonly save?: string
 }
@@ -60,6 +61,8 @@ export function ComposeCard(props: {
   readonly onCancel?: () => void
   /** 顶栏复制：把正文写进剪贴板，不发送、不影响草稿。 */
   readonly onCopy?: () => void
+  readonly copied?: boolean
+  readonly copyPending?: boolean
   /** 发送到当前会话。 */
   readonly onSend?: () => void
   /** 新建会话并发送。 */
@@ -86,11 +89,12 @@ export function ComposeCard(props: {
             type="button"
             className={uiButtonClass}
             data-compose-copy=""
-            aria-label={props.labels.copy}
-            title={props.labels.copy}
+            aria-label={props.copied ? props.labels.copied ?? props.labels.copy : props.labels.copy}
+            title={props.copied ? props.labels.copied ?? props.labels.copy : props.labels.copy}
+            disabled={props.copyPending}
             onClick={props.onCopy}
           >
-            <IconCopyOutlineRegular size={16} />
+            {props.copied ? <IconCheckOutlineRegular size={16} /> : <IconCopyOutlineRegular size={16} />}
           </button>
         )}
         {props.onCancel !== undefined && (

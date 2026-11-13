@@ -14,7 +14,40 @@ export function ComposerEditSurface({ sessionId, shellOf }: { sessionId: string;
   const anchor = useRef<HTMLSpanElement>(null)
   const [mounts, setMounts] = useState<{ head: HTMLElement; actions: HTMLElement } | null>(null)
   const [ready, setReady] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const [copyPending, setCopyPending] = useState(false)
+  const copyState = useRef<{ generation: number; busy: boolean; timer?: ReturnType<typeof setTimeout> }>({ generation: 0, busy: false })
   const request = entry?.request
+  useLayoutEffect(() => {
+    setCopied(false)
+    setCopyPending(false)
+    copyState.current.busy = false
+    return () => {
+      copyState.current.generation++
+      clearTimeout(copyState.current.timer)
+      copyState.current.timer = undefined
+    }
+  }, [request, sessionId])
+  const copyDraft = async (): Promise<void> => {
+    const state = copyState.current
+    if (state.busy) return
+    const generation = state.generation
+    state.busy = true
+    clearTimeout(state.timer)
+    setCopied(false)
+    setCopyPending(true)
+    try {
+      const ok = await copyTextToClipboard(composerEditText(sessionId))
+      if (state.generation !== generation) return
+      setComposerEditNotice(sessionId, ok ? '' : '复制失败')
+      setCopied(ok)
+      if (ok) state.timer = setTimeout(() => setCopied(false), 1500)
+    } catch {
+      if (state.generation === generation) setComposerEditNotice(sessionId, '复制失败')
+    } finally {
+      if (state.generation === generation) { state.busy = false; setCopyPending(false) }
+    }
+  }
   useLayoutEffect(() => {
     if (!request) return
     const card = anchor.current?.closest<HTMLElement>('[data-composer-card]')
@@ -97,9 +130,10 @@ export function ComposerEditSurface({ sessionId, shellOf }: { sessionId: string;
       {entry.request.reveal && <button type="button" className={uiButtonClass} data-local-reveal="" title="打开文件所在文件夹" aria-label="打开文件所在文件夹" disabled={entry.pending || entry.nativePending || !ready} onClick={() => { void performComposerEdit(sessionId, 'reveal') }}><IconFolderOpenOutlineRegular size={16} /></button>}
     </>}
     onCancel={() => closeComposerEdit(sessionId)}
-    onCopy={() => { void copyTextToClipboard(composerEditText(sessionId)).then(ok => setComposerEditNotice(sessionId, ok ? '已复制' : '复制失败')) }}
+    onCopy={() => { copyDraft().catch(error => console.warn('[chat-power] edit copy:', error)) }}
+    copied={copied} copyPending={copyPending}
     pending={entry.pending || entry.nativePending || !ready}
-    labels={{ cancel: t('markdownTurn.cancel'), copy: t('compose.copy'), save: t('compose.save'), send: t('compose.sendCurrent'), newSession: t('compose.sendNewSession') }}
+    labels={{ cancel: t('markdownTurn.cancel'), copy: t('compose.copy'), copied: t('answerCard.copied'), save: t('compose.save'), send: t('compose.sendCurrent'), newSession: t('compose.sendNewSession') }}
   >{entry.notice && <p role="status" className={statusNoticeClass}>{entry.notice}</p>}</ComposeCard>}</>
 }
 

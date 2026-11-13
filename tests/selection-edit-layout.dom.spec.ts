@@ -3,8 +3,8 @@ import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { expect, it, vi } from 'vitest'
 vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({
-  IconFolderOpenOutlineRegular: () => null, IconCheckOutlineRegular: () => null,
-  IconCloseOutlineRegular: () => null, IconCopyOutlineRegular: () => null,
+  IconFolderOpenOutlineRegular: () => null, IconCheckOutlineRegular: () => createElement('span', { 'data-test-check': '' }),
+  IconCloseOutlineRegular: () => null, IconCopyOutlineRegular: () => createElement('span', { 'data-test-copy': '' }),
   IconNewChatOutlineRegular: () => null, IconSendOutlineRegular: () => null,
 }))
 import { BIG_CLASS } from '../src/expand-editor.tsx'
@@ -88,5 +88,55 @@ it.each([[false, false], [true, false], [false, true], [true, true]])('fills vie
     expect(document.querySelector('[data-compose-edit-head]')).toBeNull()
   } finally {
     act(() => { footerRoot.unmount(); root.unmount() }); closeComposerEdit('dom-edit'); document.body.replaceChildren()
+  }
+})
+
+it('编辑副本复制成功短暂变勾，复制失败不显示成功，退出后忽略迟到结果', async () => {
+  vi.useFakeTimers()
+  document.body.innerHTML = '<main data-conversation-content><div data-conversation-scroll><footer data-composer-seat><div data-composer-card><div id="overlay"></div><div data-input-scroll><div data-composer-input contenteditable="true"></div></div></div></footer></div></main>'
+  const input = document.querySelector<HTMLElement>('[data-composer-input]')!
+  let draft = { text: '原草稿', references: [] }
+  const shell = {
+    get draftSnapshot() { return draft },
+    get snapshot() { return { draft: draft.text, phase: 'plain' } },
+    setDraft(value: any) { draft = typeof value === 'string' ? { text: value, references: [] } : value; input.textContent = draft.text },
+  }
+  const oldClipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
+  const writeText = vi.fn(async (_text: string) => {})
+  Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
+  const root = createRoot(document.getElementById('overlay')!)
+  const shellOf = () => shell
+  try {
+    openComposerEdit({ sessionId: 'copy-edit', title: '回答副本', text: '回答', send: vi.fn() })
+    act(() => root.render(createElement(ComposerEditSurface, { sessionId: 'copy-edit', shellOf })))
+    shell.setDraft('修改后的回答')
+    const button = document.querySelector<HTMLButtonElement>('[data-compose-copy]')!
+    const originalLabel = button.getAttribute('aria-label')
+    await act(async () => { button.click() })
+    expect(writeText).toHaveBeenCalledWith('修改后的回答')
+    expect(button.getAttribute('aria-label')).toBe('已复制')
+    expect(button.querySelector('[data-test-check]')).not.toBeNull()
+    expect(button.querySelector('[data-test-copy]')).toBeNull()
+    await act(async () => { await vi.advanceTimersByTimeAsync(1500) })
+    expect(button.getAttribute('aria-label')).toBe(originalLabel)
+    expect(button.querySelector('[data-test-copy]')).not.toBeNull()
+    writeText.mockRejectedValueOnce(new Error('denied'))
+    await act(async () => { button.click() })
+    expect(button.getAttribute('aria-label')).toBe(originalLabel)
+    expect(button.querySelector('[data-test-copy]')).not.toBeNull()
+    expect(document.querySelector('[role="status"]')?.textContent).toBe('复制失败')
+    let resolve!: () => void
+    writeText.mockImplementationOnce(() => new Promise<void>(done => { resolve = done }))
+    await act(async () => { button.click() })
+    expect(button.disabled).toBe(true)
+    act(() => closeComposerEdit('copy-edit'))
+    await act(async () => { resolve() })
+    expect(document.querySelector('[data-compose-copy]')).toBeNull()
+    expect(input.textContent).toBe('原草稿')
+  } finally {
+    act(() => root.unmount()); closeComposerEdit('copy-edit')
+    if (oldClipboard) Object.defineProperty(navigator, 'clipboard', oldClipboard)
+    else Reflect.deleteProperty(navigator, 'clipboard')
+    vi.useRealTimers(); document.body.replaceChildren()
   }
 })
