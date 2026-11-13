@@ -1,5 +1,5 @@
 [data-chat-power-composer-header] { flex: none; min-width: 0; }
-:global(.chat-power-composer-tools) { padding: 4px 10px; border-bottom: 1px solid var(--dsw-alias-border-l2, #8884); }
+:global(.chat-power-composer-tools) { padding: 1px 10px; border-bottom: 1px solid var(--dsw-alias-border-l2, #8884); }
 :global(.chat-power-composer-title) { display: flex; align-items: center; gap: 6px; min-height: 24px; flex-wrap: wrap; color: var(--dsw-alias-label-secondary, inherit); font-size: 13px; }
 :global(.chat-power-composer-title) time { margin-left: auto; font-variant-numeric: tabular-nums; }
 :global(.chat-power-composer-tools) button { border: 0; border-radius: 5px; background: transparent; color: inherit; padding: 5px 8px; font: inherit; cursor: pointer; }
@@ -17,3 +17,6 @@
 :global(.chat-power-composer-tools) button:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary, #5685df); outline-offset: 2px; }
 
 [data-chat-power-expand-seat] { display: inline-flex; flex: none; }
+
+/* 压低卡片原有的顶部留白，不缩小图标点击区域。 */
+[data-composer-card]:has([data-chat-power-composer-header]) { padding-top: 2px; }

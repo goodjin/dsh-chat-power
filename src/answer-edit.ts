@@ -64,3 +64,8 @@ export function answerTurnTitle(source: AnswerSource, sessionId: string, turn: n
 export function answerTurnUsage(source: AnswerSource, sessionId: string, turn: number): TurnUsage | undefined {
   return source.binding(sessionId).target('chat').getSnapshot()?.timeline?.turns.get(turn)?.data?.get('turn-tail')?.tokenUsage
 }
+
+/** 必须有整轮结束事件，不能把已输出文字或单个步骤结束当作整轮完成。 */
+export function answerTurnEnded(source: AnswerSource, sessionId: string, turn: number): boolean {
+  return source.binding(sessionId).target('chat').getSnapshot()?.timeline?.turns.get(turn)?.end !== undefined
+}

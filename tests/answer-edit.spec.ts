@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest'
-import { editAnswerCopy, answerText, answerTurnTitle, type AnswerSource } from '../src/answer-edit.ts'
+import { editAnswerCopy, answerText, answerTurnTitle, answerTurnEnded, type AnswerSource } from '../src/answer-edit.ts'
 import { closeComposerEdit, getComposerEdit } from '../src/composer-edit-state.ts'
 import type { MarkdownTurnReaders } from '../src/markdown-turn-sources.ts'
 
@@ -43,6 +43,9 @@ it('轮次耗时来自对应轮的宿主时间，区分结束、未结束和缺�
   }) }) }) }
   expect(answerTurnTitle(source, 's1', 3)).toBe('第 3 轮 · 用时 1分24秒')
   expect(answerTurnTitle(source, 's1', 4)).toBe('第 4 轮 · 用时待结算')
+  expect(answerTurnEnded(source, 's1', 3)).toBe(true)
+  expect(answerTurnEnded(source, 's1', 4)).toBe(false)
+  expect(answerTurnEnded(source, 's1', 6)).toBe(false)
   expect(answerTurnTitle(source, 's1', 5)).toBe('第 5 轮 · 用时 1小时1分1秒')
   expect(answerTurnTitle(source, 's1', 6)).toBe('第 6 轮 · 用时未知')
   timings.set(4, { start: { time: 10000 }, end: { time: 10000 } })

@@ -4,6 +4,8 @@ import { fallbackT } from './locales.ts'
 
 /** 0.2.2-rc.1 DOM 适配；保留原生节点所有权和工作步骤可见性。 */
 export const ANSWER_FRAME_SELECTOR = '[data-chat-flow-kind="assistant-step"]:not([data-chat-group-part="reasoning"]):not([data-turn-process-member])'
+const READY = 'data-chat-power-answer-ready'
+const FRAMED_SELECTOR = `${ANSWER_FRAME_SELECTOR}[${READY}]`
 const HEIGHT = '--chat-power-answer-height'
 export const ANSWER_FRAME_CSS = `
 /* 只隐藏原生操作栏，保留 turnTail 文件扩展和 React 节点原位。 */
@@ -36,7 +38,7 @@ export const ANSWER_FRAME_CSS = `
 /* 耗时已在回答标题中展示，隐藏对应的原生完成提示行。 */
 [data-chat-power-completed-hidden] { display: none !important; }
 
-${ANSWER_FRAME_SELECTOR} {
+${FRAMED_SELECTOR} {
   box-sizing: border-box;
   min-width: 0;
   height: var(${HEIGHT}, auto);
@@ -46,7 +48,7 @@ ${ANSWER_FRAME_SELECTOR} {
   border-radius: 10px;
   background: var(--dsw-alias-bg-layer-1, transparent);
 }
-${ANSWER_FRAME_SELECTOR}::before,
+${FRAMED_SELECTOR}::before,
 [data-chat-power-answer-header] {
   content: ${JSON.stringify(fallbackT('answerCard.title'))};
   display: block;
@@ -62,7 +64,7 @@ ${ANSWER_FRAME_SELECTOR}::before,
   line-height: 20px;
   font-weight: 600;
 }
-${ANSWER_FRAME_SELECTOR}:has(> [data-chat-power-answer-header])::before { display: none; }
+${FRAMED_SELECTOR}:has(> [data-chat-power-answer-header])::before { display: none; }
 [data-chat-power-answer-header] { display: flex; align-items: center; gap: 12px; }
 [data-chat-power-answer-edit], [data-chat-power-answer-copy] {
   margin-left: auto; border: 0; border-radius: 4px; padding: 4px;
@@ -84,7 +86,7 @@ export function answerFrameHeight(page: number, composer: number, latest: boolea
  * 标题只插入插件自己的元素，不搬运 React 拥有的子节点。
  * 只测量会话视口/输入框，工作步骤状态归宿主；切会话时在测量完成后补恢复已记录的底部位置。
  */
-export function installAnswerFrame(doc?: Document, onEdit?: (sessionId: string, nodeKey: string) => void, readTitle?: (sessionId: string, turn: number) => string, onCopy?: (sessionId: string, nodeKey: string) => Promise<void>, readUsage?: (sessionId: string, turn: number) => TurnUsage | undefined): () => void {
+export function installAnswerFrame(doc?: Document, onEdit?: (sessionId: string, nodeKey: string) => void, readTitle?: (sessionId: string, turn: number) => string, onCopy?: (sessionId: string, nodeKey: string) => Promise<void>, readUsage?: (sessionId: string, turn: number) => TurnUsage | undefined, readEnded?: (sessionId: string, turn: number) => boolean): () => void {
   const target = doc ?? (typeof document === 'undefined' ? undefined : document)
   const win = target?.defaultView
   if (!target || !win) return () => {}
@@ -92,7 +94,7 @@ export function installAnswerFrame(doc?: Document, onEdit?: (sessionId: string, 
   style.dataset.pluginCss = 'chat-power-native-answer-frame'
   style.textContent = ANSWER_FRAME_CSS
   target.head.append(style)
-  const scrollMemory = createAnswerScrollMemory(target, ANSWER_FRAME_SELECTOR)
+  const scrollMemory = createAnswerScrollMemory(target, FRAMED_SELECTOR)
   const managed = new Map<HTMLElement, { value: string; priority: string }>()
   const headers = new Map<HTMLElement, HTMLElement>()
   const copyTimers = new Map<HTMLButtonElement, number>()
@@ -211,6 +213,7 @@ export function installAnswerFrame(doc?: Document, onEdit?: (sessionId: string, 
   }
   const resize = typeof win.ResizeObserver === 'function' ? new win.ResizeObserver(schedule) : undefined
   const restore = (row: HTMLElement): void => {
+    row.removeAttribute(READY)
     const old = managed.get(row)
     if (!old) return
     if (old.value) row.style.setProperty(HEIGHT, old.value, old.priority)
@@ -240,8 +243,18 @@ export function installAnswerFrame(doc?: Document, onEdit?: (sessionId: string, 
       const latestTurn = turns.length ? Math.max(...turns) : undefined
       const page = container.clientHeight
       for (const row of rows) {
+        const rawTurn = row.getAttribute('data-chat-turn')
+        const turn = rawTurn === null ? NaN : Number(rawTurn)
+        const sessionId = row.closest('[data-conversation-session]')?.getAttribute('data-conversation-session')
+        let ended = false
+        try {
+          ended = readEnded ? !!sessionId && Number.isSafeInteger(turn) && turn >= 1 && readEnded(sessionId, turn)
+            : rawTurn !== null && [...container.querySelectorAll('[data-turn-tail]')].some(tail => tail.getAttribute('data-turn-tail') === rawTurn)
+        } catch { /* 切会话或历史缺页时保持原生，不能提前加框。 */ }
+        if (!ended) continue
         if (page <= 0) continue // 隐藏视图不写入错误的最小高度。
         active.add(row)
+        if (!row.hasAttribute(READY)) row.setAttribute(READY, '')
         ensureHeader(row)
         const header = headers.get(row)
         if (header) updateTitle(row, header)
@@ -275,9 +288,9 @@ export function installAnswerFrame(doc?: Document, onEdit?: (sessionId: string, 
     subtree: true, childList: true, attributes: true,
     attributeFilter: ['data-conversation-session', 'data-chat-node-key', 'data-chat-turn', 'data-chat-flow-kind', 'data-chat-group-part', 'data-turn-process-member', 'hidden'],
   })
-  // 起止事件可先于 DOM 更新到达；定时只更新标题，不做布局测量。
+  // 结束事件可先于 DOM 更新到达；定时补查就绪状态与用量。
   const titleTimer = win.setInterval(() => {
-    if (!stopped) for (const [row, header] of headers) if (row.isConnected) updateTitle(row, header)
+    if (!stopped) schedule()
   }, 1000)
   win.addEventListener('resize', schedule)
   sync()

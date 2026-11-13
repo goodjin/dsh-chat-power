@@ -61,7 +61,7 @@ export function updateAnswerUsage(header: HTMLElement, usage?: TurnUsage): void 
   }
   const count = (n: number): string => n.toLocaleString('zh-CN')
   const valid = usage && Number.isSafeInteger(usage.totalTokens) && usage.totalTokens >= 0
-  const label = valid ? `用量 ${compactTokens(usage.totalTokens)} tok` : '用量未知'
+  const label = valid ? `用量 ${compactTokens(usage.totalTokens)} tok` : '用量不可用'
   const rows: [string, string][] = valid ? [
     ...(usage.routes?.length ? [['模型', usage.routes.map(route => `${route.provider}/${route.model}`).join(', ')] as [string, string]] : []),
     ...(usage.cacheReadTokens !== undefined && usage.totalTokens > usage.outputTokens
@@ -71,7 +71,7 @@ export function updateAnswerUsage(header: HTMLElement, usage?: TurnUsage): void 
     ...(usage.cacheWriteTokens === undefined ? [] : [['缓存写入', `${count(usage.cacheWriteTokens)} tok`] as [string, string]]),
     ['输出', `${count(usage.outputTokens)} tok`],
     ...(usage.reasoningTokens === undefined ? [] : [['其中思考', `${count(usage.reasoningTokens)} tok`] as [string, string]]),
-  ] : [['说明', '本轮尚未结算，或模型未提供完整用量数据。']]
+  ] : [['说明', '宿主未提供本轮完整用量。模型未上报或历史数据不完整时无法准确统计，不代表用量为零。']]
   const summary = details.querySelector('summary')!
   const labelNode = summary.querySelector('span')!
   if (labelNode.textContent !== label) labelNode.textContent = label

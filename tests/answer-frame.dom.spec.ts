@@ -3,18 +3,18 @@ import { ANSWER_FRAME_SELECTOR, answerFrameHeight, installAnswerFrame } from '..
 
 afterEach(() => { document.body.innerHTML = ''; document.head.innerHTML = '' })
 
-it('只框住原生回答：保留图片、思考/工具节点、宿主隐藏态和节点位置', () => {
+it('隐藏视图不加框：保留图片、思考/工具节点、宿主隐藏态和节点位置', () => {
   document.body.innerHTML = `<main data-conversation-scroll>
     <div data-chat-flow-kind="assistant-step" data-chat-group-part="reasoning"><div data-slot="conversation.chat.node">思考</div></div>
     <div data-chat-flow-kind="assistant-step" data-turn-process-member="true" hidden><div data-slot="conversation.chat.node">中间回复</div></div>
     <div data-chat-flow-kind="tool-call"><div data-slot="conversation.chat.node">工具</div></div>
     <div data-chat-flow-kind="assistant-step" data-chat-group-part="response" id="answer"><div data-slot="conversation.chat.node" style="display:contents">回答<img src="data:," /></div></div>
-  </main>`
+  <div data-turn-tail="1"></div><div data-turn-tail="2"></div><div data-turn-tail="3"></div></main>`
   const before = document.body.innerHTML
   const answer = document.getElementById('answer')!
   const stop = installAnswerFrame(document)
   expect([...document.querySelectorAll(ANSWER_FRAME_SELECTOR)]).toEqual([answer])
-  expect(getComputedStyle(answer).borderTopWidth).toBe('1px')
+  expect(getComputedStyle(answer).borderTopWidth).not.toBe('1px')
   expect(document.body.innerHTML).toBe(before)
   // 流式替换正文无需插件观察器或搬运；同一原生槽位继续承载内容。
   answer.append('继续输出')
@@ -42,7 +42,7 @@ it('历史整页、最后一轮扣输入框；输入框变化、新轮开始和�
       <div data-chat-flow-kind="assistant-step" data-chat-turn="1" id="old"><div>历史回答</div></div>
       <div data-chat-flow-kind="assistant-step" data-chat-turn="2" id="latest"><div>最新回答<img src="data:," /></div></div>
       <div data-composer-seat></div>
-    </main>`
+    <div data-turn-tail="1"></div><div data-turn-tail="2"></div><div data-turn-tail="3"></div></main>`
     const container = document.querySelector('main')!
     Object.defineProperty(container, 'clientHeight', { value: 800, configurable: true })
     let composerHeight = 200
@@ -85,7 +85,7 @@ it('历史整页、最后一轮扣输入框；输入框变化、新轮开始和�
 it('标题栏编辑绑定所在会话和节点，保留原生子树，失败就地提示并可清理', () => {
   document.body.innerHTML = `<section data-conversation-session="s1"><main data-conversation-scroll>
     <div data-chat-flow-kind="assistant-step" data-chat-node-key="answer-1" data-chat-turn="3" id="answer"><div data-slot="conversation.chat.node">正文</div></div>
-  </main></section>`
+  <div data-turn-tail="1"></div><div data-turn-tail="2"></div><div data-turn-tail="3"></div></main></section>`
   Object.defineProperty(document.querySelector('main'), 'clientHeight', { value: 800 })
   const row = document.getElementById('answer')!
   const native = row.firstElementChild!
@@ -114,8 +114,8 @@ it('复制图标反馈成功及剪贴板拒绝，始终恢复按钮可用状态'
   const { vi } = await import('vitest')
   vi.useFakeTimers()
   document.body.innerHTML = `<section data-conversation-session="s1"><main data-conversation-scroll>
-    <div data-chat-flow-kind="assistant-step" data-chat-node-key="answer-1" id="answer">正文</div>
-  </main></section>`
+    <div data-chat-flow-kind="assistant-step" data-chat-node-key="answer-1" data-chat-turn="1" id="answer">正文</div>
+  <div data-turn-tail="1"></div><div data-turn-tail="2"></div><div data-turn-tail="3"></div></main></section>`
   Object.defineProperty(document.querySelector('main'), 'clientHeight', { value: 800 })
   const calls: string[][] = []
   let denied = false
@@ -151,7 +151,7 @@ it('整框预算包含标题与内边距，最后一轮再为原生尾部操作�
     <div data-chat-flow-kind="assistant-step" data-chat-turn="1" id="answer">正文</div>
     <div data-chat-flow-kind="turn-tail" id="tail">原生操作栏</div>
     <div data-composer-seat></div>
-  </main></section>`
+  <div data-turn-tail="1"></div><div data-turn-tail="2"></div><div data-turn-tail="3"></div></main></section>`
   const main = document.querySelector('main')!
   Object.defineProperty(main, 'clientHeight', { value: 800 })
   const answer = document.getElementById('answer')!
@@ -167,4 +167,37 @@ it('整框预算包含标题与内边距，最后一轮再为原生尾部操作�
     expect(getComputedStyle(header).top).toBe('0px')
     expect(getComputedStyle(header).marginTop).toBe('0px')
   } finally { stop() }
+})
+
+it('流式时无框和标题，只有整轮结束才装饰；结束事件先到也会补查，切会话不串状态', async () => {
+  const { vi } = await import('vitest')
+  vi.useFakeTimers()
+  document.body.innerHTML = `<section data-conversation-session="s1"><main data-conversation-scroll>
+    <div data-chat-flow-kind="assistant-step" data-chat-turn="1" data-chat-node-key="a"><p>正在输出</p></div>
+  </main></section>`
+  const main = document.querySelector('main')!
+  Object.defineProperty(main, 'clientHeight', { value: 800 })
+  const row = document.querySelector<HTMLElement>('[data-chat-node-key]')!
+  const native = row.firstElementChild
+  let ended = false
+  const readEnded = vi.fn((id: string, turn: number) => id === 's1' && turn === 1 && ended)
+  const stop = installAnswerFrame(document, () => {}, undefined, undefined, undefined, readEnded)
+  try {
+    expect(row.querySelector('[data-chat-power-answer-header]')).toBeNull()
+    expect(getComputedStyle(row).borderTopWidth).not.toBe('1px')
+    expect(row.style.getPropertyValue('--chat-power-answer-height')).toBe('')
+    native!.textContent = '更多文字，不代表结束'
+    await vi.advanceTimersByTimeAsync(30)
+    expect(row.querySelector('[data-chat-power-answer-header]')).toBeNull()
+    ended = true // 无 DOM 变动的结束事件也能触发加框
+    await vi.advanceTimersByTimeAsync(1020)
+    expect(row.querySelector('[data-chat-power-answer-header]')).not.toBeNull()
+    expect(getComputedStyle(row).borderTopWidth).toBe('1px')
+    expect(native!.parentElement).toBe(row)
+    document.querySelector('section')!.setAttribute('data-conversation-session', 's2')
+    await vi.advanceTimersByTimeAsync(30)
+    expect(row.querySelector('[data-chat-power-answer-header]')).toBeNull()
+    expect(row.hasAttribute('data-chat-power-answer-ready')).toBe(false)
+    expect(native!.parentElement).toBe(row)
+  } finally { stop(); vi.useRealTimers() }
 })

@@ -30,12 +30,12 @@ it('标题展示并更新用量，隐藏原生操作但保留文件和节点，�
   const read = vi.fn(() => available ? { totalTokens: 120, uncachedInputTokens: 80, cacheReadTokens: 20, outputTokens: 20, reasoningTokens: 5 } : undefined)
   const stop = installAnswerFrame(document, () => {}, undefined, undefined, read)
   const details = document.querySelector('details')!
-  expect(details.textContent).toContain('用量未知')
+  expect(details.textContent).toContain('用量不可用')
   expect(getComputedStyle(native).display).toBe('none')
   expect(getComputedStyle(document.querySelector('#files')!).display).not.toBe('none')
   available = true
   details.open = true
-  await vi.advanceTimersByTimeAsync(1000)
+  await vi.advanceTimersByTimeAsync(1020)
   expect(read).toHaveBeenCalledWith('s', 2)
   expect(details.textContent).toContain('120 tok')
   expect(details.querySelector('dl')!.textContent).toContain('其中思考5 tok')
