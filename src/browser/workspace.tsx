@@ -105,9 +105,9 @@ function ImportBookmarks() {
 }
 /** Chrome-style manager: folder tree on the left, list on the right, search filter, edit dialog. */
 type ManagerFolder = { id: string; name: string; children: Bookmark[] }
-function managerFolders(nodes: Bookmark[], name = ''): ManagerFolder[] {
-  const self: ManagerFolder = { id: '', name: name || '书签栏', children: nodes }
-  const childFolders = nodes.flatMap(n => n.children ? managerFolders(n.children, n.name) : [])
+function managerFolders(nodes: Bookmark[], name = '', id = ''): ManagerFolder[] {
+  const self: ManagerFolder = { id, name: name || '书签栏', children: nodes }
+  const childFolders = nodes.flatMap(n => n.children ? managerFolders(n.children, n.name, n.id) : [])
   return [self, ...childFolders]
 }
 function matches(node: Bookmark, query: string): boolean {
@@ -125,6 +125,7 @@ function BookmarkManager({ draft }: { draft?: { name: string; url: string } }) {
   const snapshot = useBrowser()
   const [folder, setFolder] = useState('') // selected folder id; '' = 书签栏
   const [query, setQuery] = useState('')
+  const [expanded, setExpanded] = useState(() => new Set(['']))
   const [editing, setEditing] = useState<{ node?: Bookmark; parent: string; folder: boolean }>()
   const [message, setMessage] = useState('')
   const allFolders = useMemo(() => managerFolders(snapshot.bookmarks), [snapshot.bookmarks])
@@ -138,17 +139,42 @@ function BookmarkManager({ draft }: { draft?: { name: string; url: string } }) {
     const url = String(data.get('url') ?? '')
     const isFolder = editing?.folder || !!editing?.node?.children
     try {
-      browserState.saveBookmark({ id: editing?.node?.id, name, ...(isFolder ? { children: editing?.node?.children ?? [] } : { url }) }, editing?.parent ?? '')
+      browserState.saveBookmark({ id: editing?.node?.id, name, ...(isFolder ? { children: editing?.node?.children ?? [] } : { url }) }, String(data.get('parent') ?? ''))
       setEditing(undefined); setMessage('已保存')
     } catch (error) { setMessage(error instanceof Error ? error.message : String(error)) }
   }
   const current = allFolders.find(f => f.id === folder) ?? allFolders[0]!
-  // Search flattens the whole tree to matching rows (Chrome-style); browsing lists the selected folder's direct children.
-  const items = query ? searchHits(snapshot.bookmarks, query.toLowerCase()) : current.children.map(node => ({ node, parent: folder }))
+  useEffect(() => { if (current.id !== folder) setFolder(current.id) }, [current.id, folder])
+  const selectFolder = (id: string) => {
+    setFolder(id); setQuery('')
+    setExpanded(previous => {
+      const next = new Set(previous)
+      const reveal = (nodes: Bookmark[], ancestors: string[]): boolean => nodes.some(node => {
+        if (node.id === id) { for (const key of [...ancestors, id]) next.add(key); return true }
+        return node.children ? reveal(node.children, [...ancestors, node.id]) : false
+      })
+      next.add(''); reveal(snapshot.bookmarks, [''])
+      return next
+    })
+  }
+  const tree = (entry: ManagerFolder): ReactNode => {
+    const children = entry.children.filter(n => n.children)
+    const open = expanded.has(entry.id)
+    return <li key={entry.id} role="treeitem" aria-label={entry.name} aria-selected={current.id === entry.id} aria-expanded={children.length ? open : undefined}>
+      <div className={css.treeRow}>
+        {children.length ? <button className={css.treeToggle} aria-label={`${open ? '折叠' : '展开'} ${entry.name}`} onClick={() => setExpanded(previous => { const next = new Set(previous); if (open) next.delete(entry.id); else next.add(entry.id); return next })}>{open ? '−' : '+'}</button> : <span className={css.treeSpacer} />}
+        <button className={css.treeName} aria-current={current.id === entry.id ? 'true' : undefined} title={entry.name} onClick={() => selectFolder(entry.id)}>{entry.name}</button>
+      </div>
+      {open && children.length > 0 && <ul role="group">{children.map(child => tree({ id: child.id, name: child.name, children: child.children! }))}</ul>}
+    </li>
+  }
+  const items = query ? searchHits(snapshot.bookmarks, query.toLowerCase()) : current.children.map(node => ({ node, parent: current.id }))
   const rows = (list: { node: Bookmark; parent: string }[]): ReactNode => <ul role="list">{list.map(({ node: n, parent }) => <li key={n.id} role="listitem">
-    <button aria-expanded={false} className={n.children ? css.folderRow : ''} onClick={() => n.children && setFolder(n.id)}>{n.children ? '▸ ' : ''}{n.name}{n.url ? <span className={css.urlPreview}> {n.url}</span> : null}</button>
-    <button aria-label={`编辑 ${n.name}`} onClick={() => openEdit(n, parent)}>编辑</button>
-    <button aria-label={`删除 ${n.name}`} onClick={() => { browserState.removeBookmark(n.id); setMessage('已删除') }}>删除</button>
+    <button className={`${css.bookmarkRowLabel} ${n.children ? css.folderRow : ''}`} onClick={() => n.children ? selectFolder(n.id) : n.url && browserState.open('page', n.url)}>{n.name}{n.url ? <span className={css.urlPreview}>{n.url}</span> : null}</button>
+    <span className={css.rowActions}>
+      <button aria-label={`编辑 ${n.name}`} title="编辑" onClick={() => openEdit(n, parent)}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5 4 4M4 20l4-1L20 7a2.8 2.8 0 0 0-4-4L4 15z" /></svg></button>
+      <button aria-label={`删除 ${n.name}`} title="删除" onClick={() => { browserState.removeBookmark(n.id); setMessage('已删除') }}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7" /></svg></button>
+    </span>
   </li>)}</ul>
   return <section className={css.operation} aria-label="管理书签面板"><h2>管理书签</h2>
     <div className={css.managerToolbar}>
@@ -158,7 +184,7 @@ function BookmarkManager({ draft }: { draft?: { name: string; url: string } }) {
       <button onClick={() => { setQuery('') }}>清空搜索</button>
     </div>
     <div className={css.managerLayout}>
-      <nav aria-label="文件夹树"><ul>{allFolders.map((f, i) => <li key={f.id || `root-${i}`}><button aria-current={f.id === folder ? 'true' : undefined} onClick={() => setFolder(f.id)}>{f.id === folder ? '▸ ' : ''}{f.name}</button></li>)}</ul></nav>
+      <nav aria-label="文件夹树"><ul role="tree" aria-label="书签目录">{tree(allFolders[0]!)}</ul></nav>
       <div aria-label="书签列表">{items.length ? rows(items) : <p>此目录暂无书签</p>}</div>
     </div>
     {editing && <div role="dialog" aria-label={editing.node ? '编辑书签' : '新建书签'} className={css.dialog}><form onSubmit={save}>

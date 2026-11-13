@@ -59,3 +59,16 @@
 .bookmarkMore { width:60px; margin-left:auto; }
 .bookmarkMore > div { left:auto; right:0; max-height:60vh; overflow:auto; }
 .bookmarkMore .folder > div { position:static; min-width:0; margin-left:8px; box-shadow:none; border:0; }
+
+.managerLayout nav ul[role=group] { padding-left:16px; }
+.treeRow { display:flex; align-items:center; border-radius:5px; }
+.treeRow:hover,.treeRow:has([aria-current=true]) { background:var(--dsw-alias-interactive-bg-hover); }
+.treeRow [aria-current=true] { color:var(--dsw-alias-state-business-primary); font-weight:600; }
+.workspace .treeToggle,.treeSpacer { width:24px; flex:none; text-align:center; }
+.treeName { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:left; }
+.bookmarkRowLabel { display:flex; align-items:center; gap:12px; flex:1; min-width:0; overflow:hidden; text-align:left; }
+.rowActions { display:flex; flex:none; opacity:0; pointer-events:none; }
+.rowActions svg { width:16px; height:16px; display:block; fill:none; stroke:currentColor; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
+.managerLayout li[role=listitem]:hover .rowActions,.managerLayout li[role=listitem]:focus-within .rowActions { opacity:1; pointer-events:auto; }
+.managerLayout li[role=listitem]:focus-within { background:var(--dsw-alias-interactive-bg-hover); }
+@media (hover:none) { .rowActions { opacity:1; pointer-events:auto; } }

@@ -114,3 +114,34 @@ it('书签溢出进入更多、保留文件夹与打开操作，扩宽后恢复'
   expect(bar.querySelectorAll(':scope > span')).toHaveLength(0)
   expect(bar.querySelector('[aria-label="更多书签"]')).not.toBeNull()
 })
+
+it('目录树保留真实 ID，可展开多层、切换目录，图标编辑和删除作用于当前项', async () => {
+  await act(async () => {
+    browserState.saveBookmark({ name: '项目', children: [{ id: 'nested', name: '设计', children: [{ id: 'doc', name: '说明', url: 'https://example.com/doc' }] }] })
+    browserState.open('bookmarks')
+  })
+  const manager = host.querySelector('[aria-label="管理书签面板"]')!
+  const tree = manager.querySelector('[role="tree"]')!
+  const list = () => manager.querySelector('[aria-label="书签列表"]')!
+  const named = (scope: Element, name: string) => [...scope.querySelectorAll('button')].find(b => b.textContent === name)!
+  expect(tree.querySelector('[role="treeitem"][aria-label="设计"]')).toBeNull()
+  await click(tree.querySelector('[aria-label="展开 项目"]')!)
+  expect(tree.querySelector('[role="group"] [aria-label="设计"]')).not.toBeNull()
+  await click(named(tree, '设计'))
+  expect(list().textContent).toContain('说明')
+  expect(list().textContent).not.toContain('项目')
+  expect(tree.querySelector('[aria-label="设计"]')?.getAttribute('aria-selected')).toBe('true')
+  const edit = list().querySelector('[aria-label="编辑 说明"]')!
+  expect(edit.querySelector('svg')).not.toBeNull()
+  expect(edit.textContent).toBe('')
+  await click(edit)
+  expect(manager.querySelector<HTMLInputElement>('input[aria-label="名称"]')!.value).toBe('说明')
+  expect(manager.querySelector<HTMLSelectElement>('select[aria-label="位置"]')!.value).toBe('nested')
+  await click(named(manager, '取消'))
+  await click(list().querySelector('[aria-label="删除 说明"]')!)
+  expect(list().textContent).toContain('此目录暂无书签')
+  await click(named(tree, '书签栏'))
+  expect(list().textContent).toContain('项目')
+  await click(tree.querySelector('[aria-label="折叠 项目"]')!)
+  expect(tree.querySelector('[aria-label="设计"]')).toBeNull()
+})
