@@ -17,7 +17,7 @@ import { registerConversationTools } from './conversation-tools.tsx'
 import { startMermaidDiagrams } from './mermaid.ts'
 import { injectTablePadCss } from './table-pad.ts'
 import { injectUiThemeCss } from './ui-theme.ts'
-import { startTurnFold } from './turn-fold.ts'
+import { installAnswerFrame } from './answer-frame.ts'
 import { createMarkdownTurnReaders } from './markdown-turn-sources.ts'
 import { registerSelectionToolbar } from './selection-toolbar.tsx'
 import { startMultiSelectPanel } from './selection-actions.ts'
@@ -83,23 +83,11 @@ export function apply(ctx: PluginContext): void {
     log.warn(`ui theme: inject failed — ${error instanceof Error ? error.message : String(error)}`)
   }
   try {
-    // 轮次折叠与当前轮限高：新一轮开始时历史轮折叠成摘要条，当前轮不超过一屏。
-    // 纯 DOM 增强（加属性、插自己的摘要条），失败只损失这个观感。
-    // 快捷信息（点赞栏按钮展开列表，点信息条把文本发到当前会话；列表可增删改）。
-    const disposeTurnFold = startTurnFold({
-      t: fallbackT,
-      onSendQuick: (sessionId, text) => {
-        if (text.trim() === '') return
-        const readers = createMarkdownTurnReaders(() => ctx.get('remote'))
-        void readers.sendToSession(sessionId, text).catch((error: unknown) => {
-          log.warn(`quick message: send failed — ${error instanceof Error ? error.message : String(error)}`)
-        })
-      },
-    })
-    ctx.effect(() => disposeTurnFold, 'dsh-chat-power: turn fold')
-    log.info('turn fold: started')
+    // 只装饰原生回答；工作步骤折叠、节点和滚动都由宿主管理。
+    const disposeAnswerFrame = installAnswerFrame()
+    ctx.effect(() => disposeAnswerFrame, 'dsh-chat-power: answer frame')
   } catch (error: unknown) {
-    log.warn(`turn fold: start failed — ${error instanceof Error ? error.message : String(error)}`)
+    log.warn(`answer frame: start failed — ${error instanceof Error ? error.message : String(error)}`)
   }
   try {
     // 会话区工具（标签条、文件树控件、本机文件卡）。整块失败只损失工具区，
