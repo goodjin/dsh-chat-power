@@ -33,9 +33,11 @@ ${ANSWER_FRAME_SELECTOR}::before,
 ${ANSWER_FRAME_SELECTOR}:has(> [data-chat-power-answer-header])::before { display: none; }
 [data-chat-power-answer-header] { display: flex; align-items: center; gap: 12px; }
 [data-chat-power-answer-edit] {
-  margin-left: auto; border: 0; border-radius: 4px; padding: 3px 8px;
+  margin-left: auto; border: 0; border-radius: 4px; padding: 4px;
+  width: 28px; height: 28px; flex: none; display: inline-flex; align-items: center; justify-content: center;
   color: inherit; background: transparent; font: inherit; cursor: pointer;
 }
+[data-chat-power-answer-edit] svg { width: 16px; height: 16px; }
 [data-chat-power-answer-edit]:hover { background: var(--dsw-alias-interactive-bg-hover, rgba(127,127,127,.1)); }
 [data-chat-power-answer-error] { font-weight: 400; font-size: 12px; }
 `
@@ -49,7 +51,7 @@ export function answerFrameHeight(page: number, composer: number, latest: boolea
  * 标题只插入插件自己的元素，不搬运 React 拥有的子节点。
  * 只测量会话视口/输入框，绝不改外层 scrollTop 或工作步骤 hidden 状态。
  */
-export function installAnswerFrame(doc?: Document, onEdit?: (sessionId: string, nodeKey: string) => void): () => void {
+export function installAnswerFrame(doc?: Document, onEdit?: (sessionId: string, nodeKey: string) => void, readTitle?: (sessionId: string, turn: number) => string): () => void {
   const target = doc ?? (typeof document === 'undefined' ? undefined : document)
   const win = target?.defaultView
   if (!target || !win) return () => {}
@@ -59,20 +61,33 @@ export function installAnswerFrame(doc?: Document, onEdit?: (sessionId: string, 
   target.head.append(style)
   const managed = new Map<HTMLElement, { value: string; priority: string }>()
   const headers = new Map<HTMLElement, HTMLElement>()
+  const updateTitle = (row: HTMLElement, header: HTMLElement): void => {
+    const title = header.querySelector('[data-chat-power-answer-title]')
+    if (!title) return
+    const rawTurn = row.getAttribute('data-chat-turn')
+    const turn = rawTurn === null ? NaN : Number(rawTurn)
+    const sessionId = row.closest('[data-conversation-session]')?.getAttribute('data-conversation-session')
+    let text = Number.isSafeInteger(turn) && turn >= 1 ? `第 ${turn} 轮 · 用时未知` : '轮次未知 · 用时未知'
+    if (sessionId && Number.isSafeInteger(turn) && turn >= 1 && readTitle) {
+      try { text = readTitle(sessionId, turn) } catch { /* 会话已卸载或历史未加载，保留未知提示。 */ }
+    }
+    if (title.textContent !== text) title.textContent = text
+  }
   const ensureHeader = (row: HTMLElement): void => {
     if (!onEdit || headers.get(row)?.parentElement === row) return
     headers.get(row)?.remove()
     const header = target.createElement('div')
     header.setAttribute('data-chat-power-answer-header', '')
     const title = target.createElement('span')
-    title.textContent = fallbackT('answerCard.title')
+    title.setAttribute('data-chat-power-answer-title', '')
     const error = target.createElement('span')
     error.setAttribute('data-chat-power-answer-error', '')
     error.setAttribute('role', 'status')
     const edit = target.createElement('button')
     edit.type = 'button'
     edit.setAttribute('data-chat-power-answer-edit', '')
-    edit.textContent = fallbackT('answerCard.edit')
+    edit.setAttribute('aria-label', fallbackT('answerCard.editAnswer'))
+    edit.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m16 3 5 5-12 12-6 1 1-6Z"/><path d="m14 5 5 5"/></svg>'
     edit.title = fallbackT('answerCard.editAnswer')
     edit.addEventListener('click', event => {
       event.stopPropagation()
@@ -89,6 +104,7 @@ export function installAnswerFrame(doc?: Document, onEdit?: (sessionId: string, 
     header.append(title, error, edit)
     row.prepend(header)
     headers.set(row, header)
+    updateTitle(row, header)
   }
   let stopped = false
   let pending: number | undefined
@@ -125,6 +141,8 @@ export function installAnswerFrame(doc?: Document, onEdit?: (sessionId: string, 
         if (page <= 0) continue // 隐藏视图不写入错误的最小高度。
         active.add(row)
         ensureHeader(row)
+        const header = headers.get(row)
+        if (header) updateTitle(row, header)
         if (!managed.has(row)) managed.set(row, {
           value: row.style.getPropertyValue(HEIGHT), priority: row.style.getPropertyPriority(HEIGHT),
         })
@@ -143,11 +161,16 @@ export function installAnswerFrame(doc?: Document, onEdit?: (sessionId: string, 
     subtree: true, childList: true, attributes: true,
     attributeFilter: ['data-chat-turn', 'data-chat-flow-kind', 'data-chat-group-part', 'data-turn-process-member', 'hidden'],
   })
+  // 起止事件可先于 DOM 更新到达；定时只更新标题，不做布局测量。
+  const titleTimer = win.setInterval(() => {
+    if (!stopped) for (const [row, header] of headers) if (row.isConnected) updateTitle(row, header)
+  }, 1000)
   win.addEventListener('resize', schedule)
   sync()
   return () => {
     stopped = true
     if (pending !== undefined) win.clearTimeout(pending)
+    win.clearInterval(titleTimer)
     mutations.disconnect()
     resize?.disconnect()
     win.removeEventListener('resize', schedule)
