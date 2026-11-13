@@ -9,7 +9,7 @@ ${ANSWER_FRAME_SELECTOR} {
   min-width: 0;
   height: var(${HEIGHT}, auto);
   overflow-y: auto;
-  padding: 14px 16px;
+  padding: 0 16px 14px;
   border: 1px solid var(--dsw-alias-border-l2, rgba(127,127,127,.2));
   border-radius: 10px;
   background: var(--dsw-alias-bg-layer-1, transparent);
@@ -19,9 +19,9 @@ ${ANSWER_FRAME_SELECTOR}::before,
   content: ${JSON.stringify(fallbackT('answerCard.title'))};
   display: block;
   position: sticky;
-  top: -14px;
+  top: 0;
   z-index: 1;
-  margin: -14px -16px 14px;
+  margin: 0 -16px 14px;
   padding: 10px 16px;
   border-bottom: 1px solid var(--dsw-alias-border-l2, rgba(127,127,127,.2));
   background: var(--dsw-alias-bg-layer-1, #fff);
@@ -44,8 +44,8 @@ ${ANSWER_FRAME_SELECTOR}:has(> [data-chat-power-answer-header])::before { displa
 `
 
 /** 页内留 24px 呼吸空间；极小窗口保留标题及最小正文区。 */
-export function answerFrameHeight(page: number, composer: number, latest: boolean): number {
-  return Math.max(80, Math.floor(page - 24 - (latest ? Math.max(0, composer) : 0)))
+export function answerFrameHeight(page: number, composer: number, latest: boolean, tailHeight = 0): number {
+  return Math.max(80, Math.floor(page - 24 - (latest ? Math.max(0, composer) + Math.max(0, tailHeight) : 0)))
 }
 
 /**
@@ -175,7 +175,18 @@ export function installAnswerFrame(doc?: Document, onEdit?: (sessionId: string, 
         })
         const latest = latestTurn === undefined ? row === rows.at(-1)
           : row.hasAttribute('data-chat-turn') && Number(row.getAttribute('data-chat-turn')) === latestTurn
-        const height = `${answerFrameHeight(page, composer?.getBoundingClientRect().height ?? 0, latest)}px`
+        // 宿主点赞/复制/文件尾行也占页面高度。只测回答之后的实际流行；
+        // composer 是 sticky，不能用它的屏幕 top 推导正常流间距。
+        const bottom = row.getBoundingClientRect().bottom
+        let tailHeight = 0
+        if (latest) for (const tail of container.querySelectorAll<HTMLElement>('[data-chat-flow-kind]')) {
+          if (row.contains(tail) || tail.closest('[data-conversation-scroll]') !== container) continue
+          if (!(row.compareDocumentPosition(tail) & 4)) continue
+          const rect = tail.getBoundingClientRect()
+          if (rect.height > 0) tailHeight = Math.max(tailHeight, rect.bottom - bottom)
+          sizes.add(tail)
+        }
+        const height = `${answerFrameHeight(page, composer?.getBoundingClientRect().height ?? 0, latest, tailHeight)}px`
         if (row.style.getPropertyValue(HEIGHT) !== height) row.style.setProperty(HEIGHT, height)
       }
     }

@@ -1,5 +1,5 @@
 import { afterEach, expect, it } from 'vitest'
-import { ANSWER_FRAME_SELECTOR, installAnswerFrame } from '../src/answer-frame.ts'
+import { ANSWER_FRAME_SELECTOR, answerFrameHeight, installAnswerFrame } from '../src/answer-frame.ts'
 
 afterEach(() => { document.body.innerHTML = ''; document.head.innerHTML = '' })
 
@@ -134,5 +134,30 @@ it('复制图标反馈成功及剪贴板拒绝，始终恢复按钮可用状态'
     await Promise.resolve()
     expect(document.querySelector('[role="status"]')?.textContent).toBe('剪贴板访问被拒绝')
     expect(copy.disabled).toBe(false)
+  } finally { stop() }
+})
+
+it('整框预算包含标题与内边距，最后一轮再为原生尾部操作栏留位', () => {
+  expect(answerFrameHeight(800, 200, true, 48)).toBe(528)
+  expect(answerFrameHeight(800, 200, false, 48)).toBe(776)
+  document.body.innerHTML = `<section data-conversation-session="s1"><main data-conversation-scroll>
+    <div data-chat-flow-kind="assistant-step" data-chat-turn="1" id="answer">正文</div>
+    <div data-chat-flow-kind="turn-tail" id="tail">原生操作栏</div>
+    <div data-composer-seat></div>
+  </main></section>`
+  const main = document.querySelector('main')!
+  Object.defineProperty(main, 'clientHeight', { value: 800 })
+  const answer = document.getElementById('answer')!
+  answer.getBoundingClientRect = () => ({ bottom: 600, height: 500 }) as DOMRect
+  document.getElementById('tail')!.getBoundingClientRect = () => ({ bottom: 648, height: 32 }) as DOMRect
+  document.querySelector<HTMLElement>('[data-composer-seat]')!.getBoundingClientRect = () => ({ height: 200 }) as DOMRect
+  const stop = installAnswerFrame(document, () => {})
+  try {
+    expect(answer.style.getPropertyValue('--chat-power-answer-height')).toBe('528px')
+    expect(getComputedStyle(answer).boxSizing).toBe('border-box')
+    expect(getComputedStyle(answer).paddingTop).toBe('0px')
+    const header = answer.querySelector<HTMLElement>('[data-chat-power-answer-header]')!
+    expect(getComputedStyle(header).top).toBe('0px')
+    expect(getComputedStyle(header).marginTop).toBe('0px')
   } finally { stop() }
 })
