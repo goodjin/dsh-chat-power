@@ -35,18 +35,33 @@ export async function readChromeBookmarks(root = chromeRoot(), profile?: string)
   return { root, profiles }
 }
 export function apply(ctx: any): void {
-  ctx.webServer.register({ kind: 'exact', path: ROUTE, handler: async (req: IncomingMessage, res: ServerResponse) => {
+  // register returns a disposer; bind it to the plugin scope so reloads cannot
+  // leave a handler holding an inactive Cordis context.
+  ctx.effect(() => ctx.webServer.register({ kind: 'exact', path: ROUTE, handler: async (req: IncomingMessage, res: ServerResponse) => {
     const send = (status: number, body: unknown) => { res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }); res.end(JSON.stringify(body)) }
+    let stage = '访问准入'
     try {
       const admission = ctx.connection.admit(req)
       if ('rejection' in admission) { send(admission.rejection, { error: '访问未获授权' }); return }
       if (req.method !== 'POST') { send(405, { error: '仅支持 POST' }); return }
+      stage = '读取请求'
       const chunks: Buffer[] = []; let size = 0
       for await (const chunk of req) { const b = Buffer.from(chunk); size += b.length; if (size > 8192) { send(413, { error: '请求过大' }); return }; chunks.push(b) }
       let body: any
       try { body = JSON.parse(Buffer.concat(chunks).toString()) } catch { send(400, { error: '无效请求' }); return }
       if (!body || (body.root !== undefined && (typeof body.root !== 'string' || !body.root.trim())) || (body.profile !== undefined && typeof body.profile !== 'string')) { send(400, { error: '无效目录或用户配置' }); return }
+      stage = '读取 Chrome 文件'
       send(200, await readChromeBookmarks(body.root, body.profile))
-    } catch { send(400, { error: '无法读取 Chrome 书签，请检查数据目录、文件格式和访问权限' }) }
-  } })
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      console.warn(`[chat-power] Chrome bookmarks failed at ${stage}: ${detail}`)
+      const inactive = /inactive context/.test(detail)
+      const code = (error as NodeJS.ErrnoException)?.code
+      const reason = inactive ? '书签服务上下文已失效，请退出并重新打开 DeepSeek Harness' :
+        code === 'ENOENT' ? 'Chrome 目录或书签文件不存在，请检查同步设置中的路径' :
+        code === 'EACCES' || code === 'EPERM' ? '当前 DSH 进程没有读取 Chrome 文件的权限' :
+        error instanceof SyntaxError ? 'Chrome 书签文件不是有效的 JSON，请稍后重试' : `${stage}失败：${detail}`
+      send(inactive || stage !== '读取 Chrome 文件' ? 503 : 400, { error: reason })
+    }
+  } }), 'chat-power-chrome-bookmarks-route')
 }
