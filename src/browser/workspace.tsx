@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { browserState, selectedBookmarks, type Bookmark, type Page } from './state.ts'
+import { browserState, type Bookmark, type Page } from './state.ts'
 import css from './workspace.module.css'
 import { requestChrome } from './chrome-request.ts'
 const useBrowser = () => useSyncExternalStore(browserState.subscribe, browserState.get, browserState.get)
@@ -74,33 +74,54 @@ export function BrowserChrome({ hostProps, children }: { hostProps: any; childre
     {seats && createPortal(snapshot.bookmarks.length ? <BookmarkBar nodes={snapshot.bookmarks} onOpen={url => hostProps.loadUrl(tab.id, url)} /> : null, seats.bookmarks)}
   </div>
 }
-function allIds(nodes: Bookmark[]): string[] { return nodes.flatMap(n => [n.id, ...allIds(n.children ?? [])]) }
-function ImportBookmarks() {
-  const [root, setRoot] = useState('')
+function SyncBookmarks() {
+  const snapshot = useBrowser()
+  const last = snapshot.chromeSync
+  const [root, setRoot] = useState(last?.root ?? '')
   const [profiles, setProfiles] = useState<{ id: string; name: string }[]>([])
-  const [profile, setProfile] = useState('')
-  const [tree, setTree] = useState<Bookmark[]>([])
-  const [selected, setSelected] = useState(new Set<string>())
+  const [profile, setProfile] = useState(last?.profile ?? '')
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const generation = useRef(0)
+  const inFlight = useRef(false)
   useEffect(() => () => { generation.current++ }, [])
-  const load = async (readProfile?: string) => {
+  const sync = async () => {
+    if (inFlight.current) return
+    inFlight.current = true
     const version = ++generation.current
-    setBusy(true); setMessage(''); setTree([]); setSelected(new Set())
+    setBusy(true); setMessage('')
     try {
-      const result = await requestChrome(root, readProfile)
+      let resolvedRoot = root, chosen = profile
+      let result = await requestChrome(root, profile || undefined)
       if (version !== generation.current) return
-      if ('bookmarks' in result) { setTree(result.bookmarks); setSelected(new Set(result.bookmarks.flatMap(n => allIds(n.children ?? [])).filter(id => id))) }
-      else { setProfiles(result.profiles); setProfile(result.profiles[0]?.id ?? ''); if (readProfile) setMessage('') }
-    } catch (error) { if (version === generation.current) setMessage(error instanceof Error ? error.message : String(error)) } finally { if (version === generation.current) setBusy(false) }
+      if ('profiles' in result) {
+        setProfiles(result.profiles)
+        chosen = result.profiles.find(p => p.id === 'Default')?.id ?? result.profiles[0]?.id ?? ''
+        if (!chosen) throw new Error('未找到 Chrome 书签，请检查 Chrome 数据目录')
+        resolvedRoot = result.root
+        setRoot(resolvedRoot); setProfile(chosen)
+        result = await requestChrome(resolvedRoot, chosen)
+      }
+      if (version !== generation.current) return
+      if (!('bookmarks' in result)) throw new Error('Chrome 未返回书签数据')
+      browserState.syncBookmarks(result.bookmarks, result.source ?? JSON.stringify([resolvedRoot, chosen]), resolvedRoot, chosen)
+      setMessage('同步完成，已更新 Chrome 书签并保留本地额外项目')
+    } catch (error) { if (version === generation.current) setMessage(error instanceof Error ? error.message : String(error)) }
+    finally { inFlight.current = false; if (version === generation.current) setBusy(false) }
   }
-  const render = (nodes: Bookmark[], parent = ''): ReactNode => <ul>{nodes.map(n => <li key={n.id}><label><input type="checkbox" checked={selected.has(n.id)} onChange={e => { const next = new Set(selected); e.target.checked ? next.add(n.id) : next.delete(n.id); setSelected(next) }} />{n.children ? <strong>{n.name || '未命名文件夹'}</strong> : n.name}</label>{n.children && <div>{render(n.children, `${parent}${n.id}/`)}</div>}</li>)}</ul>
-  return <section className={css.operation}><h2>导入 Chrome 书签</h2><p>读取运行 DSH 的这台电脑上的 Chrome 书签，保留目录层级与顺序。也可指定 Bookmarks 文件。</p>
-    <form onSubmit={e => { e.preventDefault(); void load() }}><label>Chrome 数据目录或 Bookmarks 文件<input value={root} onChange={e => { setRoot(e.target.value); setProfiles([]); setTree([]) }} placeholder="留空自动发现" /></label><button disabled={busy}>查找书签</button></form>
-    {profiles.length > 0 && <div><label>Chrome 用户配置<select value={profile} onChange={e => { setProfile(e.target.value); setTree([]) }}>{profiles.map(p => <option key={p.id} value={p.id}>{p.name}（{p.id}）</option>)}</select></label><button disabled={busy || !profile} onClick={() => { void load(profile) }}>预览书签</button></div>}
-    {tree.length > 0 && <><div><button onClick={() => setSelected(new Set(allIds(tree)))}>全选</button><button onClick={() => setSelected(new Set())}>取消全选</button></div>{render(tree)}<button disabled={selected.size === 0 || busy} onClick={() => { browserState.importBookmarks(selectedBookmarks(tree, selected)); setMessage('已导入到书签栏，同一目录内的重复书签已跳过') }}>导入所选书签</button></>}
+  const render = (nodes: Bookmark[]): ReactNode => <ul>{nodes.map(n => <li key={n.id}>{n.children ? <details><summary>{n.name}</summary>{render(n.children)}</details> : <span>{n.name}<small>{n.url}</small></span>}</li>)}</ul>
+  return <section className={css.operation} aria-label="同步书签面板"><h2>同步书签</h2>
+    <p>从 Chrome 单向同步到本浏览器。同一书签以 Chrome 的名称、网址和目录位置为准，本地额外的书签和目录保留。</p>
+    <p>同步来源：运行 DSH 的电脑上的 Chrome{profile ? ` · ${profile}` : ''}</p>
+    <p>上次同步时间：{last ? <time dateTime={last.at}>{new Date(last.at).toLocaleString()}</time> : '尚未同步'}</p>
+    {last && <p>上次同步数据：{last.links} 个书签、{last.folders} 个目录；新增 {last.added} 项，内容更新 {last.updated} 项，保留本地额外项目 {last.retained} 项。</p>}
+    <button disabled={busy} onClick={() => { sync().catch(error => console.warn('[chat-power] bookmark sync failed', error)) }}>{busy ? '同步中…' : '立即同步'}</button>
+    <details className={css.syncSettings}><summary>Chrome 同步设置</summary>
+      <label>Chrome 数据目录或 Bookmarks 文件<input disabled={busy} value={root} onChange={e => { setRoot(e.target.value); setProfile(''); setProfiles([]) }} placeholder="留空自动发现" /></label>
+      <label>Chrome 用户配置<select disabled={busy} value={profile} onChange={e => setProfile(e.target.value)}><option value="">自动选择默认配置</option>{(profiles.length ? profiles : profile ? [{ id: profile, name: profile }] : []).map(p => <option key={p.id} value={p.id}>{p.name}（{p.id}）</option>)}</select></label>
+    </details>
     {message && <p role="status">{message}</p>}
+    {last && <details className={css.syncData}><summary>查看上次同步的数据</summary>{last.data.length ? render(last.data) : <p>Chrome 中没有可同步的 HTTP/HTTPS 书签，本地书签已保留。</p>}</details>}
   </section>
 }
 /** Chrome-style manager: folder tree on the left, list on the right, search filter, edit dialog. */
@@ -210,12 +231,12 @@ export function BrowserWorkspace({ renderPage }: { renderPage: (page: Page, visi
     {menu && <><button className={css.dismiss} aria-label="关闭浏览器菜单" onClick={() => setMenu(false)} /><div className={css.menu} role="menu" aria-label="浏览器设置">{[
       ['新建网页', () => browserState.open()],
       [snapshot.showBookmarks ? '隐藏书签栏' : '显示书签栏', () => browserState.toggleBookmarks()],
-      ['导入 Chrome 书签', () => browserState.open('import')],
+      ['同步书签', () => browserState.open('import')],
       ['管理书签', () => { setDraft(undefined); browserState.open('bookmarks') }],
     ].map(([label, action]) => <button key={label as string} role="menuitem" onClick={() => { (action as () => void)(); setMenu(false) }}>{label as string}</button>)}</div></>}
     <div className={css.tabsRow}><div className={css.tabs} role="tablist" aria-label="网页标签">{snapshot.pages.map(p => <span key={p.id} className={css.tab} data-active={snapshot.active === p.id}><button role="tab" aria-selected={snapshot.active === p.id} aria-controls={`browser-panel-${p.id}`} title={p.title} onClick={() => browserState.select(p.id)}>{p.title}</button><button aria-label={`关闭 ${p.title}`} onClick={() => browserState.close(p.id)}>×</button></span>)}
 <button aria-label="新建网页" onClick={() => browserState.open()}>＋</button></div><button className={css.menuButton} aria-label="浏览器设置" aria-haspopup="menu" aria-expanded={menu} onClick={() => setMenu(v => !v)}>⋯</button></div>
-    {snapshot.pages.length === 0 && <div className={css.empty}><p>打开网页，或从 Chrome 导入书签</p><button onClick={() => browserState.open()}>新建网页</button><button onClick={() => browserState.open('import')}>导入 Chrome 书签</button></div>}
-    {snapshot.pages.map(p => <div id={`browser-panel-${p.id}`} role="tabpanel" key={p.id} hidden={snapshot.active !== p.id} className={css.page}>{p.type === 'import' ? <ImportBookmarks /> : p.type === 'bookmarks' ? <BookmarkManager draft={draft} /> : renderPage(p, snapshot.active === p.id)}</div>)}
+    {snapshot.pages.length === 0 && <div className={css.empty}><p>打开网页，或从 Chrome 同步书签</p><button onClick={() => browserState.open()}>新建网页</button><button onClick={() => browserState.open('import')}>同步书签</button></div>}
+    {snapshot.pages.map(p => <div id={`browser-panel-${p.id}`} role="tabpanel" key={p.id} hidden={snapshot.active !== p.id} className={css.page}>{p.type === 'import' ? <SyncBookmarks /> : p.type === 'bookmarks' ? <BookmarkManager draft={draft} /> : renderPage(p, snapshot.active === p.id)}</div>)}
   </div>
 }

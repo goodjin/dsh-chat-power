@@ -21,9 +21,9 @@ export async function readChromeBookmarks(root = chromeRoot(), profile?: string)
   root = resolve(root)
   if (profile !== undefined) {
     if (!/^(Default|Profile \d+)$/.test(profile)) throw new Error('无效的 Chrome 用户配置')
-    return { bookmarks: chromeBookmarks(await jsonFile(join(root, profile, 'Bookmarks'))) }
+    return { bookmarks: chromeBookmarks(await jsonFile(join(root, profile, 'Bookmarks'))), source: join(root, profile, 'Bookmarks') }
   }
-  if (basename(root) === 'Bookmarks') return { bookmarks: chromeBookmarks(await jsonFile(root)) }
+  if (basename(root) === 'Bookmarks') return { bookmarks: chromeBookmarks(await jsonFile(root)), source: root }
   let names: Record<string, any> = {}
   try { names = (await jsonFile(join(root, 'Local State'))).profile?.info_cache ?? {} } catch { /* Directory scan is sufficient. */ }
   const entries = await readdir(root, { withFileTypes: true })

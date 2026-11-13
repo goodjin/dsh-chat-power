@@ -1,6 +1,6 @@
 /** Read-only bookmark discovery; old Host generations may not have this route yet. */
 import type { Bookmark } from './state.ts'
-export type ChromeResult = { bookmarks: Bookmark[] } | { root: string; profiles: { id: string; name: string }[] }
+export type ChromeResult = { bookmarks: Bookmark[]; source?: string } | { root: string; profiles: { id: string; name: string }[] }
 const reload = '书签读取接口尚未加载，请退出并重新打开 DeepSeek Harness 后重试；Web 版请重启 DSH 服务'
 export async function requestChrome(root?: string, profile?: string, send: typeof fetch = fetch): Promise<ChromeResult> {
   const response = await send('/chat-power/chrome-bookmarks', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ root: root || undefined, profile }) })

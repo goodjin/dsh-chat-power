@@ -72,3 +72,10 @@
 .managerLayout li[role=listitem]:hover .rowActions,.managerLayout li[role=listitem]:focus-within .rowActions { opacity:1; pointer-events:auto; }
 .managerLayout li[role=listitem]:focus-within { background:var(--dsw-alias-interactive-bg-hover); }
 @media (hover:none) { .rowActions { opacity:1; pointer-events:auto; } }
+
+.syncSettings,.syncData { margin-top:18px; }
+.syncSettings summary,.syncData summary { cursor:pointer; margin-bottom:10px; }
+.syncSettings label { display:flex; margin:10px 0; }
+.syncSettings input { flex:1; min-width:0; }
+.syncData ul { list-style:none; padding-left:18px; }
+.syncData small { overflow-wrap:anywhere; }

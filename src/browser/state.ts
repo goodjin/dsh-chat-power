@@ -1,8 +1,9 @@
 import type { ToolTab } from '../tools-state.ts'
 
-export interface Bookmark { id: string; name: string; url?: string; children?: Bookmark[] }
+export interface Bookmark { id: string; name: string; url?: string; children?: Bookmark[]; chromeId?: string; chromeSource?: string }
 export interface Page { id: string; type: 'page' | 'import' | 'bookmarks'; title: string; url?: string }
-export interface BrowserSnapshot { pages: Page[]; active?: string; bookmarks: Bookmark[]; showBookmarks: boolean; visible?: boolean }
+export interface ChromeSync { at: string; root: string; profile: string; source: string; links: number; folders: number; added: number; updated: number; retained: number; data: Bookmark[] }
+export interface BrowserSnapshot { pages: Page[]; active?: string; bookmarks: Bookmark[]; showBookmarks: boolean; visible?: boolean; chromeSync?: ChromeSync }
 const KEY = 'chat-power.browser.v1'
 const uid = () => crypto.randomUUID()
 export function webUrl(value: string): string {
@@ -11,14 +12,15 @@ export function webUrl(value: string): string {
   return url.href
 }
 /** Parse Chrome's tree without executing bookmarklets or trusting its object shape. */
-export function chromeBookmarks(value: unknown): Bookmark[] {
+export function chromeBookmarks(value: unknown, restore = false): Bookmark[] {
   let count = 0
   function parse(node: any, depth: number): Bookmark | undefined {
     if (depth > 40 || ++count > 50000) throw new Error('书签目录过大或层级过深')
     if (!node || typeof node.name !== 'string') return undefined
-    if (node.type === 'folder' && Array.isArray(node.children)) return { id: uid(), name: node.name, children: node.children.map((n: unknown) => parse(n, depth + 1)).filter(Boolean) }
+    const identity = { id: restore && typeof node.id === 'string' ? node.id : uid(), chromeId: restore ? node.chromeId : String(node.guid ?? node.id ?? '') || undefined, chromeSource: restore && typeof node.chromeSource === 'string' ? node.chromeSource : undefined }
+    if (node.type === 'folder' && Array.isArray(node.children)) return { ...identity, name: node.name, children: node.children.map((n: unknown) => parse(n, depth + 1)).filter(Boolean) }
     if (node.type === 'url' && typeof node.url === 'string') {
-      try { return { id: uid(), name: node.name, url: webUrl(node.url) } } catch { return undefined }
+      try { return { ...identity, name: node.name, url: webUrl(node.url) } } catch { return undefined }
     }
     return undefined
   }
@@ -58,6 +60,39 @@ export function selectedBookmarks(nodes: Bookmark[], selected: Set<string>): Boo
     return selected.has(n.id) || children.length ? [{ ...n, children }] : []
   })
 }
+/** Chrome wins for matched items; unmatched local nodes survive, including in moved folders. */
+export function syncChromeBookmarks(local: Bookmark[], incoming: Bookmark[], source: string) {
+  const all: Bookmark[] = []
+  const collect = (nodes: Bookmark[]) => { for (const n of nodes) { all.push(n); if (n.children) collect(n.children) } }
+  collect(local)
+  const byChromeId = new Map(all.filter(n => n.chromeSource === source && n.chromeId).map(n => [n.chromeId!, n]))
+  const claimed = new Set<string>()
+  const deferred: { result: Bookmark[]; old: Bookmark[] }[] = []
+  const stats = { links: 0, folders: 0, added: 0, updated: 0, retained: 0 }
+  const build = (nodes: Bookmark[], siblings: Bookmark[]): Bookmark[] => {
+    const result = nodes.map(node => {
+      const sameType = (n: Bookmark) => !!n.children === !!node.children && !claimed.has(n.id)
+      const known = node.chromeId ? byChromeId.get(node.chromeId) : undefined
+      const match = (known && sameType(known) ? known : undefined) ||
+        siblings.find(n => sameType(n) && (!n.chromeSource || (!node.chromeId && n.chromeSource === source)) && (node.children ? n.name === node.name : n.url === node.url)) ||
+        siblings.find(n => sameType(n) && (!n.chromeSource || (!node.chromeId && n.chromeSource === source)) && n.name === node.name)
+      if (match) { claimed.add(match.id); if (match.name !== node.name || match.url !== node.url) stats.updated++ }
+      else stats.added++
+      if (node.children) stats.folders++; else stats.links++
+      return { ...node, id: match?.id ?? uid(), chromeSource: source, children: node.children ? build(node.children, match?.children ?? []) : undefined }
+    })
+    deferred.push({ result, old: siblings })
+    return result
+  }
+  const bookmarks = build(incoming, local)
+  const remaining = (nodes: Bookmark[]): Bookmark[] => nodes.flatMap(node => {
+    if (claimed.has(node.id)) return []
+    stats.retained++
+    return [{ ...node, children: node.children ? remaining(node.children) : undefined }]
+  })
+  for (const item of deferred) item.result.push(...remaining(item.old))
+  return { bookmarks, stats }
+}
 export class BrowserState {
   private value: BrowserSnapshot = { pages: [], bookmarks: [], showBookmarks: true }
   private listeners = new Set<() => void>()
@@ -70,9 +105,9 @@ export class BrowserState {
       if (saved?.version === 1 && Array.isArray(saved.bookmarks) && Array.isArray(saved.pages)) {
         // Re-validate persisted URLs and trees rather than trusting local storage.
         const convert = (nodes: any[]): any[] => nodes.map(n => ({ ...n, type: Array.isArray(n.children) ? 'folder' : 'url', children: Array.isArray(n.children) ? convert(n.children) : undefined }))
-        const bookmarks = flattenImportShells(chromeBookmarks({ roots: { root: { name: '', type: 'folder', children: convert(saved.bookmarks) } } })[0]?.children ?? [])
-        const pages: Page[] = saved.pages.slice(0, 100).filter((p: any) => ['page', 'import', 'bookmarks'].includes(p.type)).map((p: any) => ({ id: uid(), type: p.type, title: String(p.title ?? '新标签页'), url: p.type === 'page' && p.url ? webUrl(p.url) : undefined }))
-        this.value = { bookmarks, pages, active: pages[saved.activeIndex]?.id ?? pages[0]?.id, showBookmarks: saved.showBookmarks !== false }
+        const bookmarks = flattenImportShells(chromeBookmarks({ roots: { root: { name: '', type: 'folder', children: convert(saved.bookmarks) } } }, true)[0]?.children ?? [])
+        const pages: Page[] = saved.pages.slice(0, 100).filter((p: any) => ['page', 'import', 'bookmarks'].includes(p.type)).map((p: any) => ({ id: uid(), type: p.type, title: p.type === 'import' ? '同步书签' : String(p.title ?? '新标签页'), url: p.type === 'page' && p.url ? webUrl(p.url) : undefined }))
+        this.value = { bookmarks, pages, active: pages[saved.activeIndex]?.id ?? pages[0]?.id, showBookmarks: saved.showBookmarks !== false, chromeSync: saved.chromeSync && typeof saved.chromeSync.at === 'string' && Array.isArray(saved.chromeSync.data) ? saved.chromeSync : undefined }
       }
     } catch { /* Corrupt or unavailable storage starts an empty workspace. */ }
   }
@@ -86,7 +121,7 @@ export class BrowserState {
   open(type: Page['type'] = 'page', url?: string) {
     const existing = type !== 'page' && this.value.pages.find(p => p.type === type)
     if (existing) { this.select(existing.id); return existing }
-    const page: Page = { id: uid(), type, title: type === 'import' ? '导入 Chrome 书签' : type === 'bookmarks' ? '管理书签' : url ? new URL(webUrl(url)).hostname : '新标签页', url: url ? webUrl(url) : undefined }
+    const page: Page = { id: uid(), type, title: type === 'import' ? '同步书签' : type === 'bookmarks' ? '管理书签' : url ? new URL(webUrl(url)).hostname : '新标签页', url: url ? webUrl(url) : undefined }
     this.put({ ...this.value, pages: [...this.value.pages, page], active: page.id }); return page
   }
   select(id: string) { if (this.value.pages.some(p => p.id === id)) this.put({ ...this.value, active: id }) }
@@ -123,6 +158,12 @@ export class BrowserState {
   }
   importBookmarks(nodes: Bookmark[]) {
     this.put({ ...this.value, bookmarks: mergeBookmarks(flattenImportShells(this.value.bookmarks), flattenImportShells(nodes)) })
+  }
+  syncBookmarks(nodes: Bookmark[], source: string, root: string, profile: string) {
+    const data = flattenImportShells(nodes)
+    const result = syncChromeBookmarks(flattenImportShells(this.value.bookmarks), data, source)
+    const chromeSync: ChromeSync = { at: new Date().toISOString(), root, profile, source, data: structuredClone(data), ...result.stats }
+    this.put({ ...this.value, bookmarks: result.bookmarks, chromeSync })
   }
   tab(page: Page): ToolTab {
     let tab = this.runtime.get(page.id)

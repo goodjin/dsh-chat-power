@@ -111,3 +111,45 @@ describe('共享浏览器和书签', () => {
     expect(state.open().id).not.toBe(state.open().id)
   })
 })
+
+ describe('Chrome 单向同步', () => {
+  const chrome = (children: unknown[]) => chromeBookmarks({ roots: { bookmark_bar: { type: 'folder', name: '书签栏', children } } })
+  const link = (id: string, name: string, url = 'https://example.com/') => ({ id, type: 'url', name, url })
+  const folder = (id: string, name: string, children: unknown[]) => ({ id, type: 'folder', name, children })
+  it('匹配旧书签后覆盖字段、保留本地额外项，重复同步不增加重复项', () => {
+    const state = new BrowserState()
+    state.saveBookmark({ name: '旧名称', url: 'https://example.com/' })
+    state.saveBookmark({ name: '本地', url: 'https://local.example/' })
+    const id = state.get().bookmarks[0]!.id
+    state.syncBookmarks(chrome([link('c1', 'Chrome 名称')]), 'source', '/chrome', 'Default')
+    expect(state.get().bookmarks[0]).toMatchObject({ id, name: 'Chrome 名称', chromeId: 'c1' })
+    state.syncBookmarks(chrome([link('c1', '改名', 'https://updated.example/')]), 'source', '/chrome', 'Default')
+    expect(state.get().bookmarks.map(n => n.name)).toEqual(['改名', '本地'])
+    expect(state.get().bookmarks[0]?.url).toBe('https://updated.example/')
+    expect(state.get().chromeSync).toMatchObject({ links: 1, added: 0, updated: 1, retained: 1 })
+  })
+  it('重启后仍按 Chrome 标识更新、跨目录移动不重复，保留额外子项', () => {
+    let saved: string | null = null
+    const storage = { getItem: () => saved, setItem: (_: string, value: string) => { saved = value } }
+    let state = new BrowserState(storage)
+    state.syncBookmarks(chrome([folder('f1', '目录一', [link('c1', '网页')]), folder('f2', '目录二', [])]), 'source', '/chrome', 'Default')
+    const firstId = state.get().bookmarks[0]!.id
+    state.saveBookmark({ name: '额外', url: 'https://local.example/' }, firstId)
+    state = new BrowserState(storage)
+    expect(state.get().chromeSync?.profile).toBe('Default')
+    state.syncBookmarks(chrome([folder('f2', '目录二改名', [link('c1', '网页改名')]), folder('f1', '目录一改名', [])]), 'source', '/chrome', 'Default')
+    expect(state.get().bookmarks.map(n => n.name)).toEqual(['目录二改名', '目录一改名'])
+    expect(state.get().bookmarks[0]?.children?.map(n => n.name)).toEqual(['网页改名'])
+    expect(state.get().bookmarks[1]?.children?.map(n => n.name)).toEqual(['额外'])
+    expect(state.get().bookmarks[1]?.id).toBe(firstId)
+    state.syncBookmarks(chrome([]), 'source', '/chrome', 'Default')
+    expect(state.get().bookmarks).toHaveLength(2)
+    expect(state.get().chromeSync?.links).toBe(0)
+  })
+  it('不同 Chrome 配置中相同原生 ID 不互相覆盖', () => {
+    const state = new BrowserState()
+    state.syncBookmarks(chrome([link('1', '一')]), 'profile-1', '/chrome', 'Default')
+    state.syncBookmarks(chrome([link('1', '二')]), 'profile-2', '/chrome', 'Profile 1')
+    expect(state.get().bookmarks.map(n => n.name)).toEqual(['二', '一'])
+  })
+})
