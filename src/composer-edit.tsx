@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { IconFolderOpenOutlineRegular, IconCheckOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
+import { acquireComposerHeader } from './composer-header-mount.ts'
 import { BIG_CLASS } from './expand-editor.tsx'
 import { ComposeCard } from './compose-card.tsx'
 import { copyTextToClipboard } from './send-actions.ts'
@@ -21,10 +22,11 @@ export function ComposerEditSurface({ sessionId, shellOf }: { sessionId: string;
     const seat = card?.closest<HTMLElement>('[data-composer-seat]')
     const input = card?.querySelector<HTMLElement>('[data-composer-input]')
     if (!card || !content || !seat || !input) return
-    const head = document.createElement('div')
+    const headerMount = acquireComposerHeader(card)
+    const head = headerMount.head
     const actions = document.createElement('div')
     head.dataset.composeEditHead = ''; actions.dataset.composeEditActions = ''
-    card.prepend(head); head.after(actions)
+    head.after(actions)
     const wasExpanded = card.classList.contains(BIG_CLASS)
     card.classList.add(BIG_CLASS)
     card.dataset.composeEdit = ''
@@ -52,7 +54,8 @@ export function ComposerEditSurface({ sessionId, shellOf }: { sessionId: string;
     input.focus()
     return () => {
       try { detachComposerEdit(sessionId) } catch (error) { console.warn('[chat-power] restore draft:', error) }
-      head.remove(); actions.remove()
+      delete head.dataset.composeEditHead
+      headerMount.release(); actions.remove()
       card.classList.toggle(BIG_CLASS, wasExpanded)
       resize?.disconnect()
       window.removeEventListener('resize', resizeFile)

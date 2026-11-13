@@ -12,6 +12,7 @@
  * 接进本包的 `assistant-step` 包装（见 conversation-surfaces.tsx 的说明）。
  */
 
+import { registerComposerHeader } from './composer-header.tsx'
 import { registerLinkSettings } from './link-settings.tsx'
 import { registerConversationTools } from './conversation-tools.tsx'
 import { startMermaidDiagrams } from './mermaid.ts'
@@ -38,7 +39,7 @@ export const name = 'dsh-chat-power'
  * 不声明的话会抢在它注册之前启动，拿到 undefined 直接抛错（2026-11-05 现场：
  * 桌面版启动时把整条 entry 弄成 failed）。
  */
-export const inject = ['slots', 'locale', 'remote', 'remote.session', 'remote.workspaceFiles', 'sidebarRight', 'uiSession', 'sessions', 'conversation', 'uiConversation'] as const
+export const inject = ['slots', 'locale', 'remote', 'remote.session', 'remote.workspaceFiles', 'sidebarRight', 'uiSession', 'sessions', 'conversation', 'uiConversation', 'uiWorkspace'] as const
 
 export interface PluginContext {
   logger(name: string): { info(message: string): void; warn(message: string): void }
@@ -71,6 +72,9 @@ function safeLogger(ctx: PluginContext): { info(message: string): void; warn(mes
 
 export function apply(ctx: PluginContext): void {
   const log = safeLogger(ctx)
+  try { registerComposerHeader(ctx) } catch (error) {
+    log.warn(`composer header: registration failed — ${error instanceof Error ? error.message : String(error)}`)
+  }
   try {
     registerLinkSettings(ctx.slots)
   } catch (error: unknown) {

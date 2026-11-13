@@ -1,0 +1,60 @@
+import { createElement, act } from 'react'
+import { createRoot } from 'react-dom/client'
+import { Simulate } from 'react-dom/test-utils'
+import { afterEach, expect, it, vi } from 'vitest'
+import { ComposerHeader } from '../src/composer-header.tsx'
+import { acquireComposerHeader } from '../src/composer-header-mount.ts'
+import { readShortcuts, SHORTCUT_KEY } from '../src/composer-shortcuts.ts'
+import { openComposerEdit, closeComposerEdit } from '../src/composer-edit-state.ts'
+
+afterEach(() => { document.body.innerHTML = ''; localStorage.clear() })
+it('卡内共享标题、快捷新增删除持久化、发送与分叉绑定当前会话，保留草稿节点', async () => {
+  document.body.innerHTML = '<div data-composer-card><div id="overlay"></div><div data-composer-input>草稿</div><button id="native-send">发送</button></div>'
+  const card = document.querySelector<HTMLElement>('[data-composer-card]')!
+  const input = document.querySelector('[data-composer-input]')!
+  const nativeSend = document.getElementById('native-send')!
+  const root = createRoot(document.getElementById('overlay')!)
+  const send = vi.fn(async () => {})
+  const fork = vi.fn(async () => {})
+  const click = async (text: string) => {
+    const button = [...card.querySelectorAll('button')].find(el => el.textContent === text)!
+    expect(button).toBeDefined()
+    await act(async () => button.click())
+  }
+  try {
+    await act(async () => root.render(createElement(ComposerHeader, { sessionId: 's', actions: { send, fork }, canSend: true, canFork: true })))
+    expect(card.firstElementChild?.hasAttribute('data-chat-power-composer-header')).toBe(true)
+    expect(card.querySelector('time')).not.toBeNull()
+    await click('快捷发送 ▾')
+    await click('＋ 新增快捷方式')
+    const textarea = card.querySelector('textarea')!
+    await act(async () => Simulate.change(textarea, { target: { value: '我的快捷内容' } } as any))
+    await click('保存')
+    expect(readShortcuts(localStorage).at(-1)?.text).toBe('我的快捷内容')
+    await click('我的快捷内容')
+    expect(send).toHaveBeenCalledTimes(1)
+    expect(send).toHaveBeenCalledWith('s', '我的快捷内容')
+    expect(input.textContent).toBe('草稿')
+    expect(document.getElementById('native-send')).toBe(nativeSend)
+    await click('分叉')
+    expect(fork).toHaveBeenCalledTimes(1)
+    expect(fork).toHaveBeenCalledWith('s')
+    await click('快捷发送 ▾')
+    while (card.querySelector('button[aria-label^="删除："]')) {
+      const button = card.querySelector<HTMLButtonElement>('button[aria-label^="删除："]')!
+      await act(async () => button.click())
+    }
+    expect(localStorage.getItem(SHORTCUT_KEY)).toBe('[]')
+    expect(readShortcuts(localStorage)).toEqual([])
+    // 编辑模式与普通模式共享一个 mount；退出后常驻标题恢复。
+    const editMount = acquireComposerHeader(card)
+    expect(card.querySelectorAll('[data-chat-power-composer-header]')).toHaveLength(1)
+    await act(async () => { openComposerEdit({ sessionId: 's', title: '编辑副本', text: '内容', send }) })
+    expect(card.querySelector('.chat-power-composer-title')).toBeNull()
+    editMount.release()
+    await act(async () => closeComposerEdit('s'))
+    expect(card.querySelector('.chat-power-composer-title')).not.toBeNull()
+  } finally { await act(async () => root.unmount()); closeComposerEdit('s') }
+  expect(card.querySelector('[data-chat-power-composer-header]')).toBeNull()
+  expect(input.parentElement).toBe(card)
+})
