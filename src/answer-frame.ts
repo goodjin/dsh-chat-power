@@ -67,6 +67,7 @@ export function installAnswerFrame(doc?: Document, onEdit?: (sessionId: string, 
   const scrollMemory = createAnswerScrollMemory(target, ANSWER_FRAME_SELECTOR)
   const managed = new Map<HTMLElement, { value: string; priority: string }>()
   const headers = new Map<HTMLElement, HTMLElement>()
+  const copyTimers = new Map<HTMLButtonElement, number>()
   const completedRows = new Set<HTMLElement>()
   const updateTitle = (row: HTMLElement, header: HTMLElement): void => {
     const title = header.querySelector('[data-chat-power-answer-title]')
@@ -130,9 +131,19 @@ export function installAnswerFrame(doc?: Document, onEdit?: (sessionId: string, 
       copy.setAttribute('aria-label', fallbackT('answerCard.copy'))
       copy.title = fallbackT('answerCard.copy')
       copy.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg>'
+      const copyIcon = copy.innerHTML
+      const resetCopy = (): void => {
+        const timer = copyTimers.get(copy)
+        if (timer !== undefined) win.clearTimeout(timer)
+        copyTimers.delete(copy)
+        copy.innerHTML = copyIcon
+        copy.title = fallbackT('answerCard.copy')
+        copy.setAttribute('aria-label', copy.title)
+      }
       copy.addEventListener('click', event => {
         event.stopPropagation()
         if (copy.disabled) return
+        resetCopy()
         copy.disabled = true
         // 同步数据读取失败与异步剪贴板拒绝都在此收口。
         void (async () => {
@@ -141,7 +152,12 @@ export function installAnswerFrame(doc?: Document, onEdit?: (sessionId: string, 
             const nodeKey = row.getAttribute('data-chat-node-key')
             if (!sessionId || !nodeKey) throw new Error('无法定位这条回答，请重新打开会话')
             await onCopy(sessionId, nodeKey)
-            error.textContent = fallbackT('answerCard.copied')
+            if (stopped || !header.isConnected) return
+            error.textContent = ''
+            copy.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>'
+            copy.title = fallbackT('answerCard.copied')
+            copy.setAttribute('aria-label', copy.title)
+            copyTimers.set(copy, win.setTimeout(resetCopy, 1500))
           } catch (cause) {
             error.textContent = cause instanceof Error ? cause.message : String(cause)
           } finally { copy.disabled = false }
@@ -167,6 +183,12 @@ export function installAnswerFrame(doc?: Document, onEdit?: (sessionId: string, 
     if (old.value) row.style.setProperty(HEIGHT, old.value, old.priority)
     else row.style.removeProperty(HEIGHT)
     managed.delete(row)
+    const copy = headers.get(row)?.querySelector<HTMLButtonElement>('[data-chat-power-answer-copy]')
+    if (copy) {
+      const timer = copyTimers.get(copy)
+      if (timer !== undefined) win.clearTimeout(timer)
+      copyTimers.delete(copy)
+    }
     headers.get(row)?.remove()
     headers.delete(row)
   }
@@ -237,6 +259,8 @@ export function installAnswerFrame(doc?: Document, onEdit?: (sessionId: string, 
     for (const row of managed.keys()) restore(row)
     for (const row of completedRows) row.removeAttribute('data-chat-power-completed-hidden')
     completedRows.clear()
+    for (const timer of copyTimers.values()) win.clearTimeout(timer)
+    copyTimers.clear()
     style.remove()
   }
 }

@@ -111,6 +111,8 @@ it('标题栏编辑绑定所在会话和节点，保留原生子树，失败就�
 })
 
 it('复制图标反馈成功及剪贴板拒绝，始终恢复按钮可用状态', async () => {
+  const { vi } = await import('vitest')
+  vi.useFakeTimers()
   document.body.innerHTML = `<section data-conversation-session="s1"><main data-conversation-scroll>
     <div data-chat-flow-kind="assistant-step" data-chat-node-key="answer-1" id="answer">正文</div>
   </main></section>`
@@ -127,14 +129,19 @@ it('复制图标反馈成功及剪贴板拒绝，始终恢复按钮可用状态'
     copy.click()
     await Promise.resolve()
     expect(calls).toEqual([['s1', 'answer-1']])
-    expect(document.querySelector('[role="status"]')?.textContent).toBe('已复制')
+    expect(copy.getAttribute('aria-label')).toBe('已复制')
+    expect(copy.querySelector('rect')).toBeNull()
     expect(copy.disabled).toBe(false)
+    await vi.advanceTimersByTimeAsync(1500)
+    expect(copy.querySelector('rect')).not.toBeNull()
+    expect(copy.getAttribute('aria-label')).toBe('复制结果')
     denied = true
     copy.click()
     await Promise.resolve()
     expect(document.querySelector('[role="status"]')?.textContent).toBe('剪贴板访问被拒绝')
+    expect(copy.querySelector('rect')).not.toBeNull()
     expect(copy.disabled).toBe(false)
-  } finally { stop() }
+  } finally { stop(); vi.useRealTimers() }
 })
 
 it('整框预算包含标题与内边距，最后一轮再为原生尾部操作栏留位', () => {
