@@ -167,3 +167,20 @@ describe('composer 撑高样式注入', () => {
     expect(document.querySelectorAll(`style[data-plugin-css="${COMPOSER_SIZE_TAG}"]`).length).toBe(1)
   })
 })
+
+it('展开按钮挂进卡内标题栏，标题栏重建后重新接入，原生输入节点不移动', async () => {
+  card.appendChild(container)
+  const seat = document.createElement('span')
+  seat.setAttribute('data-chat-power-expand-seat', '')
+  card.prepend(seat)
+  await act(async () => root.render(createElement(ExpandEditor, { t: fallbackT, inHeader: true })))
+  expect(seat.querySelector('[data-expand-toggle]')).not.toBeNull()
+  expect(container.querySelector('[data-expand-toggle]')).toBeNull()
+  await toggle()
+  expect(card.classList.contains(BIG_CLASS)).toBe(true)
+  expect(input.parentElement).toBe(card)
+  const replacement = seat.cloneNode(false) as HTMLElement
+  await act(async () => seat.replaceWith(replacement))
+  expect(replacement.querySelector('[data-expand-toggle]')).not.toBeNull()
+  expect(document.querySelectorAll('[data-expand-toggle]')).toHaveLength(1)
+})

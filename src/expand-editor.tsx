@@ -5,7 +5,7 @@
  * 只干两件事：
  *
  * 1. **把宿主 composer 撑成半屏高**。新会话（宿主 hero 阶段）默认就大、居中偏下；
- *    普通会话时 composer 仍是小框，输入框上方一枚**向上箭头**浮钮，点一下把宿主
+ *    普通会话时 composer 仍是小框，标题栏内一枚**向上箭头**按钮，点一下把宿主
  *    composer 撑成半屏（再点收起）。撑高靠全局样式命中宿主稳定锚点
  *    （`data-composer-card` / `data-input-scroll`），不动宿主结构。
  *
@@ -14,11 +14,11 @@
  *    合成一个 Shift+回车喂给 Lexical，让它自己插软换行——不碰 Lexical 内部节点，
  *    宿主升级最不易坏。发送仍走宿主自己的发送按钮，草稿天然同步、发送逻辑不用重写。
  *
- * 箭头浮钮注册在 composer 的 `conversation.input.overlay` 座位（与本机文件卡同思路）：
- * 该座位渲染在 composer 卡片顶部一个 0 高的绝对定位锚点里，浮钮以 `top:-40px` 浮在
- * 卡片上沿**之外**，不压输入框文字。
+ * 控制器注册在 `conversation.input.overlay`，按钮通过 portal 渲染到插件自己的
+ * 标题栏座位，不移动任何宿主节点；编辑模式暂不显示普通输入的展开按钮。
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { ReactNode } from 'react'
 import { IconChevronDownOutlineRegular, IconChevronUpOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import { NAMESPACE, type RuntimeT } from './locales.ts'
@@ -172,9 +172,24 @@ function currentSessionIdFromDom(): string | undefined {
  * 箭头浮钮。普通会话时浮在输入框上方，点了把宿主 composer 撑成半屏、再点收起；
  * 新会话（hero）时输入框本就大，浮钮由全局样式隐藏。展开时聚焦宿主输入框。
  */
-export function ExpandEditor(props: { readonly t: RuntimeT }): ReactNode {
+export function ExpandEditor(props: { readonly t: RuntimeT; readonly inHeader?: boolean }): ReactNode {
   const [big, setBig] = useState(false)
   const t = props.t
+  const anchor = useRef<HTMLSpanElement>(null)
+  const [headerTarget, setHeaderTarget] = useState<HTMLElement | null>(null)
+  useEffect(() => {
+    if (!props.inHeader) return
+    const card = anchor.current?.closest<HTMLElement>('[data-composer-card]')
+    if (!card) return
+    const update = () => {
+      setHeaderTarget(card.querySelector<HTMLElement>('[data-chat-power-expand-seat]'))
+      setBig(card.classList.contains(BIG_CLASS))
+    }
+    update()
+    const observer = new MutationObserver(update)
+    observer.observe(card, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] })
+    return () => observer.disconnect()
+  }, [props.inHeader])
 
   // 装上回车拦截：仅在大编辑区状态改写回车，普通小框回车的宿主行为原样保留。
   useEffect(() => installEnterInterceptor(), [])
@@ -205,7 +220,7 @@ export function ExpandEditor(props: { readonly t: RuntimeT }): ReactNode {
   }
 
   const label = big ? t('expand.close') : t('expand.open')
-  return (
+  const button = (
     <button
       type="button"
       className={`${css.toggle} ${TOGGLE_CLASS}`}
@@ -218,6 +233,7 @@ export function ExpandEditor(props: { readonly t: RuntimeT }): ReactNode {
       {big ? <IconChevronDownOutlineRegular size={18} /> : <IconChevronUpOutlineRegular size={18} />}
     </button>
   )
+  return props.inHeader ? <><span ref={anchor} hidden />{headerTarget && createPortal(button, headerTarget)}</> : button
 }
 
 /** composer 座位条目宿主的最小结构类型（与本包其它注册函数一致）。 */
@@ -252,7 +268,7 @@ export function registerExpandEditor(slots: ComposerSlotHost, options: { readonl
       const sessionId = currentSessionIdFromDom()
       if (sessionId === undefined) return null
       // 按 sessionId 挂 key：换会话时组件整体重挂载，展开态自然复位。
-      return <ExpandEditor key={sessionId} t={options.t} />
+      return <ExpandEditor key={sessionId} t={options.t} inHeader />
     },
   )) as () => void
 }

@@ -1,34 +1,16 @@
-/* 会话输入框「大编辑区」箭头浮钮的样式。颜色全走宿主 token，与 ui-theme.ts 一致。 */
-
-/* 浮钮：注册在 composer 卡片顶部那个 0 高的绝对定位锚点里，水平居中、以 top:-40px
-   浮在卡片上沿**之外**，不压输入框文字。深色圆钮、70% 透明，hover 变不透明。 */
+/* 展开按钮渲染进插件自有标题栏位置，不移动宿主节点。 */
 .toggle {
-  position: absolute;
-  top: -40px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  padding: 0;
-  border: 1px solid color-mix(in srgb, var(--dsw-alias-label-primary-foreground) 22%, transparent);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--dsw-alias-bg-overlay), black 35%);
-  color: var(--dsw-alias-label-primary-foreground);
-  opacity: 0.1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 3px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary, inherit);
   cursor: pointer;
-  transition: opacity 100ms ease, color 100ms ease, border-color 100ms ease;
 }
-
-/* hover：整体变不透明，描边与图标转主题色。 */
-.toggle:hover {
-  opacity: 1;
-  border-color: var(--dsw-alias-state-business-primary, var(--dsw-alias-brand-primary, currentColor));
-  color: var(--dsw-alias-state-business-primary, var(--dsw-alias-brand-primary, currentColor));
-}
-
-.toggle:focus-visible {
-  outline: 2px solid var(--dsw-alias-state-business-primary, var(--dsw-alias-brand-primary, currentColor));
-  outline-offset: 2px;
-}
+.toggle:hover { background: var(--dsw-alias-interactive-bg-hover, #8882); }
+.toggle:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary, #5685df); outline-offset: 2px; }
