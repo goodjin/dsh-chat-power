@@ -4,14 +4,6 @@ export interface Bookmark { id: string; name: string; url?: string; children?: B
 export interface Page { id: string; type: 'page' | 'import' | 'bookmarks'; title: string; url?: string }
 export interface BrowserSnapshot { pages: Page[]; active?: string; bookmarks: Bookmark[]; showBookmarks: boolean; visible?: boolean }
 const KEY = 'chat-power.browser.v1'
-const LEGACY_IMPORT_FOLDER = '从 Chrome 导入'
-/** Expand the pre-v2 import shell folder into the bookmark bar top level. */
-function unshell(nodes: Bookmark[]): Bookmark[] {
-  const shells = nodes.filter(n => n.children && n.name === LEGACY_IMPORT_FOLDER)
-  if (!shells.length) return nodes
-  const rest = nodes.filter(n => !(n.children && n.name === LEGACY_IMPORT_FOLDER))
-  return shells.reduce((merged, shell) => mergeBookmarks(merged, shell.children ?? []), rest)
-}
 const uid = () => crypto.randomUUID()
 export function webUrl(value: string): string {
   const url = new URL(value.includes('://') ? value : `https://${value}`)
@@ -37,13 +29,18 @@ export function chromeBookmarks(value: unknown): Bookmark[] {
 export function folders(nodes: Bookmark[], depth = 0): { id: string; name: string }[] {
   return nodes.flatMap(n => n.children ? [{ id: n.id, name: '　'.repeat(depth) + n.name }, ...folders(n.children, depth + 1)] : [])
 }
-/** v1 数据可能把导入内容包在「从 Chrome 导入」壳文件夹里；展开合并为一级目录。 */
-const SHELL = '从 Chrome 导入'
-export function expandLegacyShell(nodes: Bookmark[]): Bookmark[] {
-  const shells = nodes.filter(n => n.name === SHELL && n.children)
+/**
+ * 导入壳名单：旧版「从 Chrome 导入」包装文件夹，以及 Chrome 书签文件的根节点
+ * （书签栏 / 其他书签 / 移动设备书签，中英文）。这些名字出现在一级时视为壳，
+ * 展开为其中内容；名字匹配只作用于最外层，用户自建的同名子目录不受影响。
+ */
+const IMPORT_SHELLS = new Set(['从 chrome 导入', '书签栏', '其他书签', '移动设备书签', 'bookmarks bar', 'bookmarks bar.', 'other bookmarks', 'mobile bookmarks'])
+/** 递归剥掉一级的导入壳（壳中壳也一并剥掉），内容提升为一级。 */
+export function flattenImportShells(nodes: Bookmark[]): Bookmark[] {
+  const shells = nodes.filter(n => n.children && IMPORT_SHELLS.has(n.name.toLowerCase()))
   if (!shells.length) return nodes
-  const rest = nodes.filter(n => n.name !== SHELL || !n.children)
-  return mergeBookmarks(rest, shells.flatMap(s => s.children!))
+  const rest = nodes.filter(n => !(n.children && IMPORT_SHELLS.has(n.name.toLowerCase())))
+  return flattenImportShells([...rest, ...shells.flatMap(s => s.children ?? [])])
 }
 export function mergeBookmarks(target: Bookmark[], source: Bookmark[]): Bookmark[] {
   const result = structuredClone(target)
@@ -73,7 +70,7 @@ export class BrowserState {
       if (saved?.version === 1 && Array.isArray(saved.bookmarks) && Array.isArray(saved.pages)) {
         // Re-validate persisted URLs and trees rather than trusting local storage.
         const convert = (nodes: any[]): any[] => nodes.map(n => ({ ...n, type: Array.isArray(n.children) ? 'folder' : 'url', children: Array.isArray(n.children) ? convert(n.children) : undefined }))
-        const bookmarks = expandLegacyShell(chromeBookmarks({ roots: { root: { name: '', type: 'folder', children: convert(saved.bookmarks) } } })[0]?.children ?? [])
+        const bookmarks = flattenImportShells(chromeBookmarks({ roots: { root: { name: '', type: 'folder', children: convert(saved.bookmarks) } } })[0]?.children ?? [])
         const pages: Page[] = saved.pages.slice(0, 100).filter((p: any) => ['page', 'import', 'bookmarks'].includes(p.type)).map((p: any) => ({ id: uid(), type: p.type, title: String(p.title ?? '新标签页'), url: p.type === 'page' && p.url ? webUrl(p.url) : undefined }))
         this.value = { bookmarks, pages, active: pages[saved.activeIndex]?.id ?? pages[0]?.id, showBookmarks: saved.showBookmarks !== false }
       }
@@ -125,7 +122,7 @@ export class BrowserState {
     this.put({ ...this.value, bookmarks: remove(this.value.bookmarks) })
   }
   importBookmarks(nodes: Bookmark[]) {
-    this.put({ ...this.value, bookmarks: mergeBookmarks(expandLegacyShell(this.value.bookmarks), nodes) })
+    this.put({ ...this.value, bookmarks: mergeBookmarks(flattenImportShells(this.value.bookmarks), flattenImportShells(nodes)) })
   }
   tab(page: Page): ToolTab {
     let tab = this.runtime.get(page.id)

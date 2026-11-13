@@ -24,21 +24,38 @@ describe('共享浏览器和书签', () => {
     expect(tree[0]?.children).toHaveLength(1)
     const state = new BrowserState()
     state.importBookmarks(tree); state.importBookmarks(chromeBookmarks(source))
-    expect(state.get().bookmarks.map(n => n.name)).toEqual(['书签栏'])
-    expect(state.get().bookmarks[0]?.children?.[0]?.children).toHaveLength(1)
+    expect(state.get().bookmarks.map(n => n.name)).toEqual(['项目'])
+    expect(state.get().bookmarks[0]?.children).toHaveLength(1)
     state.importBookmarks([{ id: 'other', name: '另一个目录', children: [{ id: 'url', name: '文档', url: 'https://example.com/docs' }] }])
     expect(state.get().bookmarks).toHaveLength(2) // 顶层直接并列，不再包壳
     expect(state.get().bookmarks[1]?.children).toHaveLength(1)
   })
-  it('导入直接落一级目录：Chrome 顶层节点成为书签栏一级项，同名仍去重', () => {
+  it('导入拆掉 Chrome 根节点壳：书签栏/其他书签不占一级，其子项直接落一级', () => {
     const state = new BrowserState()
-    const tree = chromeBookmarks(source)
-    const leaf = tree[0]!.children![0]!.children![0]!
-    state.importBookmarks(selectedBookmarks(tree, new Set([leaf.id])))
-    expect(state.get().bookmarks).toHaveLength(1) // 「书签栏」根节点成为一级项，而非包进「从 Chrome 导入」
-    expect(state.get().bookmarks[0]?.name).toBe('书签栏')
-    state.importBookmarks(selectedBookmarks(chromeBookmarks(source), new Set([leaf.id])))
-    expect(state.get().bookmarks).toHaveLength(1) // 同名顶层目录去重
+    state.importBookmarks(chromeBookmarks(source))
+    const top = state.get().bookmarks
+    expect(top.map(n => n.name)).toEqual(['项目']) // Chrome「书签栏」根拆开，子目录「项目」落一级
+    expect(top[0]?.children?.map(n => n.name)).toEqual(['文档']) // 危险 javascript: 书签被过滤
+    expect(top.some(n => n.name === '书签栏')).toBe(false)
+    // 重复导入去重
+    state.importBookmarks(chromeBookmarks(source))
+    expect(state.get().bookmarks.map(n => n.name)).toEqual(['项目'])
+    // 其他根（其他书签/移动设备书签）同样拆壳
+    state.importBookmarks(chromeBookmarks({ roots: { other: { type: 'folder', name: '其他书签', children: [{ type: 'url', name: '收藏', url: 'https://other.example.com/' }] } } }))
+    expect(state.get().bookmarks.map(n => n.name)).toEqual(['项目', '收藏'])
+  })
+  it('恢复时迁移上一版形状：一级的「书签栏/其他书签」根壳拆开，子项落一级', () => {
+    let saved: string | null = null
+    const storage = { getItem: () => saved, setItem: (_: string, s: string) => { saved = s } }
+    // 上一版插件导入后写入的形状：Chrome 根节点整个成为一级文件夹
+    saved = JSON.stringify({ version: 1, pages: [], bookmarks: [
+      { id: 'r1', name: '书签栏', children: [{ id: 'p1', name: '项目', children: [{ id: 'u1', name: '文档', url: 'https://example.com/' }] }] },
+      { id: 'r2', name: '其他书签', children: [{ id: 'u2', name: '收藏', url: 'https://other.example.com/' }] },
+    ] })
+    const restored = new BrowserState(storage)
+    expect(restored.get().bookmarks.map(n => n.name)).toEqual(['项目', '收藏'])
+    expect(restored.get().bookmarks.some(n => n.name === '书签栏' || n.name === '其他书签')).toBe(false)
+    expect(restored.get().bookmarks[0]?.children?.[0]?.name).toBe('文档')
   })
   it('旧「从 Chrome 导入」壳在导入或恢复时展开并入一级目录', () => {
     const state = new BrowserState()
