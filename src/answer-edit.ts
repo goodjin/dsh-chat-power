@@ -1,4 +1,5 @@
 import { openComposerEdit, setComposerEditNotice } from './composer-edit-state.ts'
+import type { TurnUsage } from './answer-usage.ts'
 import { fallbackT } from './locales.ts'
 import type { MarkdownTurnReaders } from './markdown-turn-sources.ts'
 
@@ -7,6 +8,7 @@ export interface AnswerSource {
   binding(id: string): {
     target(name: 'chat'): { getSnapshot(): {
       timeline?: { turns: ReadonlyMap<number, {
+        data?: { get(key: string): { tokenUsage?: TurnUsage } | undefined }
         start?: { time: number }
         end?: { time: number; data?: { reason?: { kind: string } } }
       }> }
@@ -56,4 +58,9 @@ export function answerTurnTitle(source: AnswerSource, sessionId: string, turn: n
   const duration = hours ? `${hours}小时${minutes}分${tail}秒`
     : minutes ? `${minutes}分${tail}秒` : `${tail}秒`
   return `${prefix} · 用时 ${duration}`
+}
+
+/** 与原生 TurnTailNodeView 读取同一份整轮结算，不自行相加或猜测。 */
+export function answerTurnUsage(source: AnswerSource, sessionId: string, turn: number): TurnUsage | undefined {
+  return source.binding(sessionId).target('chat').getSnapshot()?.timeline?.turns.get(turn)?.data?.get('turn-tail')?.tokenUsage
 }

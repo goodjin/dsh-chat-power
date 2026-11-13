@@ -19,7 +19,7 @@ import { startMermaidDiagrams } from './mermaid.ts'
 import { injectTablePadCss } from './table-pad.ts'
 import { injectUiThemeCss } from './ui-theme.ts'
 import { installAnswerFrame } from './answer-frame.ts'
-import { editAnswerCopy, answerText, answerTurnTitle, type AnswerSource } from './answer-edit.ts'
+import { editAnswerCopy, answerText, answerTurnTitle, answerTurnUsage, type AnswerSource } from './answer-edit.ts'
 import { createMarkdownTurnReaders } from './markdown-turn-sources.ts'
 import { registerSelectionToolbar } from './selection-toolbar.tsx'
 import { startMultiSelectPanel } from './selection-actions.ts'
@@ -97,7 +97,7 @@ export function apply(ctx: PluginContext): void {
       const text = answerText(ctx.get('uiConversation') as AnswerSource, sessionId, nodeKey)
       if (!navigator.clipboard?.writeText) throw new Error('当前环境无法访问剪贴板')
       await navigator.clipboard.writeText(text)
-    })
+    }, (sessionId, turn) => answerTurnUsage(ctx.get('uiConversation') as AnswerSource, sessionId, turn))
     ctx.effect(() => disposeAnswerFrame, 'dsh-chat-power: answer frame')
   } catch (error: unknown) {
     log.warn(`answer frame: start failed — ${error instanceof Error ? error.message : String(error)}`)

@@ -190,3 +190,5 @@ The tag is the immutable "known-good coordinate" of that dsh version — a snaps
 Chrome 导入通过受 DSH 登录准入保护的 `/chat-power/chrome-bookmarks` 只读接口读取 **DSH 宿主所在电脑** 的 Chrome 数据。自动发现 macOS、Windows、Linux 默认目录及 `Default` / `Profile N` 用户配置，也可手动指定数据目录或 `Bookmarks` 文件。预览支持按目录或单项勾选，导入到「从 Chrome 导入」，保留目录层级与顺序。同目录内按名称和网址去重，不会删除不同目录里的同网址书签。仅导入 HTTP/HTTPS 书签，跳过浏览器内部地址与脚本书签。不读取会话文件、账号、密码或 Cookie，不改写 Chrome 数据。
 
 浏览器引擎继续复用宿主原生组件：桌面版使用原生网页视图，web 版使用宿主 iframe，受目标网站嵌入策略限制。新增的宿主读取行需重开桌面应用后加载。验证：`NODE_OPTIONS=--no-experimental-webstorage npm test`（Node 26 环境）；`npm run build`；容器的双宿主声明检查与客户端激活预检。
+
+回答标题栏展示对应会话、对应轮次的 Token 用量，直接读取宿主 `timeline.turns.get(turn).data.get('turn-tail').tokenUsage`，点击展开输入、输出、缓存、思考及模型明细。此入口不受原生「详细」显示设置限制；未结算或数据不完整显示「用量未知」，不估算为零。原生轮尾的点赞／用量等操作栏通过 CSS 隐藏，文件扩展区域保留，宿主节点不搬运。插件卸载后原生操作栏恢复。

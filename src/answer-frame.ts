@@ -1,3 +1,4 @@
+import { updateAnswerUsage, type TurnUsage } from './answer-usage.ts'
 import { createAnswerScrollMemory } from './answer-scroll.ts'
 import { fallbackT } from './locales.ts'
 
@@ -5,6 +6,16 @@ import { fallbackT } from './locales.ts'
 export const ANSWER_FRAME_SELECTOR = '[data-chat-flow-kind="assistant-step"]:not([data-chat-group-part="reasoning"]):not([data-turn-process-member])'
 const HEIGHT = '--chat-power-answer-height'
 export const ANSWER_FRAME_CSS = `
+/* 只隐藏原生操作栏，保留 turnTail 文件扩展和 React 节点原位。 */
+[data-turn-tail] > [data-clock="end"] { display: none !important; }
+[data-chat-power-answer-usage] { position: relative; font-size: 12px; font-weight: 400; }
+[data-chat-power-answer-usage] summary { cursor: pointer; white-space: nowrap; }
+[data-chat-power-answer-usage] > div {
+  position: absolute; top: 28px; right: 0; width: min(300px, 65vw); max-height: 50vh; overflow: auto;
+  padding: 12px; border: 1px solid var(--dsw-alias-border-l2, #ccc); border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-1, #fff); box-shadow: 0 4px 16px #0002;
+  white-space: pre-line; overflow-wrap: anywhere;
+}
 /* 耗时已在回答标题中展示，隐藏对应的原生完成提示行。 */
 [data-chat-power-completed-hidden] { display: none !important; }
 
@@ -56,7 +67,7 @@ export function answerFrameHeight(page: number, composer: number, latest: boolea
  * 标题只插入插件自己的元素，不搬运 React 拥有的子节点。
  * 只测量会话视口/输入框，工作步骤状态归宿主；切会话时在测量完成后补恢复已记录的底部位置。
  */
-export function installAnswerFrame(doc?: Document, onEdit?: (sessionId: string, nodeKey: string) => void, readTitle?: (sessionId: string, turn: number) => string, onCopy?: (sessionId: string, nodeKey: string) => Promise<void>): () => void {
+export function installAnswerFrame(doc?: Document, onEdit?: (sessionId: string, nodeKey: string) => void, readTitle?: (sessionId: string, turn: number) => string, onCopy?: (sessionId: string, nodeKey: string) => Promise<void>, readUsage?: (sessionId: string, turn: number) => TurnUsage | undefined): () => void {
   const target = doc ?? (typeof document === 'undefined' ? undefined : document)
   const win = target?.defaultView
   if (!target || !win) return () => {}
@@ -80,6 +91,11 @@ export function installAnswerFrame(doc?: Document, onEdit?: (sessionId: string, 
       try { text = readTitle(sessionId, turn) } catch { /* 会话已卸载或历史未加载，保留未知提示。 */ }
     }
     if (title.textContent !== text) title.textContent = text
+    if (readUsage) {
+      let usage: TurnUsage | undefined
+      try { if (sessionId && Number.isSafeInteger(turn) && turn >= 1) usage = readUsage(sessionId, turn) } catch { /* 已卸载或缺页 */ }
+      updateAnswerUsage(header, usage)
+    }
     const container = row.closest('[data-conversation-scroll]')
     // 只在本轮已有成功结算的标题时隐藏重复提示；停止、错误及缺失数据保留原生提示。
     const completed = text.includes(' · 用时 ')
