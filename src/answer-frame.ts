@@ -1,3 +1,4 @@
+import { createAnswerScrollMemory } from './answer-scroll.ts'
 import { fallbackT } from './locales.ts'
 
 /** 0.2.2-rc.1 DOM 适配；保留原生节点所有权和工作步骤可见性。 */
@@ -53,7 +54,7 @@ export function answerFrameHeight(page: number, composer: number, latest: boolea
 
 /**
  * 标题只插入插件自己的元素，不搬运 React 拥有的子节点。
- * 只测量会话视口/输入框，绝不改外层 scrollTop 或工作步骤 hidden 状态。
+ * 只测量会话视口/输入框，工作步骤状态归宿主；切会话时在测量完成后补恢复已记录的底部位置。
  */
 export function installAnswerFrame(doc?: Document, onEdit?: (sessionId: string, nodeKey: string) => void, readTitle?: (sessionId: string, turn: number) => string, onCopy?: (sessionId: string, nodeKey: string) => Promise<void>): () => void {
   const target = doc ?? (typeof document === 'undefined' ? undefined : document)
@@ -63,6 +64,7 @@ export function installAnswerFrame(doc?: Document, onEdit?: (sessionId: string, 
   style.dataset.pluginCss = 'chat-power-native-answer-frame'
   style.textContent = ANSWER_FRAME_CSS
   target.head.append(style)
+  const scrollMemory = createAnswerScrollMemory(target, ANSWER_FRAME_SELECTOR)
   const managed = new Map<HTMLElement, { value: string; priority: string }>()
   const headers = new Map<HTMLElement, HTMLElement>()
   const completedRows = new Set<HTMLElement>()
@@ -209,13 +211,14 @@ export function installAnswerFrame(doc?: Document, onEdit?: (sessionId: string, 
       }
     }
     for (const row of managed.keys()) if (!active.has(row)) restore(row)
+    scrollMemory.refresh()
     for (const node of observed) if (!sizes.has(node)) { resize?.unobserve(node); observed.delete(node) }
     for (const node of sizes) if (!observed.has(node)) { resize?.observe(node); observed.add(node) }
   }
   const mutations = new win.MutationObserver(schedule)
   mutations.observe(target.body, {
     subtree: true, childList: true, attributes: true,
-    attributeFilter: ['data-chat-turn', 'data-chat-flow-kind', 'data-chat-group-part', 'data-turn-process-member', 'hidden'],
+    attributeFilter: ['data-conversation-session', 'data-chat-node-key', 'data-chat-turn', 'data-chat-flow-kind', 'data-chat-group-part', 'data-turn-process-member', 'hidden'],
   })
   // 起止事件可先于 DOM 更新到达；定时只更新标题，不做布局测量。
   const titleTimer = win.setInterval(() => {
@@ -225,6 +228,7 @@ export function installAnswerFrame(doc?: Document, onEdit?: (sessionId: string, 
   sync()
   return () => {
     stopped = true
+    scrollMemory.dispose()
     if (pending !== undefined) win.clearTimeout(pending)
     win.clearInterval(titleTimer)
     mutations.disconnect()
