@@ -7,6 +7,49 @@ const useBrowser = () => useSyncExternalStore(browserState.subscribe, browserSta
 function BookmarkItems({ nodes, onOpen }: { nodes: Bookmark[]; onOpen: (url: string) => void }) {
   return <>{nodes.map(n => n.children ? <details key={n.id} className={css.folder}><summary>{n.name || '未命名文件夹'}</summary><div><BookmarkItems nodes={n.children} onOpen={onOpen} />{n.children.length === 0 && <span>空文件夹</span>}</div></details> : <span key={n.id} className={css.bookmark}><button title={n.url} onClick={() => { if (n.url) onOpen(n.url) }}>{n.name || n.url}</button><button aria-label={`在新标签打开 ${n.name}`} title="在新标签打开" onClick={() => browserState.open('page', n.url)}>↗</button></span>)}</>
 }
+/** Keep folder popovers outside the measured row so they never increase its height. */
+export function BookmarkBar({ nodes, onOpen }: { nodes: Bookmark[]; onOpen: (url: string) => void }) {
+  const root = useRef<HTMLDivElement>(null)
+  const measureRow = useRef<HTMLDivElement>(null)
+  const more = useRef<HTMLDetailsElement>(null)
+  const [count, setCount] = useState(0)
+  useLayoutEffect(() => {
+    const bar = root.current, row = measureRow.current
+    if (!bar || !row) return
+    const measure = () => {
+      const widths = Array.from(row.children, child => child.getBoundingClientRect().width)
+      const available = bar.clientWidth
+      const total = widths.reduce((sum, width) => sum + width, 0) + Math.max(0, widths.length - 1) * 6
+      if (total <= available) { setCount(nodes.length); return }
+      let used = 0, visible = 0
+      for (const width of widths) {
+        const next = used + (visible ? 6 : 0) + width
+        if (next > Math.max(0, available - 66)) break
+        used = next; visible++
+      }
+      setCount(visible)
+    }
+    measure()
+    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(measure) : undefined
+    observer?.observe(bar)
+    for (const child of row.children) observer?.observe(child)
+    window.addEventListener('resize', measure)
+    return () => { observer?.disconnect(); window.removeEventListener('resize', measure) }
+  }, [nodes])
+  useEffect(() => {
+    const dismiss = (event: PointerEvent) => { if (more.current && !more.current.contains(event.target as Node)) more.current.open = false }
+    document.addEventListener('pointerdown', dismiss)
+    return () => document.removeEventListener('pointerdown', dismiss)
+  }, [])
+  return <div ref={root} className={css.bookmarkRow} aria-label="书签栏">
+    <div ref={measureRow} className={css.bookmarkMeasure} aria-hidden="true"><BookmarkItems nodes={nodes} onOpen={() => {}} /></div>
+    <BookmarkItems nodes={nodes.slice(0, count)} onOpen={onOpen} />
+    {count < nodes.length && <details ref={more} className={`${css.folder} ${css.bookmarkMore}`} onKeyDown={event => { if (event.key === 'Escape' && more.current) { more.current.open = false; more.current.querySelector('summary')?.focus() } }}>
+      <summary aria-label="更多书签">更多 »</summary>
+      <div onClick={event => { if ((event.target as HTMLElement).closest('button') && more.current) more.current.open = false }}><BookmarkItems nodes={nodes.slice(count)} onOpen={onOpen} /></div>
+    </details>}
+  </div>
+}
 /** Wrap the host body; keep its desktop/iframe engine, navigation and visibility contract. */
 export function BrowserChrome({ hostProps, children }: { hostProps: any; children: ReactNode }) {
   const snapshot = useBrowser()
@@ -28,7 +71,7 @@ export function BrowserChrome({ hostProps, children }: { hostProps: any; childre
   const current = native?.frame?.address === 'unknown' ? undefined : target?.url ?? snapshot.pages.find(p => p.id === tab.id)?.url
   return <div ref={root} className={css.native}>{children}
     {seats && createPortal(<button type="button" aria-label="添加当前页面到书签" title="添加书签" disabled={!current} onClick={() => window.dispatchEvent(new CustomEvent('chat-power:add-bookmark', { detail: { name: target?.title || current, url: current } }))}>☆</button>, seats.star)}
-    {seats && createPortal(snapshot.bookmarks.length ? <BookmarkItems nodes={snapshot.bookmarks} onOpen={url => hostProps.loadUrl(tab.id, url)} /> : null, seats.bookmarks)}
+    {seats && createPortal(snapshot.bookmarks.length ? <BookmarkBar nodes={snapshot.bookmarks} onOpen={url => hostProps.loadUrl(tab.id, url)} /> : null, seats.bookmarks)}
   </div>
 }
 function allIds(nodes: Bookmark[]): string[] { return nodes.flatMap(n => [n.id, ...allIds(n.children ?? [])]) }

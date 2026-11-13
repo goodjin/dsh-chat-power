@@ -1,7 +1,7 @@
 import { createElement, act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { BrowserChrome, BrowserWorkspace } from '../src/browser/workspace.tsx'
+import { BookmarkBar, BrowserChrome, BrowserWorkspace } from '../src/browser/workspace.tsx'
 import { browserState, type Page } from '../src/browser/state.ts'
 let host: HTMLDivElement; let root: Root
 const button = (text: string) => [...host.querySelectorAll('button')].find(b => b.textContent === text)!
@@ -87,4 +87,30 @@ describe('浏览器工作台真实 DOM', () => {
     expect(manager.querySelector('[role="dialog"]')).toBeNull()
     expect(browserState.get().bookmarks.map(b => b.name)).toContain('研究文档')
   })
+})
+
+it('书签溢出进入更多、保留文件夹与打开操作，扩宽后恢复', async () => {
+  let available = 180
+  vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(() => available)
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ width: 100 } as DOMRect)
+  const opened = vi.fn()
+  const nodes = [{ id: 'a', name: '首页', url: 'https://example.com' }, { id: 'b', name: '资料', children: [{ id: 'c', name: '文档', url: 'https://example.com/docs' }] }]
+  await act(async () => { root.render(createElement(BookmarkBar, { nodes, onOpen: opened })) })
+  const bar = host.querySelector('[aria-label="书签栏"]')!
+  const more = bar.querySelector('[aria-label="更多书签"]')!.parentElement as HTMLDetailsElement
+  expect(bar.querySelectorAll(':scope > span')).toHaveLength(1)
+  expect(more.textContent).toContain('资料')
+  await click(more.querySelector('summary')!)
+  await click(more.querySelector('details summary')!)
+  await click(more.querySelector('button')!)
+  expect(opened).toHaveBeenCalledWith('https://example.com/docs')
+  expect(more.open).toBe(false)
+  available = 400
+  await act(async () => { window.dispatchEvent(new Event('resize')) })
+  expect(bar.querySelector('[aria-label="更多书签"]')).toBeNull()
+  expect(bar.querySelector(':scope > details > summary')?.textContent).toBe('资料')
+  available = 40
+  await act(async () => { window.dispatchEvent(new Event('resize')) })
+  expect(bar.querySelectorAll(':scope > span')).toHaveLength(0)
+  expect(bar.querySelector('[aria-label="更多书签"]')).not.toBeNull()
 })
