@@ -3,7 +3,7 @@ import { injectTablePadCss, TABLE_PAD_TAG } from '../src/table-pad.ts'
 
 afterEach(() => { document.querySelectorAll(`style[data-plugin-css="${TABLE_PAD_TAG}"]`).forEach(node => node.remove()) })
 
-describe('宽表格两端留白与横向可达性', () => {
+describe('宽表格在本包的每轮框里', () => {
   it('注入一条样式：末列右内边距补回 16px', () => {
     injectTablePadCss()
     const style = document.querySelector(`style[data-plugin-css="${TABLE_PAD_TAG}"]`)
@@ -26,6 +26,18 @@ describe('宽表格两端留白与横向可达性', () => {
     injectTablePadCss()
     const css = document.querySelector(`style[data-plugin-css="${TABLE_PAD_TAG}"]`)?.textContent ?? ''
     expect(css).toContain('md-table-wide{overflow-x:auto}')
+  })
+
+  it('框内收回宿主的「两侧出血」：表格不再探出回答框', () => {
+    injectTablePadCss()
+    const css = document.querySelector(`style[data-plugin-css="${TABLE_PAD_TAG}"]`)?.textContent ?? ''
+    // 宿主的出血由这两个变量驱动；框内归零，宿主的宽度/位移公式自会算回框内。
+    expect(css).toContain('[data-chat-power-answer-ready] .md-table-wide')
+    expect(css).toContain('--dsh-table-lead:0px')
+    expect(css).toContain('--dsh-table-spare:0px')
+    // 归零要压过宿主那条规则（同等权重时靠顺序），所以用 !important。
+    expect(css).toContain('--dsh-table-lead:0px!important')
+    expect(css).toContain('--dsh-table-spare:0px!important')
   })
 
   it('只作用宽表：窄表（tableFill）不受影响', () => {
