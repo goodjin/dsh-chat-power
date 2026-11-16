@@ -53,10 +53,21 @@ describe('链接清单的 DOM 值', () => {
 })
 
 describe('接线约束', () => {
-  it('拦截层按「按钮 title 命中清单」认领回答块文件链接', () => {
+  it('拦截层按「按钮 class 带 fileLink 记号 / title 命中清单」认领回答块文件链接', () => {
+    const intercept = source('../src/answer-link-intercept.ts')
+    expect(intercept).toContain('answerFileLinkPathAt')
     const tools = source('../src/conversation-tools.tsx')
-    expect(tools).toContain('answerFileLinkPathAt')
-    expect(tools).toContain("sessionFileAddressOf")
+    expect(tools).toContain('installAnswerLinkInterception')
+    expect(tools).toContain('openAnswerFile')
+  })
+
+  it('认领范围是回答内容，而不是插件的框（回答行是框的兄弟节点）', () => {
+    const intercept = source('../src/answer-link-intercept.ts')
+    expect(intercept).toContain('ANSWER_LINK_SCOPE')
+    expect(intercept).toContain('assistant-step')
+    // 旧写法：只认插件自己的框，宿主回答行根本不在里面 → 这条功能从未生效。
+    expect(intercept).not.toContain("closest('[data-chat-power-frame-box]')")
+    expect(source('../src/conversation-tools.tsx')).not.toContain("closest('[data-chat-power-frame-box]')")
   })
 
   it('认领后先开文档预览标签（text），起不来退回编辑标签（local）', () => {

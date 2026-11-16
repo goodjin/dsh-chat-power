@@ -202,3 +202,14 @@ it('普通、新会话及重新激活都使用新高度，实际可编辑区域�
   expect(getComputedStyle(card).minHeight).not.toBe(`${window.innerHeight * .75}px`)
   stale.remove()
 })
+
+it('收起态：卡片不再撑高（min-height 归零），输入区整块不占地方', () => {
+  injectComposerSizeCss()
+  content.dataset.contentPhase = 'active'
+  card.dataset.chatPowerCollapsed = ''
+  expect(getComputedStyle(card).minHeight).toBe('0px')
+  // 收起标记排除在撑高规则之外：标记在时不再套 216px。
+  expect(getComputedStyle(card).minHeight).not.toBe('216px')
+  delete card.dataset.chatPowerCollapsed
+  expect(getComputedStyle(card).minHeight).toBe('216px')
+})

@@ -20,3 +20,30 @@
 
 /* 压低卡片原有的顶部留白，不缩小图标点击区域。 */
 [data-composer-card]:has([data-chat-power-composer-header]) { padding-top: 2px; }
+
+/* 收起态：标题栏整个收进一条小横条（时间 + 向上按钮），宿主输入框整块隐藏，
+   卡片高度就是横条高度。标记由 composer-header 组件写在卡片上。
+   选择器整条包进 :global——里面的属性名不能被 CSS module 改写。 */
+:global([data-chat-power-collapsed] > :not([data-chat-power-composer-header])) { display: none !important; }
+:global([data-chat-power-collapsed] [data-composer-input]),
+:global([data-chat-power-collapsed] [data-input-scroll]),
+:global([data-chat-power-collapsed] [data-chat-power-expand-seat]) { display: none !important; }
+:global(.chat-power-composer-collapsed) { display: flex; align-items: center; justify-content: flex-end; gap: 4px; min-height: 26px; }
+
+/* 快捷发送等操作的回执：浮在屏幕底部，不占标题栏的位置，1.6 秒后自消。 */
+:global(.chat-power-composer-toast) {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 40;
+  padding: 6px 14px;
+  border: 1px solid var(--dsw-alias-border-l2, #8884);
+  border-radius: 999px;
+  background: var(--dsw-alias-bg-layer-2, var(--dsw-specific-input-major, #222));
+  color: var(--dsw-alias-label-primary, inherit);
+  font-size: 12px;
+  line-height: 18px;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 18%);
+  pointer-events: none;
+}

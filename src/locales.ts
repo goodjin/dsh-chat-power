@@ -49,6 +49,7 @@ export type ChatPowerLocaleKey =
   | 'selection.multiAdded' | 'selection.editTitle' | 'selection.multiEditTitle'
   | 'selection.collectedCount'
   | 'expand.open' | 'expand.close'
+  | 'composer.collapse' | 'composer.expand'
   | 'turnFold.label' | 'turnFold.labelWithSummary' | 'turnFold.requestLabel'
   | 'turnFold.requestExpand' | 'turnFold.requestCollapse'
   | 'turnFold.showMiddle' | 'turnFold.showedMiddle'
@@ -155,6 +156,8 @@ export const zh: Record<ChatPowerLocaleKey, string> = {
   'selection.collectedCount': '已收集 {count} 段',
   'expand.open': '展开成大编辑区（回车换行，点发送才发送）',
   'expand.close': '收起编辑区',
+  'composer.collapse': '收起输入框',
+  'composer.expand': '展开输入框',
   'turnFold.label': '第 {turn} 轮 · {clock}',
   'turnFold.frameThinking': '思考',
   'turnFold.frameTools': '工具调用',
@@ -293,6 +296,8 @@ export const en: Record<ChatPowerLocaleKey, string> = {
   'selection.collectedCount': '{count} collected',
   'expand.open': 'Expand to a large editor (Enter newline, only Send sends)',
   'expand.close': 'Collapse the editor',
+  'composer.collapse': 'Collapse the input box',
+  'composer.expand': 'Expand the input box',
   'turnFold.label': 'Turn {turn} · {clock}',
   'turnFold.frameThinking': 'Thinking',
   'turnFold.frameTools': 'Tool calls',
