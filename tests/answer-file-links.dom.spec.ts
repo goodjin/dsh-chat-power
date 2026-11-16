@@ -1,15 +1,14 @@
 // @vitest-environment jsdom
 /**
- * 回答块文件链接（宿主**按钮形态**）的真实 DOM 回归。
+ * 回答块文件链接的真实 DOM 回归。
  *
  * 宿主把 markdown 里的相对文件链接渲染成
- * `<button type="button" title="{路径}">`——不是 `<a>`，也没有任何资源地址属性。
- * 点它走宿主 openFile → 右侧栏，这正是用户报的故障。修好后的契约：
+ * `<button type="button" class="…fileLink…" title="{路径}">`——不是 `<a>`、也没有任何
+ * 资源地址属性。点它走宿主 openFile → 右侧栏，这正是用户报的故障。修好后的契约：
  *
- * 拦截层按「按钮 title 命中 `data-answer-file-links` 清单」认出文件链接
- * （行内代码 mention、代码块复制钮这些同样带 title 的按钮不得误伤）。
- * 注：清单原本由答案卡在渲染时写入；答案卡 wrap 拆除后（2026-11-13，
- * 原生带子座位无法合法遮蔽）清单暂无写入方，识别层保留待重做挂载。
+ * 拦截层按「按钮 class 带 `fileLink` 记号」认出文件链接
+ * （行内代码 mention、代码块复制钮这些不得误伤）。
+ * 注：清单形态（data-answer-file-links）仍保留——回答卡若写清单，按 title 命中认领。
  */
 import { createElement } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -48,6 +47,8 @@ function buildAnswerDom(links: string): { session: HTMLElement; body: HTMLElemen
   const hostButton = document.createElement('button')
   hostButton.type = 'button'
   hostButton.title = 'dir/b.md'
+  // 宿主编译后的类名：`_fileLink_<哈希>`——哈希会变，fileLink 记号不变。
+  hostButton.className = '_fileLink_1ypvv_59'
   const icon = document.createElement('span')
   icon.textContent = '⤷'
   hostButton.appendChild(icon)
@@ -65,20 +66,27 @@ describe('回答块文件链接的识别', () => {
   beforeEach(() => { document.body.innerHTML = '' })
   afterEach(() => { document.body.innerHTML = '' })
 
-  it('宿主文件链接按钮：title 命中回答卡的链接清单 → 给出路径', () => {
-    const { body } = buildAnswerDom('dir/b.md')
+  it('宿主文件链接按钮：class 带 fileLink 记号 → 给出路径（不依赖清单）', () => {
+    const { body } = buildAnswerDom('')
     const button = body.querySelector('button') as HTMLButtonElement
     expect(button.getAttribute('type')).toBe('button')
     expect(answerFileLinkPathAt(button)).toBe('dir/b.md')
   })
 
   it('点在按钮内部的图标 / 文字上，同样向上找到按钮', () => {
-    const { body } = buildAnswerDom('dir/b.md')
+    const { body } = buildAnswerDom('')
     const icon = body.querySelector('button span') as HTMLElement
     expect(answerFileLinkPathAt(icon)).toBe('dir/b.md')
   })
 
-  it('title 不在清单里（代码块复制钮这类同带 title 的按钮）→ 不认', () => {
+  it('清单形态仍在：class 不带记号但 title 命中清单 → 也认', () => {
+    const { body } = buildAnswerDom('dir/b.md')
+    const button = body.querySelector('button') as HTMLButtonElement
+    button.className = '_other_1ypvv_59'
+    expect(answerFileLinkPathAt(button)).toBe('dir/b.md')
+  })
+
+  it('既无记号也不在清单里（代码块复制钮这类同带 title 的按钮）→ 不认', () => {
     const { body } = buildAnswerDom('dir/b.md')
     const copy = document.createElement('button')
     copy.type = 'button'
@@ -87,12 +95,13 @@ describe('回答块文件链接的识别', () => {
     expect(answerFileLinkPathAt(copy)).toBeUndefined()
   })
 
-  it('行内代码 mention（有 aria-label、在 code 里）→ 不认', () => {
-    const { body } = buildAnswerDom('dir/b.md')
+  it('行内代码 mention（带 fileMention 记号、有 aria-label、在 code 里）→ 不认', () => {
+    const { body } = buildAnswerDom('')
     const code = document.createElement('code')
     const mention = document.createElement('button')
     mention.type = 'button'
     mention.title = 'dir/b.md'
+    mention.className = '_fileMention_1ypvv_85'
     mention.setAttribute('aria-label', 'dir/b.md')
     code.appendChild(mention)
     body.appendChild(code)

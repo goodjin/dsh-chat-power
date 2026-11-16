@@ -135,22 +135,28 @@ export function installEnterInterceptor(): () => void {
  * 只命中宿主稳定锚点（`data-conversation-content` / `data-composer-card` /
  * `data-input-scroll`），不改宿主结构；颜色不写死（此处只调尺寸与布局）。
  * 与 table-pad.ts / ui-theme.ts 同一套 data 标记去重约定。
+ *
+ * 收起态（`data-chat-power-collapsed`，由 composer-header 组件写在卡片上）把
+ * 整块输入区收成一条横条：所有撑高规则都排除它，卡片自身高度归零。
  */
 export const COMPOSER_SIZE_CSS = `
 /* 默认输入卡（含标题和工具行）约 144px，增加 50% 到 216px。 */
-[data-conversation-content]:not([data-content-phase="hero"]) [data-composer-card]:not(.${BIG_CLASS}):not([data-compose-edit]) { min-height:216px !important; }
-[data-composer-card]:not(.${BIG_CLASS}):not([data-compose-edit]) [data-input-scroll] { flex:1 1 auto; min-height:108px; }
-[data-composer-card]:not([data-compose-edit]) [data-composer-input] { min-height:108px; }
-[data-composer-card]:not([data-compose-edit]) [data-input-scroll] { display:flex; flex-direction:column; }
-[data-composer-card]:not([data-compose-edit]) [data-input-scroll] > div { flex:1; }
-[data-composer-card]:not([data-compose-edit]) [data-composer-input] { height:100%; }
+[data-conversation-content]:not([data-content-phase="hero"]) [data-composer-card]:not(.${BIG_CLASS}):not([data-compose-edit]):not([data-chat-power-collapsed]) { min-height:216px !important; }
+[data-composer-card]:not(.${BIG_CLASS}):not([data-compose-edit]):not([data-chat-power-collapsed]) [data-input-scroll] { flex:1 1 auto; min-height:108px; }
+[data-composer-card]:not([data-compose-edit]):not([data-chat-power-collapsed]) [data-composer-input] { min-height:108px; }
+[data-composer-card]:not([data-compose-edit]):not([data-chat-power-collapsed]) [data-input-scroll] { display:flex; flex-direction:column; }
+[data-composer-card]:not([data-compose-edit]):not([data-chat-power-collapsed]) [data-input-scroll] > div { flex:1; }
+[data-composer-card]:not([data-compose-edit]):not([data-chat-power-collapsed]) [data-composer-input] { height:100%; }
 
 [data-conversation-content][data-content-phase="hero"] [data-conversation-scroll]{justify-content:flex-end !important}
-[data-conversation-content][data-content-phase="hero"] [data-composer-card]:not([data-compose-edit]){min-height:75vh !important;display:flex !important;flex-direction:column !important}
+[data-conversation-content][data-content-phase="hero"] [data-composer-card]:not([data-compose-edit]):not([data-chat-power-collapsed]){min-height:75vh !important;display:flex !important;flex-direction:column !important}
 [data-conversation-content][data-content-phase="hero"] [data-composer-card] [data-input-scroll]{flex:1 1 auto !important;max-height:none !important;min-height:0 !important}
 [data-composer-card].${BIG_CLASS}:not([data-compose-edit]){min-height:50vh !important;display:flex !important;flex-direction:column !important}
 [data-composer-card].${BIG_CLASS} [data-input-scroll]{flex:1 1 auto !important;max-height:none !important;min-height:0 !important}
 [data-content-phase="hero"] .${TOGGLE_CLASS}{display:none}
+
+/* 收起态：卡片只剩标题栏里那条横条，宿主输入区整块不占地方。 */
+[data-composer-card][data-chat-power-collapsed]{min-height:0 !important;height:auto !important;padding-top:0 !important;padding-bottom:0 !important}
 `.trim()
 
 /** 注入标记；重复注入与诊断都靠它。 */

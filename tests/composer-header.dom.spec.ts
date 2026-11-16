@@ -7,7 +7,7 @@ import { acquireComposerHeader } from '../src/composer-header-mount.ts'
 import { readShortcuts, SHORTCUT_KEY } from '../src/composer-shortcuts.ts'
 import { openComposerEdit, closeComposerEdit } from '../src/composer-edit-state.ts'
 
-afterEach(() => { document.body.innerHTML = ''; localStorage.clear() })
+afterEach(() => { document.body.innerHTML = ''; localStorage.clear(); vi.useRealTimers() })
 it('卡内共享标题、快捷新增删除持久化、发送与分叉绑定当前会话，保留草稿节点', async () => {
   document.body.innerHTML = '<div data-composer-card><div id="overlay"></div><div data-composer-input>草稿</div><button id="native-send">发送</button></div>'
   const card = document.querySelector<HTMLElement>('[data-composer-card]')!
@@ -22,6 +22,7 @@ it('卡内共享标题、快捷新增删除持久化、发送与分叉绑定当�
     await act(async () => button.click())
   }
   try {
+    vi.useFakeTimers()
     await act(async () => root.render(createElement(ComposerHeader, { sessionId: 's', actions: { send, fork }, canSend: true, canFork: true })))
     expect(card.firstElementChild?.hasAttribute('data-chat-power-composer-header')).toBe(true)
     expect(card.querySelector('time')).not.toBeNull()
@@ -36,9 +37,23 @@ it('卡内共享标题、快捷新增删除持久化、发送与分叉绑定当�
     expect(send).toHaveBeenCalledWith('s', '我的快捷内容')
     expect(input.textContent).toBe('草稿')
     expect(document.getElementById('native-send')).toBe(nativeSend)
+    // 发送成功不写进标题栏（用户要求），改成底部浮一条回执，1.6 秒后自消。
+    expect(card.querySelector('.chat-power-composer-notice')).toBeNull()
+    expect(document.querySelector('[data-composer-toast]')?.textContent).toBe('已发送')
+    await act(async () => { vi.advanceTimersByTime(1700) })
+    expect(document.querySelector('[data-composer-toast]')).toBeNull()
     await click('分叉')
     expect(fork).toHaveBeenCalledTimes(1)
     expect(fork).toHaveBeenCalledWith('s')
+    // 收起输入框：标题栏换成小横条，卡片打上收起标记。
+    await click('收起输入框')
+    expect(card.hasAttribute('data-chat-power-collapsed')).toBe(true)
+    expect(card.querySelector('.chat-power-composer-collapsed')).not.toBeNull()
+    expect(card.querySelector('.chat-power-composer-title')).toBeNull()
+    // 再点展开：标记与横条都退掉，回到标题栏。
+    await click('展开输入框')
+    expect(card.hasAttribute('data-chat-power-collapsed')).toBe(false)
+    expect(card.querySelector('.chat-power-composer-title')).not.toBeNull()
     await click('快捷发送')
     while (card.querySelector('button[aria-label^="删除："]')) {
       const button = card.querySelector<HTMLButtonElement>('button[aria-label^="删除："]')!
