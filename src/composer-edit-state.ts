@@ -1,4 +1,6 @@
 /** One editing transaction per session. The host remains the only text editor. */
+import { editingViewOf, restoreEditingView } from './editing-view.ts'
+import { toolsState } from './tools-state.ts'
 export interface EditShell {
   readonly draftSnapshot?: unknown
   readonly snapshot: { draft: string; phase: string; notice?: { level: string } }
@@ -20,6 +22,8 @@ export interface ComposerEdit {
   pending: boolean
   nativePending?: boolean
   notice: string
+  /** 打开编辑前激活的工具标签（工作区文件 / 浏览器 / 终端…）：关闭时还回去。 */
+  editingView?: string
 }
 const entries = new Map<string, ComposerEdit>()
 const bindings = new Map<string, { shell: EditShell; backup: unknown; stop?: () => void }>()
@@ -33,7 +37,10 @@ function patch(id: string, update: Partial<ComposerEdit>) {
 }
 export function openComposerEdit(request: ComposerEditRequest): boolean {
   if (entries.has(request.sessionId)) return false
-  entries.set(request.sessionId, { request, text: request.text, pending: false, notice: '' })
+  // 打开编辑会切回对话那一格（编辑卡挂在输入框上方）；先记住切走前的那一格，
+  // 关闭时还回去——否则在工作区文件里打开编辑、关掉后停在对话。
+  const editingView = editingViewOf(toolsState, request.sessionId)
+  entries.set(request.sessionId, { request, text: request.text, pending: false, notice: '', editingView })
   publish()
   if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('chat-power:selection-edit-open', { detail: { sessionId: request.sessionId } }))
   return true
@@ -76,12 +83,20 @@ export function attachComposerEdit(id: string, shell: EditShell): void {
     // The host keeps the draft on failure and consumes it after an accepted send.
     // Defer restoration until the host finishes its submission transaction.
     if (snapshot.draft === '' && snapshot.notice?.level !== 'error') queueMicrotask(() => {
-      if (bindings.get(id) === binding && shell.snapshot.draft === '') closeComposerEdit(id)
+      // 宿主收下了草稿（已发送）：落点留在对话，不还原工具区那一格。
+      if (bindings.get(id) === binding && shell.snapshot.draft === '') closeComposerEdit(id, 'sent')
     })
   })
   patch(id, {})
 }
-export function closeComposerEdit(id: string): void {
+/**
+ * 关掉编辑。
+ *
+ * @param id - 会话 id。
+ * @param reason - 关闭原因：`cancel` 是用户主动退出编辑（把工具区落点还回去），
+ *   `sent` 是发送成功/宿主收下了草稿（消息进了对话，落点留在对话）。
+ */
+export function closeComposerEdit(id: string, reason: 'cancel' | 'sent' = 'cancel'): void {
   const entry = entries.get(id)
   if (!entry || entry.pending || entry.nativePending) return
   try { detachComposerEdit(id) } catch (error) {
@@ -91,6 +106,8 @@ export function closeComposerEdit(id: string): void {
   entries.delete(id)
   publish()
   try { entry.request.onClose?.() } catch (error) { console.warn('[chat-power] editor close:', error) }
+  // 主动退出编辑：回到打开前的那一格（工作区文件等），别停在对话。
+  if (reason === 'cancel') restoreEditingView(toolsState, id, entry.editingView)
 }
 export function composerEditText(id: string): string {
   return bindings.get(id)?.shell.snapshot.draft ?? entries.get(id)?.text ?? ''
@@ -111,7 +128,8 @@ export async function performComposerEdit(id: string, action: 'current' | 'new' 
     } else if (action === 'reveal') await entry.request.reveal?.()
     else await entry.request.send(text, action)
     patch(id, { pending: false, notice: action === 'save' ? '已保存' : '' })
-    if (action === 'current' || action === 'new') closeComposerEdit(id)
+    // 发送成功：消息进了对话，落点留在对话，不还原工具区那一格。
+    if (action === 'current' || action === 'new') closeComposerEdit(id, 'sent')
   } catch (error) {
     patch(id, { pending: false, notice: `操作失败：${error instanceof Error ? error.message : String(error)}` })
   }

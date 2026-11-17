@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { IconFolderOpenOutlineRegular, IconCheckOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import { acquireComposerHeader } from './composer-header-mount.ts'
 import { BIG_CLASS } from './expand-editor.tsx'
+import { scrollEditToTop } from './edit-scroll.ts'
 import { ComposeCard } from './compose-card.tsx'
 import { copyTextToClipboard } from './send-actions.ts'
 import { statusNoticeClass, uiButtonClass, btnClass } from './ui-theme.ts'
@@ -90,7 +91,8 @@ export function ComposerEditSurface({ sessionId, shellOf }: { sessionId: string;
     input.focus({ preventScroll: true })
     const align = window.requestAnimationFrame(() => {
       resizeEditor()
-      if (viewport) viewport.scrollTop = viewport.scrollHeight
+      // 编辑面回到顶部：内容灌进来后浏览器把滚动留在末尾，顶部就看不见了。
+      scrollEditToTop(card)
     })
     return () => {
       try { detachComposerEdit(sessionId) } catch (error) { console.warn('[chat-power] restore draft:', error) }
