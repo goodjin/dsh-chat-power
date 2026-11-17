@@ -16,6 +16,7 @@ import {
   ROW_ATTR,
   TAB_ATTR,
   TAB_ID_ATTR,
+  DOC_ATTR,
   handleToolsRowClick,
   syncSessionToolsRow,
   type RowDocumentLike,
@@ -63,6 +64,12 @@ const handlers = (snapshot: (sessionId: string) => ToolsRowSnapshot): ToolsRowHa
   closeTab: () => {},
   subscribe: () => () => {},
   labels: { chat: '对话', kinds: { files: '文件', browser: '浏览器', terminal: '终端' } },
+  icons: {
+    files: '<svg data-icon="files"></svg>',
+    browser: '<svg data-icon="browser"></svg>',
+    terminal: '<svg data-icon="terminal"></svg>',
+    document: '<svg data-icon="document"></svg>',
+  },
 })
 
 const doc = () => document as unknown as RowDocumentLike
@@ -78,6 +85,35 @@ describe('标签并入宿主行（真实 DOM）', () => {
     expect(group).not.toBeNull()
     // 三个种类启动器 + 一个文件标签。
     expect(group!.querySelectorAll(`[${TAB_ATTR}]`)).toHaveLength(4)
+  })
+
+  it('打开的文件是视图入口：图标 + 文件名，与浏览器/终端同一排同一款', () => {
+    const { content, hostRow } = buildSession('s1')
+    const h = handlers(() => ({
+      active: 't4',
+      tabs: [
+        { id: 't1', kind: 'files', title: '工作区文件' },
+        { id: 't2', kind: 'browser', title: '浏览器' },
+        { id: 't3', kind: 'terminal', title: '终端' },
+        { id: 't4', kind: 'local', title: 'a.md' },
+      ],
+    }))
+    const row = syncSessionToolsRow(content as unknown as RowElementLike, doc(), h, {})
+    const group = row!.querySelector(`[${GROUP_ATTR}]`) as unknown as HTMLElement
+    const docs = group.querySelectorAll(`[${DOC_ATTR}]`)
+    expect(docs).toHaveLength(1)
+    const view = docs[0]!
+    // 视图入口：图标 + 文件名，和旁边三个视图入口是同一种按钮。
+    const button = view.querySelector(`[${TAB_ATTR}]`)!
+    expect(button.textContent).toBe('a.md')
+    expect(button.querySelector('[data-icon="document"]')).not.toBeNull()
+    expect(button.getAttribute('aria-selected')).toBe('true')
+    // 关闭钮与它并在一处（按钮里不能套按钮）。
+    expect(view.querySelector('[data-chat-tools-tab-close]')).not.toBeNull()
+    // 位置：紧跟三个视图之后（同一排里，不是行尾另起一个样式的标签）。
+    const kids = Array.from(group.children) as HTMLElement[]
+    expect(kids.indexOf(view as unknown as HTMLElement)).toBe(kids.length - 1)
+    expect(kids.filter(el => el.hasAttribute('data-chat-tools-tab-kind'))).toHaveLength(3)
   })
 
   it('标签组排在宿主自己的标签之后', () => {

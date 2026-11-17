@@ -31,8 +31,15 @@
 export const GROUP_ATTR = 'data-chat-tools-group'
 /** 单个工具标签标记（我们的）。 */
 export const TAB_ATTR = 'data-chat-tools-tab'
-/** 文件标签的外壳：标题 + 关闭钮同处一个框里（Chrome 标签那样是一个整体）。 */
-export const TAB_WRAP_ATTR = 'data-chat-tools-tab-wrap'
+/**
+ * 打开的文件的视图入口外壳。
+ *
+ * 打开的文件与浏览器、终端是同一类东西——都是「切过去就在下方那块地方看内容」
+ * 的视图，所以它在那一行里与它们并排，样式也照它们的样子（扁平方钮 + 图标 +
+ * 名字）。以前它被画成行尾一个带边框、带 × 的 Chrome 标签，与旁边的视图
+ * 既不同形也不同位，看着像另一套东西。
+ */
+export const DOC_ATTR = 'data-chat-tools-doc'
 /** 标签上的工具标签 id（toolsState 里的 tab.id）。 */
 export const TAB_ID_ATTR = 'data-chat-tools-tab-id'
 /** 标签上的工具种类（kind 启动器才有）。 */
@@ -76,7 +83,7 @@ export interface ToolsRowHandlers {
   /** 文案由调用方注入，模块不写死语言。 */
   labels: { chat: string; kinds: Record<ToolRowKind, string> }
   /** 每个入口的图标（SVG 源码）；没有就不画图标。 */
-  icons?: Partial<Record<ToolRowKind, string>> & { chat?: string }
+  icons?: Partial<Record<ToolRowKind, string>> & { chat?: string; document?: string }
 }
 
 /** 行补挂与点击路由要用的最小元素面（真实 DOM 满足它，测试里的假元素也满足）。 */
@@ -301,11 +308,12 @@ export function syncSessionToolsRow(root: RowElementLike, doc: RowDocumentLike, 
   }
   for (const tab of snapshot.tabs) {
     if (tab.kind === 'chat' || tab.kind === 'files' || tab.kind === 'browser' || tab.kind === 'terminal') continue
-    // 文件标签 = 一个框：标题按钮与关闭钮同处框内，视觉上是一个整体
-    // （Chrome 标签那样）。关闭钮是标题按钮的兄弟节点，不嵌套在按钮里
-    // （按钮里再套按钮不是合法 HTML），靠事件委托区分点击落点。
+    // 打开的文件 = 一个视图入口：与浏览器、终端同款（扁平方钮、图标 + 文件名），
+    // 排在它们后面。关闭钮是它的兄弟节点而不是子按钮（按钮里再套按钮不是合法
+    // HTML），靠事件委托区分点击落点；平时不显形，悬停/聚焦才出现，
+    // 免得这一排里多一个常驻的小圆点。
     const wrap = doc.createElement('span')
-    wrap.setAttribute(TAB_WRAP_ATTR, '')
+    wrap.setAttribute(DOC_ATTR, '')
     if (isActive(snapshot, tab)) wrap.setAttribute('data-chat-tools-tab-active', '')
     const button = doc.createElement('button')
     button.setAttribute('type', 'button')
@@ -314,6 +322,14 @@ export function syncSessionToolsRow(root: RowElementLike, doc: RowDocumentLike, 
     button.setAttribute(TAB_ID_ATTR, tab.id)
     button.setAttribute('aria-selected', isActive(snapshot, tab) ? 'true' : 'false')
     button.setAttribute('title', tab.title)
+    const icon = handlers.icons?.document
+    if (icon !== undefined && icon !== '') {
+      const mark = doc.createElement('span')
+      mark.setAttribute('aria-hidden', 'true')
+      mark.setAttribute('data-chat-tools-icon', '')
+      mark.innerHTML = icon
+      button.append(mark)
+    }
     button.append(doc.createTextNode(tab.title))
     wrap.append(button)
     const close = doc.createElement('button')
