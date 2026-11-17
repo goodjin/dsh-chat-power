@@ -32,14 +32,19 @@ export const name = 'dsh-chat-power'
 
 /**
  * 依赖：插槽表、locale 注册中心（文案）、remote 服务（文件阅读区读 workspaceFiles /
- * session），以及右侧栏的 `sidebarRight`（工具标签的宿主服务）。缺任一，对应功能
+ * session / workspace），以及右侧栏的 `sidebarRight`（工具标签的宿主服务）。缺任一，对应功能
  * 安静退回，不拖累其它。
  *
  * `sidebarRight` 必须声明：工具适配器在 apply 里就要读它的 openTabs 订阅；
  * 不声明的话会抢在它注册之前启动，拿到 undefined 直接抛错（2026-11-05 现场：
  * 桌面版启动时把整条 entry 弄成 failed）。
+ *
+ * remote 的每个子命名空间都要单独声明：cordis 的 traceable 代理把
+ * `remote.workspace` 解析成 `ctx['remote.workspace']`，未声明就**抛错**而非
+ * 返回 undefined（2026-11-17 现场：编辑回答 → 创建新会话，读 workspace 继承
+ * 工作区时整条发送失败）。见 tests/remote-inject-gate.spec.ts。
  */
-export const inject = ['slots', 'locale', 'remote', 'remote.session', 'remote.workspaceFiles', 'sidebarRight', 'uiSession', 'sessions', 'conversation', 'uiConversation', 'uiWorkspace'] as const
+export const inject = ['slots', 'locale', 'remote', 'remote.session', 'remote.workspace', 'remote.workspaceFiles', 'sidebarRight', 'uiSession', 'sessions', 'conversation', 'uiConversation', 'uiWorkspace'] as const
 
 export interface PluginContext {
   logger(name: string): { info(message: string): void; warn(message: string): void }
