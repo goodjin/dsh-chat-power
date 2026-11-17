@@ -23,6 +23,7 @@ import { ToolsFrame } from './tools-frame.tsx'
 import { createMarkdownTurnReaders } from './markdown-turn-sources.ts'
 import type { MarkdownTurnReaders } from './markdown-turn-sources.ts'
 import { registerMarkdownTurn } from './markdown-turn.tsx'
+import { registerTurnFailureLine } from './turn-failure-line.tsx'
 import { registerExpandFilesChip } from './markdown-turn-chip.tsx'
 import { registerLocalFileComposer } from './local-file.tsx'
 import { registerSelectionEditComposer } from './selection-edit-card.tsx'
@@ -180,6 +181,14 @@ export function registerConversationSurfaces(ctx: Surface): void {
     registerMarkdownTurn(slots as unknown as Parameters<typeof registerMarkdownTurn>[0], readers)
   } catch (error) {
     if (typeof console !== 'undefined') console.warn(`[dsh-chat-power] markdown turn: registration failed — ${error instanceof Error ? error.message : String(error)}`)
+  }
+
+  // 回合失败行：错误收尾直接画在回合尾部（aborted 不算失败）。注册失败只降级
+  // 自己——没有失败行时界面回到「失败只翻文件可见」的旧状态。
+  try {
+    registerTurnFailureLine(slots as unknown as Parameters<typeof registerTurnFailureLine>[0])
+  } catch (error) {
+    if (typeof console !== 'undefined') console.warn(`[dsh-chat-power] turn failure line: registration failed — ${error instanceof Error ? error.message : String(error)}`)
   }
 
   // 「本轮文件」入口：注册进点赞栏那排（assistant-actions 插槽），点开展开下方的文件列表。
