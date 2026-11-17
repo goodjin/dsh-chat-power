@@ -1,7 +1,6 @@
 import { updateAnswerUsage, type TurnUsage } from './answer-usage.ts'
 import { createAnswerScrollMemory } from './answer-scroll.ts'
 import { fallbackT } from './locales.ts'
-import { QUESTION_SLOT_ATTR } from './question-frame.tsx'
 
 /** 0.2.2-rc.1 DOM 适配；保留原生节点所有权和工作步骤可见性。 */
 export const ANSWER_FRAME_SELECTOR = '[data-chat-flow-kind="assistant-step"]:not([data-chat-group-part="reasoning"]):not([data-turn-process-member])'
@@ -38,16 +37,6 @@ export const ANSWER_FRAME_CSS = `
 @media (max-width:480px) { [data-chat-power-answer-usage] summary span { display:none; } }
 /* 耗时已在回答标题中展示，隐藏对应的原生完成提示行。 */
 [data-chat-power-completed-hidden] { display: none !important; }
-
-/* 提问记录：搬进回答框底部的那一格。它是回答的一部分，不再画自己的框——
-   只在内容前加一条分隔线与「提问」小标题，一眼看出这段是当时那问一答。 */
-[data-chat-power-answer-question]:not(:empty) {
-  margin: 12px -16px 0;
-  padding: 10px 16px 0;
-  border-top: 1px solid var(--dsw-alias-border-l2, rgba(127,127,127,.2));
-}
-/* 提问记录被搬走后，宿主那条空行不留白。 */
-[data-chat-power-question-moved] { display: none !important; }
 
 ${FRAMED_SELECTOR} {
   box-sizing: border-box;
@@ -215,18 +204,6 @@ export function installAnswerFrame(doc?: Document, onEdit?: (sessionId: string, 
     headers.set(row, header)
     updateTitle(row, header)
   }
-  /**
-   * 回答框底部预留一格：提问记录搬进来后落在框底（见 question-frame.tsx）。
-   *
-   * 这一格是本包自己的普通 DOM，宿主不认得它；它不画任何东西，空着时无影响。
-   */
-  const ensureQuestionSlot = (row: HTMLElement): void => {
-    if (row.querySelector(`[${QUESTION_SLOT_ATTR}]`) !== null) return
-    const slot = target.createElement('div')
-    slot.setAttribute(QUESTION_SLOT_ATTR, '')
-    row.appendChild(slot)
-  }
-
   let stopped = false
   let pending: number | undefined
   const observed = new Set<Element>()
@@ -279,7 +256,6 @@ export function installAnswerFrame(doc?: Document, onEdit?: (sessionId: string, 
         active.add(row)
         if (!row.hasAttribute(READY)) row.setAttribute(READY, '')
         ensureHeader(row)
-        ensureQuestionSlot(row)
         const header = headers.get(row)
         if (header) updateTitle(row, header)
         if (!managed.has(row)) managed.set(row, {

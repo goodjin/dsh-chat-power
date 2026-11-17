@@ -20,7 +20,6 @@ import { createElement } from 'react'
 import type { ReactNode } from 'react'
 import type { ComponentType } from 'react'
 import { ToolsFrame } from './tools-frame.tsx'
-import { QuestionRecord, observeQuestionPlacement } from './question-frame.tsx'
 import { createMarkdownTurnReaders } from './markdown-turn-sources.ts'
 import type { MarkdownTurnReaders } from './markdown-turn-sources.ts'
 import { registerMarkdownTurn } from './markdown-turn.tsx'
@@ -138,25 +137,9 @@ export function registerConversationSurfaces(ctx: Surface): void {
     { key: 'manual-compaction', label: 'turnFold.frameCompaction', kind: 'plain' },
     { key: 'context', label: 'turnFold.frameContext', kind: 'plain' },
     { key: 'turn-max-tokens', label: 'turnFold.frameLimit', kind: 'plain' },
+    { key: 'question-reply', label: 'turnFold.frameQuestion', kind: 'plain' },
     { key: 'workflow-run', label: 'turnFold.frameWorkflow', kind: 'plain' },
   ]
-  // 提问记录（宿主把「你回答了模型先前等待的问题」投影成的一条节点）：
-  // 它与回答是同一件事的两面，用户要它们在**同一个框**里。做法见
-  // question-frame.tsx——内容画进本包自带的容器，再由 DOM 路线把容器搬进
-  // 前面那个回答框底部预留的格子。
-  const removeQuestionRenderer = (() => {
-    const entry = slots.entries(NODE_SLOT).find(
-      candidate => candidate.options.key === 'question-reply' && (candidate.options.priority as number | undefined ?? 0) >= 0,
-    )
-    if (entry === undefined) return () => {}
-    const NativeQuestion = entry.component as ComponentType<AssistantStepProps>
-    return slots.register({
-      name: NODE_SLOT, key: 'question-reply', priority: WRAP_PRIORITY,
-      ...(entry.locale === undefined ? {} : { locale: entry.locale }),
-      ...(entry.inject === undefined ? {} : { inject: entry.inject }),
-    }, (props: AssistantStepProps) => createElement(QuestionRecord, null, createElement(NativeQuestion, props)))
-  })()
-
   const removeExtraRenderers: (() => void)[] = []
   const originalExtraComponents = new Map<string, unknown>()
   let installingExtra = false
@@ -191,9 +174,6 @@ export function registerConversationSurfaces(ctx: Surface): void {
   }
   const unsubscribeExtraRenderer = slots.subscribe(NODE_SLOT, attachExtraRenderers)
   attachExtraRenderers()
-  // 回答框是后画的（回答完成才有框）：盯着页面，提问记录随时归位。
-  const stopQuestionPlacement = observeQuestionPlacement()
-  ctx.effect(() => () => { stopQuestionPlacement(); removeQuestionRenderer() }, 'dsh-chat-power: question placement')
 
   // 会话尾部文件卡片：通用座位，排在官方改动卡片之后。
   try {
