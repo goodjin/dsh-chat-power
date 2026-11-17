@@ -17,7 +17,7 @@ import {
   TAB_CLOSE_ATTR,
   TAB_ID_ATTR,
   TAB_KIND_ATTR,
-  TAB_WRAP_ATTR,
+  DOC_ATTR,
   handleToolsRowClick,
   syncSessionToolsRow,
   type RowElementLike,
@@ -175,6 +175,7 @@ function handlers(snapshot: (sessionId: string) => ToolsRowSnapshot): { value: T
       files: '<svg data-icon="files"></svg>',
       browser: '<svg data-icon="browser"></svg>',
       terminal: '<svg data-icon="terminal"></svg>',
+      document: '<svg data-icon="document"></svg>',
     },
   }
   return { value, actions }
@@ -257,20 +258,40 @@ describe('syncSessionToolsRow（同步）', () => {
     expect(kids.indexOf(group as unknown)).toBeGreaterThan(kids.indexOf(chat as unknown))
   })
 
-  it('文件标签是一个整体：关闭钮在标签框里（标题与 × 同处一个外壳）', () => {
-    const { content, hostRow } = session('s1')
-    const h = handlers(() => snapshotOf([{ id: 't1', kind: 'local', title: 'a.md' }], 't1'))
+  it('打开的文件是视图入口：与浏览器/终端同款，排在它们后面', () => {
+    const { content } = session('s1')
+    const h = handlers(() => snapshotOf([
+      { id: 't1', kind: 'files', title: '工作区文件' },
+      { id: 't2', kind: 'browser', title: '浏览器' },
+      { id: 't3', kind: 'terminal', title: '终端' },
+      { id: 't4', kind: 'local', title: 'a.md' },
+    ], 't4'))
     const row = syncSessionToolsRow(content, fakeDoc(), h.value, {})
     const group = row!.querySelector(`[${GROUP_ATTR}]`)!
-    const wraps = Array.from(group.querySelectorAll(`[${TAB_WRAP_ATTR}]`))
-    expect(wraps).toHaveLength(1)
-    const wrap = wraps[0]!
-    // 框里既有标题按钮，也有关闭钮——视觉上是一个整体（Chrome 那样）。
-    expect(wrap.querySelector(`[${TAB_ATTR}]`)).not.toBeNull()
-    expect(wrap.querySelector(`[${TAB_CLOSE_ATTR}]`)).not.toBeNull()
-    // 当前标签的高亮挂在外壳上（框高亮，标题按钮不单独高亮）。
-    expect(wrap.getAttribute('data-chat-tools-tab-active')).toBe('')
-    expect(wrap.querySelector(`[${TAB_ATTR}]`)!.hasAttribute('data-chat-tools-tab-active')).toBe(false)
+    // 三个视图入口在前，打开的文件跟在后面（同一排、同款视图）。
+    const kinds = Array.from(group.querySelectorAll(`[${TAB_KIND_ATTR}]`)).map(el => el.getAttribute(TAB_KIND_ATTR))
+    expect(kinds).toEqual(['files', 'browser', 'terminal'])
+    const docs = Array.from(group.querySelectorAll(`[${DOC_ATTR}]`))
+    expect(docs).toHaveLength(1)
+    const doc = docs[0]!
+    // 视图入口：图标 + 文件名，与浏览器/终端同一款（扁平方钮）。
+    const button = doc.querySelector(`[${TAB_ATTR}]`)!
+    expect(button.getAttribute('title')).toBe('a.md')
+    expect(button.getAttribute('aria-selected')).toBe('true')
+    expect(button.querySelector('[data-chat-tools-icon]')).not.toBeNull()
+    // 关闭钮与标题钮并在一处（按钮里不能套按钮），平时不显形。
+    expect(doc.querySelector(`[${TAB_CLOSE_ATTR}]`)).not.toBeNull()
+    // 位置：视图入口在组里的最后，紧跟终端之后。
+    const kids = (group as unknown as { children: unknown[] }).children
+    expect(kids.indexOf(doc)).toBe(kids.length - 1)
+  })
+
+  it('没有打开的文件时，那一排里没有文档视图入口', () => {
+    const { content } = session('s1')
+    const h = handlers(() => snapshotOf([{ id: 't1', kind: 'files', title: '工作区文件' }], 't1'))
+    const row = syncSessionToolsRow(content, fakeDoc(), h.value, {})
+    const group = row!.querySelector(`[${GROUP_ATTR}]`)!
+    expect(group.querySelectorAll(`[${DOC_ATTR}]`)).toHaveLength(0)
   })
 
   it('宿主行缺席：自建行带「对话」标签（图标 + 文字），排在工具标签组之前', () => {

@@ -43,17 +43,17 @@
 [data-chat-tools-tab-close] { display:inline-flex; align-items:center; justify-content:center; flex:none; width:24px; height:24px; padding:0; border:none; border-radius:6px; background:transparent; color:var(--dsw-alias-label-secondary,inherit); font:inherit; font-size:12px; cursor:pointer; }
 [data-chat-tools-tab-close]:hover { background:var(--dsw-alias-interactive-bg-hover,rgba(127,127,127,.12)); color:var(--dsw-alias-label-primary,inherit); }
 
-/* 文件标签外壳：标题与关闭钮同框，视觉上是一个整体（Chrome 标签那样）。 */
-[data-chat-tools-tab-wrap] { display:inline-flex; align-items:center; gap:4px; flex:none; max-width:200px; padding:3px 4px 3px 10px; border:1px solid var(--dsw-alias-border-l2,rgba(127,127,127,.2)); border-radius:var(--dsw-radius-md,8px); background:transparent; color:var(--dsw-alias-label-secondary,inherit); font:inherit; font-size:12px; }
-[data-chat-tools-tab-wrap]:hover { background:var(--dsw-alias-interactive-bg-hover,rgba(127,127,127,.12)); color:var(--dsw-alias-label-primary,inherit); }
-[data-chat-tools-tab-wrap][data-chat-tools-tab-active] { background:var(--dsw-alias-interactive-bg-active,var(--dsw-alias-interactive-bg-hover,rgba(127,127,127,.16))); border-color:var(--dsw-alias-border-l3,var(--dsw-alias-state-business-primary,rgba(127,127,127,.4))); color:var(--dsw-alias-label-primary,inherit); }
-/* 外壳里的标题按钮：框线与底色都交给外壳，按钮只管文字（省略号截断）。 */
-[data-chat-tools-tab-wrap] [data-chat-tools-tab] { flex:0 1 auto; min-width:0; max-width:150px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; padding:0; border:none; border-radius:0; background:transparent; color:inherit; font:inherit; font-size:inherit; line-height:20px; }
-[data-chat-tools-tab-wrap] [data-chat-tools-tab]:hover,
-[data-chat-tools-tab-wrap] [data-chat-tools-tab][aria-selected=true] { background:transparent; border-color:transparent; color:inherit; }
-/* 外壳里的关闭钮：常驻显示的小圆钮（Chrome 那样），悬停加深。 */
-[data-chat-tools-tab-wrap] [data-chat-tools-tab-close] { width:18px; height:18px; border-radius:50%; font-size:12px; line-height:1; }
-[data-chat-tools-tab-wrap] [data-chat-tools-tab-close]:hover { background:var(--dsw-alias-interactive-bg-hover,rgba(127,127,127,.18)); color:var(--dsw-alias-label-primary,inherit); }
+/* 打开的文件 = 视图入口：与浏览器 / 终端同款（扁平方钮、图标 + 文件名），
+   排在它们后面。外壳只是把「标题钮 + 关闭钮」并成一处，本身不画任何框线——
+   以前这里是一枚带边框的 Chrome 标签，与旁边的视图既不同形也不同位。 */
+[data-chat-tools-doc] { display:inline-flex; align-items:center; gap:2px; flex:none; max-width:200px; }
+/* 外壳里的标题按钮：与 [data-chat-tools-tab] 同一款外观，只把宽度让给文件名。 */
+[data-chat-tools-doc] [data-chat-tools-tab] { flex:0 1 auto; min-width:0; max-width:160px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+/* 关闭钮：平时不显形（这一排看上去与其它视图一致），悬停/聚焦才出现。 */
+[data-chat-tools-doc] [data-chat-tools-tab-close] { width:18px; height:18px; border-radius:50%; font-size:12px; line-height:1; opacity:0; }
+[data-chat-tools-doc]:hover [data-chat-tools-tab-close],
+[data-chat-tools-doc]:focus-within [data-chat-tools-tab-close] { opacity:1; }
+[data-chat-tools-doc] [data-chat-tools-tab-close]:hover { background:var(--dsw-alias-interactive-bg-hover,rgba(127,127,127,.18)); color:var(--dsw-alias-label-primary,inherit); }
 
 /* 工具标签激活时：把宿主自己的标签（对话 / 轨迹）压暗，一行只突出一个。 */
 [data-conversation-tabs][data-chat-tools-live] button[role=tab]:not([data-chat-tools-tab]) { opacity:.55; }

@@ -154,16 +154,19 @@ describe('统一编辑链路', () => {
     expect(read('../src/index.ts')).toContain('registerLinkSettings(ctx.slots)')
   })
 
-  it('工具标签 Chrome 风格：框线分隔、当前标签突出、关闭钮在标签框内、过多时横向滚动', () => {
+  it('工具标签：框线分隔、当前标签突出、关闭钮小而隐形、过多时横向滚动', () => {
     const css = read('../src/conversation-tools.module.css')
     expect(css).toMatch(/\[data-chat-tools-tab\][^{]*\{[^}]*border/)
     expect(css).toMatch(/\[data-chat-tools-tab-active\][^{]*\{[^}]*border/)
     expect(css).toMatch(/\[data-chat-tools-tab-close\][^{]*\{[^}]*width:\s*(24|28)px/)
     expect(css).toMatch(/\[data-chat-tools-group\][^{]*\{[^}]*overflow-x:\s*auto/)
     expect(css).toMatch(/\[data-chat-tools-live\][^{]*\{[^}]*opacity/)
-    // 关闭钮在标签框里：外壳（标题 + ×）自带框线，框内的关闭钮是一枚小圆钮。
-    expect(css).toMatch(/\[data-chat-tools-tab-wrap\][^{]*\{[^}]*border/)
-    expect(css).toMatch(/\[data-chat-tools-tab-wrap\]\s*\[data-chat-tools-tab-close\][^{]*\{[^}]*width:\s*(16|18|20)px/)
+    // 打开的文件是**视图入口**：与浏览器 / 终端同款（扁平方钮、图标 + 文件名），
+    // 外壳不画框线；关闭钮平时不显形，悬停才出现。
+    expect(css).toMatch(/\[data-chat-tools-doc\][^{]*\{[^}]*display:\s*inline-flex/)
+    expect(css).not.toMatch(/\[data-chat-tools-doc\][^{]*\{[^}]*border:/)
+    expect(css).toMatch(/\[data-chat-tools-doc\]\s*\[data-chat-tools-tab-close\][^{]*\{[^}]*opacity:\s*0/)
+    expect(css).toMatch(/\[data-chat-tools-doc\]:hover\s*\[data-chat-tools-tab-close\][^{]*\{[^}]*opacity:\s*1/)
   })
 
   it('自建标签行不被宿主的「调整会话列宽」把手压住（把手会让指针变成左右箭头、并吃掉点击）', () => {

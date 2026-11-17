@@ -37,6 +37,8 @@ const TOOL_ENTRY_ICONS = {
   files: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2 4.2c0-.66.54-1.2 1.2-1.2h2.4l1.5 1.8h5.7c.66 0 1.2.54 1.2 1.2v6c0 .66-.54 1.2-1.2 1.2H3.2c-.66 0-1.2-.54-1.2-1.2V4.2Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>',
   browser: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="5.6" stroke="currentColor" stroke-width="1.3"/><path d="M2.6 8h10.8M8 2.4c1.5 1.6 2.2 3.5 2.2 5.6S9.5 12 8 13.6C6.5 12 5.8 10.1 5.8 8S6.5 4 8 2.4Z" stroke="currentColor" stroke-width="1.3"/></svg>',
   terminal: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="2.4" y="3" width="11.2" height="10" rx="1.6" stroke="currentColor" stroke-width="1.3"/><path d="M5 6.6 7.2 8.4 5 10.2M8.8 10.6h2.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  // 打开的文件：与文件、浏览器、终端同一排的视图入口，图标也同款（14px、描边）。
+  document: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3.4 2.6h5L11.6 6v7.4H3.4V2.6Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M8.4 2.6V6h3.2M5.4 8.6h4M5.4 10.8h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>',
 }
 
 export function registerConversationTools(ctx: any) {
