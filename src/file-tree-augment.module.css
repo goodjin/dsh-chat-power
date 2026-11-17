@@ -1,6 +1,5 @@
 /* 文件树行控件：多选框放进文件按钮内部（多选框 → 文件名同一行），编辑按钮
    紧跟在文件按钮之后；三者同行、垂直居中，鼠标移过整行变色并加框线。
-   多选框与编辑按钮都默认隐藏、移过整行才浮现（已勾选的多选框常显）。
    作用域是会话区工具区的内容容器（[data-chat-tools-session]）——宿主右侧栏
    的文件树没有这个标记，不会被我们的控件影响。 */
 
@@ -24,19 +23,10 @@
   padding: 4px 6px; text-align: left;
 }
 
-/* 多选框：文件按钮内部、垂直居中，勾选色随宿主语义 token。
-   默认隐藏、悬停浮现，与编辑按钮同款交互；占位保留（opacity 而非 display），
-   鼠标移入时文件名不跳动。已勾选的常显——勾选代表输入框引用，状态要看得见。 */
+/* 多选框：文件按钮内部、垂直居中，勾选色随宿主语义 token。 */
 [data-chat-tools-session] li[data-files-entry="file"] [data-chat-file-check] {
   flex: none; width: 14px; height: 14px; margin: 0; cursor: pointer;
   accent-color: var(--dsw-alias-state-business-primary, var(--ds-brand, #4d6bfe));
-  opacity: 0; pointer-events: none;
-}
-[data-chat-tools-session] li[data-files-entry="file"]:hover [data-chat-file-check],
-[data-chat-tools-session] li[data-files-entry="file"]:focus-within [data-chat-file-check],
-[data-chat-tools-session] li[data-files-entry="file"] [data-chat-file-check]:focus-visible,
-[data-chat-tools-session] li[data-files-entry="file"] [data-chat-file-check]:checked {
-  opacity: 1; pointer-events: auto;
 }
 
 /* 编辑按钮：行内 28px 图标钮，布局跟随而非覆盖，不遮文件名。 */
@@ -58,10 +48,9 @@
   color: var(--dsw-alias-label-primary, inherit);
 }
 
-/* 触屏没有 hover：编辑按钮与多选框常显（发现性不依赖悬浮）。 */
+/* 触屏没有 hover：编辑按钮常显（发现性不依赖悬浮）。 */
 @media (hover: none) {
-  [data-chat-tools-session] li[data-files-entry="file"] > [data-chat-file-edit],
-  [data-chat-tools-session] li[data-files-entry="file"] [data-chat-file-check] {
+  [data-chat-tools-session] li[data-files-entry="file"] > [data-chat-file-edit] {
     opacity: 1; pointer-events: auto;
   }
 }

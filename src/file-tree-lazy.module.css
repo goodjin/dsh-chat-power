@@ -27,7 +27,7 @@
   gap: 4px;
 }
 
-.item [data-chat-file-check],
+.item > [data-chat-file-check],
 .item > [data-chat-file-edit] {
   flex: none;
 }
@@ -42,22 +42,6 @@
 .item:hover > [data-chat-file-edit],
 .item:focus-within > [data-chat-file-edit],
 .item > [data-chat-file-edit]:focus-visible {
-  opacity: 1 !important;
-  pointer-events: auto !important;
-}
-
-/* 多选框与编辑钮同款：默认隐藏、移过整行才浮现（键盘聚焦同待遇）。
-   多选框在文件按钮内部，用后代选择器；占位保留，文件名不跳动。
-   已勾选的常显——勾选代表输入框引用，状态不能随鼠标移开藏起来。 */
-.item [data-chat-file-check] {
-  opacity: 0 !important;
-  pointer-events: none !important;
-}
-
-.item:hover [data-chat-file-check],
-.item:focus-within [data-chat-file-check],
-.item [data-chat-file-check]:focus-visible,
-.item [data-chat-file-check]:checked {
   opacity: 1 !important;
   pointer-events: auto !important;
 }
