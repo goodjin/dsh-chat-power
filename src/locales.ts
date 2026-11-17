@@ -50,6 +50,8 @@ export type ChatPowerLocaleKey =
   | 'selection.collectedCount'
   | 'expand.open' | 'expand.close'
   | 'composer.collapse' | 'composer.expand'
+  | 'documentActions.copy' | 'documentActions.copied' | 'documentActions.edit'
+  | 'documentActions.failed'
   | 'turnFold.label' | 'turnFold.labelWithSummary' | 'turnFold.requestLabel'
   | 'turnFold.requestExpand' | 'turnFold.requestCollapse'
   | 'turnFold.showMiddle' | 'turnFold.showedMiddle'
@@ -158,6 +160,10 @@ export const zh: Record<ChatPowerLocaleKey, string> = {
   'expand.close': '收起编辑区',
   'composer.collapse': '收起输入框',
   'composer.expand': '展开输入框',
+  'documentActions.copy': '复制全文',
+  'documentActions.copied': '已复制全文',
+  'documentActions.edit': '编辑并发送',
+  'documentActions.failed': '操作失败：',
   'turnFold.label': '第 {turn} 轮 · {clock}',
   'turnFold.frameThinking': '思考',
   'turnFold.frameTools': '工具调用',
@@ -298,6 +304,10 @@ export const en: Record<ChatPowerLocaleKey, string> = {
   'expand.close': 'Collapse the editor',
   'composer.collapse': 'Collapse the input box',
   'composer.expand': 'Expand the input box',
+  'documentActions.copy': 'Copy all',
+  'documentActions.copied': 'Copied',
+  'documentActions.edit': 'Edit and send',
+  'documentActions.failed': 'Failed: ',
   'turnFold.label': 'Turn {turn} · {clock}',
   'turnFold.frameThinking': 'Thinking',
   'turnFold.frameTools': 'Tool calls',

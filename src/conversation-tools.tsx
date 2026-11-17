@@ -18,6 +18,7 @@ import { startSendWatch, USER_NODE_SELECTOR } from './send-watch.ts'
 import { LOCAL_FILE_ACCEPT, LOCAL_FILE_MAX_BYTES, LocalFileComposerCard } from './local-file.tsx'
 import { createMarkdownTurnReaders } from './markdown-turn-sources.ts'
 import { installAnswerLinkInterception } from './answer-link-intercept.ts'
+import { DocumentActions } from './document-actions.tsx'
 import { sessionFileAddressOf } from './file-address.ts'
 import { fallbackT } from './locales.ts'
 import { readDefaultLinkOpenMode, openInBrowser } from './link-open.ts'
@@ -359,28 +360,19 @@ export function registerConversationTools(ctx: any) {
     },
     icons: TOOL_ENTRY_ICONS,
   }), 'chat-power: tools tab row')
-  function DocumentActions({ sessionId, absolutePath }: { sessionId: string; absolutePath: string }) {
-    const [status, setStatus] = useState('')
-    const [busy, setBusy] = useState(false)
-    const lifetime = useRef<AbortController>()
-    useEffect(() => { const c = new AbortController(); lifetime.current = c; return () => c.abort() }, [])
-    const run = async (edit: boolean) => {
-      if (busy || !lifetime.current) return
-      const signal = lifetime.current.signal
-      setBusy(true); setStatus('')
-      try {
-        if (edit) { openWorkspaceEditor(sessionId, absolutePath); return }
-        const text = await readEntireWorkspaceText(sessionId, absolutePath,
-          offset => readers.readPage(sessionId, absolutePath, offset, signal), signal)
-        await navigator.clipboard.writeText(text); setStatus('已复制全文')
-      } catch (error) { if (!signal.aborted) setStatus(`操作失败：${String(error)}`) }
-      finally { if (!signal.aborted) setBusy(false) }
-    }
-    return <><button disabled={busy} onClick={() => void run(false)}>复制全文</button><button disabled={busy} onClick={() => void run(true)}>编辑并发送</button><span role="status">{status}</span></>
+  // 宿主把文档预览那一排的尾部交给这个插槽，并把当前文件的绝对路径作为属性送进来；
+  // 会话号来自插槽的会话作用域。本包把两个动作做成图标钮（见 document-actions.tsx）。
+  function DocumentActionsSlot(props: { sessionId: string; absolutePath: string }) {
+    return <DocumentActions
+      sessionId={props.sessionId}
+      absolutePath={props.absolutePath}
+      readers={readers}
+      onEdit={(id, path) => { openWorkspaceEditor(id, path) }}
+    />
   }
   ctx.slots.inject(toolSlot('sidebar.right.tab.document.actions'), () => ctx.slots.register({
     name: toolSlot('sidebar.right.tab.document.actions'), id: 'chat-power-document-actions',
-  }, DocumentActions))
+  }, DocumentActionsSlot))
   adapter.install()
   // 文件树行控件：宿主 0.2.2 起不能再包宿主面板，改为在渲染出来的树上补控件。
   // 「提示词」视图：查看/编辑当前会话的系统提示词（router/worker 可编辑，普通会话只读）。
