@@ -1,11 +1,15 @@
-/* 懒加载工作区文件树：一次只画当前目录的一层，条目多了用「加载更多」继续。 */
-
+/* 懒加载工作区文件树：一次只画当前目录的一层，条目多了用「加载更多」继续。
+   树自己占满可用高度并滚动——文件多时滚动条出现在文件列表上，下面的文件
+   不会再被裁掉看不见（2026-11-17 现场）。 */
 .tree {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: 4px;
   padding: 8px 12px;
   min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
   font-size: 13px;
 }
 
@@ -15,6 +19,7 @@
   padding: 0 0 0 14px;
   /* 缩进参考线：子层左侧一条竖线，层级关系一眼可读。 */
   border-left: 1px solid var(--dsw-alias-border-l2, rgba(127, 127, 127, 0.16));
+  /* 滚动交给 .tree：列表自身不裁剪，展开的子层超出可见区时整棵树一起滚。 */
   margin-left: 6px;
 }
 
