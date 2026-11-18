@@ -241,10 +241,14 @@ describe('syncSessionToolsRow（同步）', () => {
     const group = hostRow!.querySelector(`[${GROUP_ATTR}]`)
     expect(group).not.toBeNull()
     expect(row!.getAttribute(LIVE_ATTR)).toBe('')
-    // 三个种类启动器 + 一个文件标签 + 一枚关闭钮。
+    // 三个种类启动器 + 一枚文件标签外壳 + 外壳里的标题钮（外壳自己就是这枚标签）。
     const tabs = group!.querySelectorAll(`[${TAB_ATTR}]`)
-    expect(tabs).toHaveLength(4)
+    expect(tabs).toHaveLength(5)
     expect(group!.querySelectorAll(`[${TAB_CLOSE_ATTR}]`)).toHaveLength(1)
+    // 外壳标签带自己的标签 id：点它（含框内空白处）也能选中这个标签。
+    const shell = group!.querySelector(`[${DOC_ATTR}]`)!
+    expect(shell.hasAttribute(TAB_ATTR)).toBe(true)
+    expect(shell.getAttribute(TAB_ID_ATTR)).toBe('t1')
   })
 
   it('标签组排在宿主自己的标签之后', () => {
@@ -279,6 +283,10 @@ describe('syncSessionToolsRow（同步）', () => {
     expect(button.getAttribute('title')).toBe('a.md')
     expect(button.getAttribute('aria-selected')).toBe('true')
     expect(button.querySelector('[data-chat-tools-icon]')).not.toBeNull()
+    // 外壳自己是这一排里的一枚标签（Chrome 式：标题钮与关闭钮同处一个框里）。
+    expect(doc.hasAttribute(TAB_ATTR)).toBe(true)
+    expect(doc.getAttribute(TAB_ID_ATTR)).toBe('t4')
+    expect(doc.hasAttribute('data-chat-tools-tab-active')).toBe(true)
     // 关闭钮与标题钮并在一处（按钮里不能套按钮），平时不显形。
     expect(doc.querySelector(`[${TAB_CLOSE_ATTR}]`)).not.toBeNull()
     // 位置：视图入口在组里的最后，紧跟终端之后。
@@ -342,7 +350,7 @@ describe('syncSessionToolsRow（同步）', () => {
     syncSessionToolsRow(content, fakeDoc(), h.value, {})
     syncSessionToolsRow(content, fakeDoc(), h.value, {})
     const group = hostRow!.querySelector(`[${GROUP_ATTR}]`)
-    expect(group!.querySelectorAll(`[${TAB_ATTR}]`)).toHaveLength(4)
+    expect(group!.querySelectorAll(`[${TAB_ATTR}]`)).toHaveLength(5)
   })
 
   it('宿主重渲染把新标签追加到行尾（我们之后）：把标签组挪回末尾', () => {
@@ -429,6 +437,18 @@ describe('handleToolsRowClick（点击路由）', () => {
     const tab = group.querySelectorAll(`[${TAB_ID_ATTR}]`)[0]!
     const event = { target: tab, preventDefault: () => {}, stopPropagation: () => {} }
     expect(handleToolsRowClick(event as never, value)).toBe(true)
+    expect(actions).toEqual(['select:s1:t1'])
+  })
+
+  it('点文件标签外壳的空白处（标题钮与关闭钮之外）→ selectTab，不落到宿主', () => {
+    // 外壳自己就是这枚标签：框内空白处（内边距 / 间隙）点击也要选中，
+    // 不能落到「宿主标签」分支把工具收起来。
+    const { group, actions, value } = build()
+    const shell = group.querySelectorAll(`[${DOC_ATTR}]`)[0]!
+    const stopped = { stopped: false }
+    const handled = handleToolsRowClick({ target: shell, preventDefault: () => {}, stopPropagation: () => { stopped.stopped = true } } as never, value)
+    expect(handled).toBe(true)
+    expect(stopped.stopped).toBe(true)
     expect(actions).toEqual(['select:s1:t1'])
   })
 
