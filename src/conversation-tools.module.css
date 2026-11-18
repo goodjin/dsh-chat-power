@@ -43,18 +43,6 @@
 [data-chat-tools-tab-close] { display:inline-flex; align-items:center; justify-content:center; flex:none; width:24px; height:24px; padding:0; border:none; border-radius:6px; background:transparent; color:var(--dsw-alias-label-secondary,inherit); font:inherit; font-size:12px; cursor:pointer; }
 [data-chat-tools-tab-close]:hover { background:var(--dsw-alias-interactive-bg-hover,rgba(127,127,127,.12)); color:var(--dsw-alias-label-primary,inherit); }
 
-/* 打开的文件 = 视图入口：与浏览器 / 终端同款（扁平方钮、图标 + 文件名），
-   排在它们后面。外壳只是把「标题钮 + 关闭钮」并成一处，本身不画任何框线——
-   以前这里是一枚带边框的 Chrome 标签，与旁边的视图既不同形也不同位。 */
-[data-chat-tools-doc] { display:inline-flex; align-items:center; gap:2px; flex:none; max-width:200px; }
-/* 外壳里的标题按钮：与 [data-chat-tools-tab] 同一款外观，只把宽度让给文件名。 */
-[data-chat-tools-doc] [data-chat-tools-tab] { flex:0 1 auto; min-width:0; max-width:160px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
-/* 关闭钮：平时不显形（这一排看上去与其它视图一致），悬停/聚焦才出现。 */
-[data-chat-tools-doc] [data-chat-tools-tab-close] { width:18px; height:18px; border-radius:50%; font-size:12px; line-height:1; opacity:0; }
-[data-chat-tools-doc]:hover [data-chat-tools-tab-close],
-[data-chat-tools-doc]:focus-within [data-chat-tools-tab-close] { opacity:1; }
-[data-chat-tools-doc] [data-chat-tools-tab-close]:hover { background:var(--dsw-alias-interactive-bg-hover,rgba(127,127,127,.18)); color:var(--dsw-alias-label-primary,inherit); }
-
 /* 工具标签激活时：把宿主自己的标签（对话 / 轨迹）压暗，一行只突出一个。 */
 [data-conversation-tabs][data-chat-tools-live] button[role=tab]:not([data-chat-tools-tab]) { opacity:.55; }
 
@@ -108,6 +96,67 @@
   color: currentColor;
 }
 
+/* ===== 打开的文件：一枚 Chrome 式标签 =====
+   外壳本身就是框（标题钮与关闭钮都在框内——框里再套按钮不是合法 HTML，
+   关闭钮是标题钮的兄弟，靠事件委托区分落点）；框线与底色随激活出现，
+   悬停时整框变色。2026-11-18 现场：框原来画在内层标题钮上，关闭钮落到
+   框外、位置也比旁边的视图低。 */
+[data-chat-tools-doc] {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+  min-width: 0;
+  max-width: 210px;
+  padding: 3px 4px 3px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--dsw-radius-md, 8px);
+}
+[data-chat-tools-doc]:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(127, 127, 127, 0.12));
+  color: var(--dsw-alias-label-primary, inherit);
+}
+[data-chat-tools-doc][data-chat-tools-tab-active] {
+  background: var(--dsw-alias-interactive-bg-active, transparent);
+  border-color: var(--dsw-alias-border-l2, transparent);
+  color: var(--dsw-alias-label-primary, inherit);
+  font-weight: 600;
+}
+
+/* 外壳里的标题钮：只留图标与文件名，外观归外壳（框线、底色都画在框上）。 */
+[data-chat-tools-doc] [data-chat-tools-tab] {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 170px;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+[data-chat-tools-doc] [data-chat-tools-tab]:hover,
+[data-chat-tools-doc] [data-chat-tools-tab][aria-selected=true],
+[data-chat-tools-doc] [data-chat-tools-tab][data-chat-tools-tab-active] {
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-weight: inherit;
+}
+
+/* 关闭钮：框内右侧的小圆钮，平时不显形，悬停 / 聚焦 / 激活才出现。 */
+[data-chat-tools-doc] [data-chat-tools-tab-close] { width:18px; height:18px; border-radius:50%; font-size:12px; line-height:1; opacity:0; }
+[data-chat-tools-doc]:hover [data-chat-tools-tab-close],
+[data-chat-tools-doc]:focus-within [data-chat-tools-tab-close],
+[data-chat-tools-doc][data-chat-tools-tab-active] [data-chat-tools-tab-close] { opacity:1; }
+[data-chat-tools-doc] [data-chat-tools-tab-close]:hover { background:var(--dsw-alias-interactive-bg-hover,rgba(127,127,127,.18)); color:var(--dsw-alias-label-primary,inherit); }
+
 /* 与宿主文字标签使用同一套高度、点击区域和底部选中线。 */
 [data-conversation-tabs] [data-chat-tools-group] {
   align-items: flex-start;
@@ -115,7 +164,8 @@
   overflow: visible;
   flex-wrap: wrap;
 }
-[data-conversation-tabs] [data-chat-tools-group] > [data-chat-tools-tab] {
+[data-conversation-tabs] [data-chat-tools-group] > [data-chat-tools-tab],
+[data-conversation-tabs] [data-chat-tools-group] > [data-chat-tools-doc] {
   --dsh-tab-hit-inline: 10px;
   box-sizing: border-box;
   flex: none;
@@ -140,10 +190,12 @@
   height: 2px;
   border-radius: 2px;
 }
-[data-conversation-tabs] [data-chat-tools-group] > [data-chat-tools-tab][aria-selected=true] {
+[data-conversation-tabs] [data-chat-tools-group] > [data-chat-tools-tab][aria-selected=true],
+[data-conversation-tabs] [data-chat-tools-group] > [data-chat-tools-doc][data-chat-tools-tab-active] {
   color: var(--dsw-alias-state-business-primary);
 }
-[data-conversation-tabs] [data-chat-tools-group] > [data-chat-tools-tab][aria-selected=true]::after {
+[data-conversation-tabs] [data-chat-tools-group] > [data-chat-tools-tab][aria-selected=true]::after,
+[data-conversation-tabs] [data-chat-tools-group] > [data-chat-tools-doc][data-chat-tools-tab-active]::after {
   background: var(--dsw-alias-state-business-primary);
 }
 [data-conversation-tabs][data-chat-tools-live] > button[role=tab] {

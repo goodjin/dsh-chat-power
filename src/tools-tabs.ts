@@ -35,9 +35,10 @@ export const TAB_ATTR = 'data-chat-tools-tab'
  * 打开的文件的视图入口外壳。
  *
  * 打开的文件与浏览器、终端是同一类东西——都是「切过去就在下方那块地方看内容」
- * 的视图，所以它在那一行里与它们并排，样式也照它们的样子（扁平方钮 + 图标 +
- * 名字）。以前它被画成行尾一个带边框、带 × 的 Chrome 标签，与旁边的视图
- * 既不同形也不同位，看着像另一套东西。
+ * 的视图。在宿主标签行里它与它们并排、同一款对齐（同高同位、底部选中线）；
+ * 同时它是一枚 Chrome 式标签：外壳本身就是框，标题钮与关闭钮都在框内。
+ * （2026-11-18 现场：框画在内层标题钮上、关闭钮落在框外，位置也比旁边的
+ * 视图低——外壳没吃到宿主行的对齐样式，样式只写给「组的直接子元素」。）
  */
 export const DOC_ATTR = 'data-chat-tools-doc'
 /** 标签上的工具标签 id（toolsState 里的 tab.id）。 */
@@ -308,12 +309,15 @@ export function syncSessionToolsRow(root: RowElementLike, doc: RowDocumentLike, 
   }
   for (const tab of snapshot.tabs) {
     if (tab.kind === 'chat' || tab.kind === 'files' || tab.kind === 'browser' || tab.kind === 'terminal') continue
-    // 打开的文件 = 一个视图入口：与浏览器、终端同款（扁平方钮、图标 + 文件名），
-    // 排在它们后面。关闭钮是它的兄弟节点而不是子按钮（按钮里再套按钮不是合法
-    // HTML），靠事件委托区分点击落点；平时不显形，悬停/聚焦才出现，
-    // 免得这一排里多一个常驻的小圆点。
+    // 打开的文件 = 一枚 Chrome 式标签：外壳本身就是框，标题钮与关闭钮都在框内
+    // （框里再套按钮不是合法 HTML，所以关闭钮是标题钮的兄弟，靠事件委托区分
+    // 落点）。外壳挂上标签与标签 id：点它（含框内空白处）就是选中这个标签。
+    // 排在三个视图入口之后；关闭钮平时不显形，悬停 / 聚焦 / 激活才出现。
     const wrap = doc.createElement('span')
     wrap.setAttribute(DOC_ATTR, '')
+    wrap.setAttribute(TAB_ATTR, '')
+    wrap.setAttribute(TAB_ID_ATTR, tab.id)
+    wrap.setAttribute('title', tab.title)
     if (isActive(snapshot, tab)) wrap.setAttribute('data-chat-tools-tab-active', '')
     const button = doc.createElement('button')
     button.setAttribute('type', 'button')

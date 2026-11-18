@@ -83,8 +83,8 @@ describe('标签并入宿主行（真实 DOM）', () => {
     expect(content.querySelector(`[${ROW_ATTR}]`)).toBeNull()
     const group = hostRow.querySelector(`[${GROUP_ATTR}]`)
     expect(group).not.toBeNull()
-    // 三个种类启动器 + 一个文件标签。
-    expect(group!.querySelectorAll(`[${TAB_ATTR}]`)).toHaveLength(4)
+    // 三个种类启动器 + 一枚文件标签外壳 + 外壳里的标题钮（外壳自己就是这枚标签）。
+    expect(group!.querySelectorAll(`[${TAB_ATTR}]`)).toHaveLength(5)
   })
 
   it('打开的文件是视图入口：图标 + 文件名，与浏览器/终端同一排同一款', () => {
@@ -103,6 +103,10 @@ describe('标签并入宿主行（真实 DOM）', () => {
     const docs = group.querySelectorAll(`[${DOC_ATTR}]`)
     expect(docs).toHaveLength(1)
     const view = docs[0]!
+    // 外壳自己是这枚标签：框（Chrome 式）包住标题钮与关闭钮。
+    expect(view.hasAttribute(TAB_ATTR)).toBe(true)
+    expect(view.getAttribute(TAB_ID_ATTR)).toBe('t4')
+    expect(view.getAttribute('data-chat-tools-tab-active')).toBe('')
     // 视图入口：图标 + 文件名，和旁边三个视图入口是同一种按钮。
     const button = view.querySelector(`[${TAB_ATTR}]`)!
     expect(button.textContent).toBe('a.md')

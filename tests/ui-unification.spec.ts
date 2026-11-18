@@ -161,12 +161,14 @@ describe('统一编辑链路', () => {
     expect(css).toMatch(/\[data-chat-tools-tab-close\][^{]*\{[^}]*width:\s*(24|28)px/)
     expect(css).toMatch(/\[data-chat-tools-group\][^{]*\{[^}]*overflow-x:\s*auto/)
     expect(css).toMatch(/\[data-chat-tools-live\][^{]*\{[^}]*opacity/)
-    // 打开的文件是**视图入口**：与浏览器 / 终端同款（扁平方钮、图标 + 文件名），
-    // 外壳不画框线；关闭钮平时不显形，悬停才出现。
+    // 打开的文件是一枚 Chrome 式标签：外壳自己就是框（标题钮与关闭钮都在框内），
+    // 关闭钮平时不显形，悬停 / 激活才出现。
     expect(css).toMatch(/\[data-chat-tools-doc\][^{]*\{[^}]*display:\s*inline-flex/)
-    expect(css).not.toMatch(/\[data-chat-tools-doc\][^{]*\{[^}]*border:/)
+    expect(css).toMatch(/\[data-chat-tools-doc\]\s*\{[^}]*border:\s*1px solid/)
     expect(css).toMatch(/\[data-chat-tools-doc\]\s*\[data-chat-tools-tab-close\][^{]*\{[^}]*opacity:\s*0/)
     expect(css).toMatch(/\[data-chat-tools-doc\]:hover\s*\[data-chat-tools-tab-close\][^{]*\{[^}]*opacity:\s*1/)
+    // 宿主行里：文档标签与浏览器 / 终端入口同款对齐（同高同位、底部选中线）。
+    expect(css).toMatch(/\[data-chat-tools-doc\][^{]*\{[^}]*min-height:\s*35px/)
   })
 
   it('自建标签行不被宿主的「调整会话列宽」把手压住（把手会让指针变成左右箭头、并吃掉点击）', () => {
