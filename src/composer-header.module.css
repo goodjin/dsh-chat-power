@@ -18,6 +18,12 @@
 
 [data-chat-power-expand-seat] { display: inline-flex; flex: none; }
 
+/* 大编辑区（输入框向上撑成半屏）时，「整个收起输入框」按钮先藏起来：
+   那一栏里已经有一个向下箭头（浮钮从「撑大」翻成「收回」），两个同形状的
+   箭头并排会让人以为点错了；而且半屏状态与「整块收走」是两种不同的收起，
+   混在一处更糊。收起半屏有浮钮，整块收走等回到小框再做（2026-11-18 现场）。 */
+:global([data-composer-card].dshcp-big) [data-composer-collapse] { display: none !important; }
+
 /* 压低卡片原有的顶部留白，不缩小图标点击区域。 */
 [data-composer-card]:has([data-chat-power-composer-header]) { padding-top: 2px; }
 

@@ -2,6 +2,9 @@ import { createElement, act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { Simulate } from 'react-dom/test-utils'
 import { afterEach, expect, it, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { ComposerHeader } from '../src/composer-header.tsx'
 import { acquireComposerHeader } from '../src/composer-header-mount.ts'
 import { readShortcuts, SHORTCUT_KEY } from '../src/composer-shortcuts.ts'
@@ -72,4 +75,24 @@ it('卡内共享标题、快捷新增删除持久化、发送与分叉绑定当�
   } finally { await act(async () => root.unmount()); closeComposerEdit('s') }
   expect(card.querySelector('[data-chat-power-composer-header]')).toBeNull()
   expect(input.parentElement).toBe(card)
+})
+
+it('大编辑区时「收起输入框」按钮被样式藏掉（不与浮钮的向下箭头撞形）', async () => {
+  // 2026-11-18 现场：输入框撑成半屏后，标题栏里有两个向下箭头——「收起输入框」
+  // 的图标与浮钮翻成的向下箭头。大编辑区时前者先藏起来。
+  document.body.innerHTML = '<div data-composer-card><div id="overlay"></div><div data-composer-input>草稿</div></div>'
+  const card = document.querySelector<HTMLElement>('[data-composer-card]')!
+  const root = createRoot(document.getElementById('overlay')!)
+  const send = vi.fn(async () => {})
+  try {
+    await act(async () => root.render(createElement(ComposerHeader, { sessionId: 's', actions: { send, fork: send } })))
+    const collapse = card.querySelector<HTMLButtonElement>('[data-composer-collapse]')
+    expect(collapse).not.toBeNull()
+    // 小框时它在。
+    expect(card.classList.contains('dshcp-big')).toBe(false)
+    // 撑成大编辑区：卡片挂上 dshcp-big，样式据此把该按钮藏掉。
+    await act(async () => { card.classList.add('dshcp-big') })
+    const css = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'composer-header.module.css'), 'utf8')
+    expect(css).toMatch(/:global\(\[data-composer-card\]\.dshcp-big\)\s+\[data-composer-collapse\]\s*\{[^}]*display:\s*none/)
+  } finally { await act(async () => root.unmount()) }
 })

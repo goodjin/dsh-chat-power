@@ -111,7 +111,7 @@ export function ComposerHeader({ sessionId, actions, canSend = false, canFork = 
       <time dateTime={now.toISOString()} title={now.toLocaleString()}>{now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}</time>
       <button type="button" disabled={pending || !canFork} data-composer-icon="" aria-label="分叉" title="从最后一个已完成轮次分叉并打开；不发送草稿" onClick={() => run(() => actions.fork(sessionId), '已创建分支')}><HeaderIcon name="fork" /></button>
       <button type="button" data-composer-icon="" aria-label="快捷发送" title="快捷发送" aria-expanded={open} disabled={pending} onClick={() => setOpen(!open)}><HeaderIcon name="quick" /></button>
-      <button type="button" data-composer-icon="" aria-label="收起输入框" title="收起输入框" onClick={toggleCollapsed}><HeaderIcon name="collapse" /></button>
+      <button type="button" data-composer-icon="" data-composer-collapse="" aria-label="收起输入框" title="收起输入框" onClick={toggleCollapsed}><HeaderIcon name="collapse" /></button>
       <span data-chat-power-expand-seat="" />
     </div>}
     {notice && <div role="status" className="chat-power-composer-notice">{notice}</div>}
