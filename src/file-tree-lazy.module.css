@@ -149,3 +149,78 @@ li[data-files-entry='directory'] > .row {
   color: var(--dsw-alias-label-tertiary, inherit);
   font-size: 12px;
 }
+
+/* 根路径栏：会话的工作目录。目录段弱化、末段高亮（与「文件管理」一致）。 */
+.root {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+  padding: 0 2px 4px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  color: var(--dsw-alias-label-tertiary, inherit);
+  font-size: 12px;
+}
+
+.rootPart {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rootSeparator {
+  margin-right: 2px;
+  opacity: 0.6;
+}
+
+.rootLeaf {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--dsw-alias-label-primary, inherit);
+}
+
+/* 重新读取：默认隐藏，移过根路径栏才出现（同「文件管理」标题行的做法）。 */
+.refresh {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  margin-left: auto;
+  padding: 2px 4px;
+  border: none;
+  border-radius: var(--dsw-radius-sm, 4px);
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary, inherit);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.root:hover .refresh,
+.refresh:focus-visible {
+  opacity: 1;
+}
+
+.refresh:hover {
+  background: var(--dsw-alias-interactive-bg-hover, transparent);
+}
+
+/* 当前文件：正在编辑/预览的那一行标出来。
+   宿主没有单独的「选中」token，用 interactive-bg-active（激活态底色）。 */
+.row[data-current] {
+  background: var(--dsw-alias-interactive-bg-active, transparent);
+  color: var(--dsw-alias-label-primary, inherit);
+  font-weight: 500;
+}
+
+.row[data-current] .icon {
+  color: var(--dsw-alias-label-primary, inherit);
+}
+
+/* 键盘聚焦的行：焦点环看得见（方向键在树里移动时）。 */
+.row:focus-visible {
+  outline: 2px solid var(--dsw-alias-brand-primary, currentColor);
+  outline-offset: -2px;
+}
