@@ -187,6 +187,18 @@ describe('统一编辑链路', () => {
     expect(tools).toMatch(/fileLive[\s\S]{0,200}kind === 'local'[\s\S]{0,200}kind === 'text'/)
   })
 
+  it('工具标签收起前记下会话滚动位置，视图恢复后写回去（塌缩会把 scrollTop 钳到 0）', () => {
+    // 现场（2026-11-18）：打开文件再点回会话，滚动位置停在历史开头——收起视图时
+    // 滚动层塌缩、scrollTop 被钳到 0，退出时没人写回去。
+    const tools = read('../src/conversation-tools.tsx')
+    // 收起（hide）之前先记刻度。
+    expect(tools).toMatch(/capture\(scroll, id\)[\s\S]{0,400}hider\.hide\(/)
+    // 视图恢复（hider.restore）之后写回刻度。
+    expect(tools).toMatch(/hider\.restore\(\)[\s\S]{0,200}\.restore\(scroll\)/)
+    // 保管器跨效果运行存活（记与还不在同一次效果里）：挂在 ref 上。
+    expect(tools).toMatch(/scrollKeeperRef[\s\S]{0,80}createConversationScrollKeeper/)
+  })
+
   it('仅保存只给工作区文件的编辑：edit:// 开头的标签接写回通道，本机文件没有保存钮', () => {
     const tools = read('../src/conversation-tools.tsx')
     expect(tools).toContain('saveWorkspaceText')
