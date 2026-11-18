@@ -6,6 +6,7 @@ import { toolsState } from './tools-state.ts'
 import { createToolsAdapter, toolSlot, browserBodySlot } from './tools-adapter.tsx'
 import { attachToolsRow } from './tools-tabs.ts'
 import { createToolMessageHider, isToolMessageNode, mountToolBody, toolHiddenNodes } from './tools-layout.ts'
+import { createConversationScrollKeeper, type ConversationScrollKeeper } from './tools-scroll.ts'
 import { attachFilesTreeAugment, hasHistoryForPhase, type AugmentHandlers } from './file-tree-augment.tsx'
 import { LazyFileTree } from './file-tree-lazy.tsx'
 import { currentFilePath } from './file-tree-current.ts'
@@ -218,6 +219,10 @@ export function registerConversationTools(ctx: any) {
     const [reference, setReference] = useState<any>(null)
     const [browserReference, setBrowserReference] = useState<any>(null)
     const browserHeld = useRef<any>(null)
+    // 会话滚动位置保管：记与还不在同一次布局效果里（收起时记、退出时还），
+    // 所以挂在 ref 上跨运行存活。
+    const scrollKeeperRef = useRef<ConversationScrollKeeper | null>(null)
+    if (scrollKeeperRef.current === null) scrollKeeperRef.current = createConversationScrollKeeper()
     useEffect(() => {
       if (!id || browserHeld.current) return
       const ref = ctx.get('sessions').retain(id, { source: 'chatPowerBrowser' })
@@ -320,6 +325,10 @@ export function registerConversationTools(ctx: any) {
             node instanceof HTMLElement)
       let guard: MutationObserver | undefined
       if (toolActive && id) {
+        // 收起之前先记下会话滚动刻度：视图一收起，滚动层内容塌缩，scrollTop
+        // 会被浏览器钳到 0，到时候就无从恢复了（2026-11-18 现场：点开文件再
+        // 点回会话，位置跳到历史开头）。
+        if (scroll !== null) scrollKeeperRef.current!.capture(scroll, id)
         for (const node of messages) hider.hide(node)
         body.dataset.chatStripLive = ''
         // 兜底：工具标签激活期间宿主补渲染的新视图节点也要收起。
@@ -341,6 +350,9 @@ export function registerConversationTools(ctx: any) {
         guard?.disconnect()
         delete body.dataset.chatEditorLive
         hider.restore()
+        // 视图恢复、内容高度回来之后再写回刻度（贴底还贴底，中间还原刻度；
+        // 激活期间切了会话则不写——见 tools-scroll.ts）。
+        if (scroll !== null) scrollKeeperRef.current!.restore(scroll)
       }
     }, [mounts, toolActive, id])
     if (!mounts) return null
