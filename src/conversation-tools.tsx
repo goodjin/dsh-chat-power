@@ -8,6 +8,12 @@ import { attachToolsRow } from './tools-tabs.ts'
 import { createToolMessageHider, isToolMessageNode, mountToolBody, toolHiddenNodes } from './tools-layout.ts'
 import { attachFilesTreeAugment, hasHistoryForPhase, type AugmentHandlers } from './file-tree-augment.tsx'
 import { LazyFileTree } from './file-tree-lazy.tsx'
+import { currentFilePath } from './file-tree-current.ts'
+import {
+  DIRECTORY_MENU_KIND, FILE_MENU_KIND, registerWorkspaceFileMenu,
+  type ContextMenusLike, type WorkspaceFileTarget,
+} from './file-tree-menu.ts'
+import { copyTextToClipboard } from './send-actions.ts'
 import { registerPromptView } from './prompt-view.tsx'
 import { checkedFiles, toolsNotice } from './checked-files.ts'
 import { createReferenceApplier } from './composer-references.ts'
@@ -102,6 +108,26 @@ export function registerConversationTools(ctx: any) {
       openWorkspaceEditor(sessionId, path)
     }
   }
+  // 会话的工作目录（根路径显示用）：会话头的 cwd，缺席时退回沙箱根。
+  const sessionRootPath = (sessionId: string): string | undefined => {
+    try {
+      const sessions = ctx.get('sessions') as any
+      const session = sessions?.get?.(sessionId)
+      const cwd = session?.header?.cwd
+      if (typeof cwd === 'string' && cwd !== '') return cwd
+    } catch { /* 会话服务不可用：没有根路径就不显示 */ }
+    return undefined
+  }
+  // 文件树右键菜单：复制路径 / 在本机显示。菜单由宿主那份负责渲染，
+  // 我们只注册自己的动作。
+  const openFileMenu = (target: WorkspaceFileTarget, point: { x: number; y: number }): void => {
+    const menus = ctx.get('contextMenus') as ContextMenusLike | undefined
+    if (menus === undefined || typeof menus.open !== 'function') return
+    menus.open(
+      { kind: target.directory ? DIRECTORY_MENU_KIND : FILE_MENU_KIND, value: target },
+      point,
+    )
+  }
   // 行控件按会话走：会话 ID 写在控件上，点击时不用再猜是哪个会话。
   const augmentHandlers = (): AugmentHandlers => ({
     checked: (sessionId, path) => checkedFiles.has(sessionId, path),
@@ -170,6 +196,9 @@ export function registerConversationTools(ctx: any) {
                     sessionId={id}
                     remote={() => ctx.get('remote')}
                     t={fallbackT}
+                    currentPath={currentFilePath(s.tabs as any, s.active)}
+                    rootPath={sessionRootPath(id)}
+                    onContextMenu={(target, point) => { openFileMenu(target, point) }}
                     onOpenFile={path => { openWorkspaceEditor(id, path) }} />
                 : definition && props.renderSlot(BODY, {}, { entryKey: definition.id, hookContext: () => info })}
           </div>
@@ -393,6 +422,31 @@ export function registerConversationTools(ctx: any) {
     return () => window.removeEventListener('chat-power:edit-workspace', edit)
   }, 'chat-power: edit workspace in composer')
   ctx.effect(() => attachFilesTreeAugment(augmentHandlers), 'chat-power: files tree augment')
+  // 工作区文件树的右键菜单：复制路径、在本机显示。菜单由宿主那份渲染，
+  // 我们只注册动作。
+  ctx.effect(() => {
+    const menus = ctx.get('contextMenus') as ContextMenusLike | undefined
+    if (menus === undefined || typeof menus.register !== 'function') return () => {}
+    return registerWorkspaceFileMenu(menus, {
+      copyPath: (path) => {
+        void copyTextToClipboard(path).then(ok => {
+          toolsNotice.set(currentId() ?? '', ok ? '已复制路径' : '复制失败')
+        })
+      },
+      reveal: (path) => {
+        const sessionId = currentId()
+        if (sessionId === undefined) return
+        void readers.revealFile(sessionId, path).catch(error => {
+          toolsNotice.set(sessionId, `打开所在文件夹失败：${String(error)}`)
+        })
+      },
+      absolutePath: (sessionId, path) => {
+        const root = sessionRootPath(sessionId)
+        if (root === undefined) return path
+        return root.endsWith('/') ? `${root}${path}` : `${root}/${path}`
+      },
+    })
+  }, 'chat-power: files tree context menu')
   // 选区编辑卡打开时：若正处于编辑标签（输入框隐藏 ✓），切回聊天，
   // 让输入框恢复、选区卡锚回输入框上方（否则卡片会掉到输入框下面）。
   ctx.effect(() => {

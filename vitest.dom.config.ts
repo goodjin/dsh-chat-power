@@ -13,7 +13,7 @@ import { defineConfig } from 'vitest/config'
  */
 export default defineConfig({
   test: {
-    include: ['tests/**/*.dom.spec.ts'],
+    include: ['tests/**/*.dom.spec.ts', 'tests/**/*.dom.spec.tsx'],
     environment: 'jsdom',
     // 真渲染要在测试文件 import react 之前就把 act 环境标好（见 dom-setup.ts）。
     setupFiles: ['./tests/dom-setup.ts'],

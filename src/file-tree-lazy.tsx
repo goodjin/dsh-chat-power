@@ -8,8 +8,13 @@
  * 每层最多显示 {@link FILE_PAGE_SIZE} 条，剩下的用「加载更多」继续显示。
  * 文件大小随目录列表一起回来（`list` 的结果带 `size`），不再逐个 stat。
  */
-import { Fragment, useCallback, useEffect, useState, type ReactNode } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import styles from './file-tree-lazy.module.css'
+import { watchDirectory } from './file-tree-watch.ts'
+import { fileIconKind, fileIconPath } from './file-tree-icons.ts'
+import { ancestorsOf, isCurrentRow, rootPathView } from './file-tree-view.ts'
+import { handleTreeKey, visibleRows } from './file-tree-keyboard.ts'
+import type { WorkspaceFileTarget } from './file-tree-menu.ts'
 
 /** 每层最多显示多少条（超出部分用「加载更多」继续）。 */
 export const FILE_PAGE_SIZE = 100
@@ -179,6 +184,16 @@ function listingRemote(remote: () => unknown): ListingRemote | undefined {
   return { list: files.list.bind(files) as ListingRemote['list'] }
 }
 
+/**
+ * 把路径里的引号转义掉，好放进属性选择器里。
+ *
+ * @param value - 路径。
+ * @returns 转义后的字符串。
+ */
+function cssEscape(value: string): string {
+  return value.replace(/["\\]/g, '\\$&')
+}
+
 export function LazyFileTree(props: {
   /** 会话 ID（远程调用要带）。 */
   readonly sessionId: string
@@ -188,12 +203,27 @@ export function LazyFileTree(props: {
   readonly t: (key: string, vars?: Record<string, string | number>) => string
   /** 点文件：交给上层打开。 */
   readonly onOpenFile?: (path: string) => void
+  /** 当前打开/编辑中的文件（工作区相对路径）：这一行会高亮。 */
+  readonly currentPath?: string
+  /** 根路径显示（会话工作目录）。 */
+  readonly rootPath?: string
+  /** 重新读取整棵树。 */
+  readonly onRefresh?: () => void
+  /** 右键菜单：打开菜单（目标是这一行）。 */
+  readonly onContextMenu?: (target: WorkspaceFileTarget, point: { x: number; y: number }) => void
 }): ReactNode {
   const [levels, setLevels] = useState<Record<string, LevelState>>({})
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
+  const [focusedPath, setFocusedPath] = useState<string | undefined>(undefined)
+
+  // 取远程对象的函数每次渲染都是新的（父组件传的内联箭头），不能进依赖——
+  // 否则 load 每次渲染都重建、首屏加载的 effect 反复触发、监听被反复重建。
+  // remoteRef 保持最新引用，依赖里只放稳定的东西。
+  const remoteRef = useRef(props.remote)
+  remoteRef.current = props.remote
 
   const load = useCallback((path: string): void => {
-    const api = listingRemote(props.remote)
+    const api = listingRemote(() => remoteRef.current())
     if (api === undefined) {
       // remote 缺失（能力没接上 / 换了连接）：明确报错，不再静默 return 成空白。
       setLevels(prev => ({ ...prev, [path]: failedLevel(REMOTE_MISSING_ERROR) }))
@@ -206,11 +236,36 @@ export function LazyFileTree(props: {
     }).catch(() => {
       setLevels(prev => ({ ...prev, [path]: failedLevel(LIST_ERROR) }))
     })
-  }, [props.remote, props.sessionId])
+  }, [props.sessionId])
 
   useEffect(() => {
     load('')
   }, [load])
+
+  // 自动刷新：展开着的目录挂上变更监听，文件一变就重读那一层。
+  // 折叠的目录不监听（没人看）；根目录永远展开，所以永远在监听。
+  const watched = useMemo(() => {
+    const paths = Object.keys(expanded).filter(path => expanded[path] === true)
+    paths.push('')
+    return paths.sort()
+  }, [expanded])
+  const watchKey = watched.join('|')
+  useEffect(() => {
+    const controller = new AbortController()
+    // 每个目录一个监听：目录多时并发订阅，但每个都是独立的取消信号。
+    for (const path of watched) {
+      void watchDirectory({
+        host: remoteRef.current(),
+        sessionId: props.sessionId,
+        path,
+        signal: controller.signal,
+        onChange: () => { load(path) },
+      })
+    }
+    return () => { controller.abort() }
+    // watchKey 是展开集合的稳定表示：watched 每次渲染都是新数组，不能进依赖。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchKey, load, props.sessionId])
 
   const toggle = (path: string): void => {
     const open = expanded[path] === true
@@ -225,6 +280,63 @@ export function LazyFileTree(props: {
       return { ...prev, [path]: { ...level, shown: level.shown + FILE_PAGE_SIZE } }
     })
   }
+
+  // 当前文件的祖先目录自动展开：打开的文件在树里要看得见。
+  const currentPath = props.currentPath
+  useEffect(() => {
+    const ancestors = ancestorsOf(currentPath)
+    if (ancestors.length === 0) return
+    setExpanded(prev => {
+      let changed = false
+      const next = { ...prev }
+      for (const ancestor of ancestors) {
+        if (next[ancestor] !== true) { next[ancestor] = true; changed = true }
+      }
+      return changed ? next : prev
+    })
+  }, [currentPath])
+
+  // 当前文件所在行的祖先要读出来才能显示——没有列出过的目录是空的。
+  useEffect(() => {
+    const ancestors = ancestorsOf(currentPath)
+    for (const ancestor of ancestors) {
+      if (levels[ancestor] === undefined) load(ancestor)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPath])
+
+  // 键盘导航：在可见行列表上算动作。
+  const rows = useMemo(() => {
+    const entries: Record<string, { name: string; type: 'file' | 'directory' | 'other' }[]> = {}
+    for (const [path, level] of Object.entries(levels)) {
+      entries[path] = level.entries.map(entry => ({ name: entry.name, type: entry.type }))
+    }
+    return visibleRows(entries, expanded)
+  }, [levels, expanded])
+
+  const focusRow = useCallback((path: string): void => {
+    setFocusedPath(path)
+    const element = document.querySelector<HTMLElement>(`[data-files-path="${cssEscape(path)}"] button`)
+    element?.focus()
+  }, [])
+
+  const onKeyDown = useCallback((event: React.KeyboardEvent, path: string): void => {
+    const outcome = handleTreeKey(rows, path, event.key)
+    if (outcome.toggle !== undefined) {
+      event.preventDefault()
+      toggle(outcome.toggle)
+      return
+    }
+    if (outcome.open !== undefined) {
+      event.preventDefault()
+      props.onOpenFile?.(outcome.open)
+      return
+    }
+    if (outcome.focus !== undefined) {
+      event.preventDefault()
+      focusRow(outcome.focus)
+    }
+  }, [focusRow, props, rows])
 
   const renderLevel = (path: string, depth: number): ReactNode => {
     const level = levels[path]
@@ -242,6 +354,7 @@ export function LazyFileTree(props: {
           const entryPath = path === '' ? entry.name : `${path}/${entry.name}`
           const isDirectory = entry.type === 'directory'
           const open = expanded[entryPath] === true
+          const current = !isDirectory && isCurrentRow(entryPath, props.currentPath)
           return <Fragment key={entryPath}>
             <li
               key={entryPath}
@@ -252,7 +365,21 @@ export function LazyFileTree(props: {
               <button
                 type="button"
                 className={styles.row}
+                data-current={current || undefined}
+                aria-current={current ? 'true' : undefined}
                 aria-expanded={isDirectory ? open : undefined}
+                tabIndex={entryPath === focusedPath ? 0 : -1}
+                onFocus={() => setFocusedPath(entryPath)}
+                onKeyDown={event => { onKeyDown(event, entryPath) }}
+                onContextMenu={event => {
+                  if (props.onContextMenu === undefined) return
+                  event.preventDefault()
+                  event.stopPropagation()
+                  props.onContextMenu(
+                    { sessionId: props.sessionId, path: entryPath, directory: isDirectory },
+                    { x: event.clientX, y: event.clientY },
+                  )
+                }}
                 onClick={() => {
                   if (isDirectory) toggle(entryPath)
                   else props.onOpenFile?.(entryPath)
@@ -268,9 +395,14 @@ export function LazyFileTree(props: {
                     <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M4 1.8h4.2L9.8 3.4H13c.6 0 1 .4 1 1v9c0 .6-.4 1-1 1H4c-.6 0-1-.4-1-1V2.8c0-.6.4-1 1-1Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
                   </span>
                 )}
-                {isDirectory && (
+                {isDirectory ? (
                   <span className={styles.icon} aria-hidden="true">
                     <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M2 4.2c0-.66.54-1.2 1.2-1.2h2.4l1.5 1.8h5.7c.66 0 1.2.54 1.2 1.2v6c0 .66-.54 1.2-1.2 1.2H3.2c-.66 0-1.2-.54-1.2-1.2V4.2Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+                  </span>
+                ) : (
+                  // 文件类型图标：代码、样式、图片、压缩包……一眼能看出是什么文件。
+                  <span className={styles.icon} aria-hidden="true">
+                    <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d={fileIconPath(fileIconKind(entry.name))} stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                   </span>
                 )}
                 <span className={styles.name}>{entry.name}</span>
@@ -291,7 +423,28 @@ export function LazyFileTree(props: {
     </>
   }
 
-  return <div className={styles.tree} data-chat-lazy-file-tree="">{renderLevel('', 0)}</div>
+  const root = rootPathView(props.rootPath)
+  return <div className={styles.tree} data-chat-lazy-file-tree="">
+    {(root.leaf !== '' || root.directories.length > 0) && (
+      // 根路径：目录段弱化、末段高亮，长路径省略中段、悬停看全路径。
+      <div className={styles.root} title={props.rootPath}>
+        {root.directories.map((part, index) => (
+          <span key={`${part}-${index}`} className={styles.rootPart}>
+            <span className={styles.rootSeparator}>/</span>{part}
+          </span>
+        ))}
+        {root.leaf !== '' && <span className={styles.rootLeaf}>{root.leaf}</span>}
+        {props.onRefresh !== undefined && (
+          <button type="button" className={styles.refresh} data-files-refresh=""
+            aria-label={props.t('fileTree.refresh')} title={props.t('fileTree.refresh')}
+            onClick={() => { props.onRefresh?.(); load('') }}>
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.6-3.7M13 2.5V5h-2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        )}
+      </div>
+    )}
+    {renderLevel('', 0)}
+  </div>
 }
 
 /** 字节数转成人类看得懂的短文本。 */

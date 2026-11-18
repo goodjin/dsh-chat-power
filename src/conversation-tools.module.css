@@ -169,13 +169,14 @@
   padding: 10px 0;
 }
 
-/* 编辑卡文本域占满可用高度，超长内容由文本域自身滚动——能看到下面的内容，
-   滚动时上文仍在（2026-11-17 现场：内容多时没有滚动条，编辑到下面看不到上面）。 */
-[data-chat-tools-session] .body > [data-compose-card] textarea[data-local-file-text] {
+/* 编辑面（宿主输入框那层）占满可用高度，超长内容由它自身滚动——能看到下面的
+   内容，滚动时上文仍在（2026-11-17 现场：内容多时没有滚动条，编辑到下面看不到上面）。
+   11-12 起编辑统一到宿主输入框：滚动层是 `[data-input-scroll]`，
+   从前那个 textarea 已经不存在了。 */
+[data-chat-tools-session] .body > [data-compose-card] [data-input-scroll] {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
-  resize: none;
 }
 
 .tools[hidden],.browserWorkspace[hidden] { display:none; }

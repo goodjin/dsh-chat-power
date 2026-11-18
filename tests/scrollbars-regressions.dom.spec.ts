@@ -24,9 +24,11 @@ const lazyCss = (): string => cssText('file-tree-lazy.module.css')
 const toolsCss = (): string => cssText('conversation-tools.module.css')
 
 describe('编辑卡：文本域自身滚动', () => {
-  it('编辑卡里的文本域占满编辑区并可滚（不靠整块页面滚动）', () => {
+  it('编辑面是宿主输入框那层（不是从前那个已不存在的 textarea）', () => {
+    // 11-12 起编辑统一到宿主输入框：编辑面是 `[data-input-scroll]` 那层。
     const css = toolsCss()
-    expect(css).toMatch(/textarea\[data-local-file-text\][^{]*\{[^}]*overflow-y:\s*auto/)
+    expect(css).not.toMatch(/textarea\[data-local-file-text\]/)
+    expect(css).toMatch(/\[data-input-scroll\][^{]*\{[^}]*overflow-y:\s*auto/)
   })
 })
 
@@ -48,5 +50,27 @@ describe('工作区文件树：整棵树滚动', () => {
     expect(body).toBeDefined()
     expect(body).not.toMatch(/overflow:\s*hidden/)
     expect(body).not.toMatch(/overflow-y:\s*hidden/)
+  })
+})
+
+describe('工作区文件树：根路径栏与当前文件高亮', () => {
+  const ruleFor = (css: string, selector: string): string | undefined => {
+    const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const m = css.match(new RegExp(escaped.replace(/\s+/g, '\\s*') + '\\s*\\{([^}]*)\\}'))
+    return m?.[1]
+  }
+  it('根路径栏：目录段弱化、末段高亮', () => {
+    const css = lazyCss()
+    expect(ruleFor(css, '.root')).toBeDefined()
+    expect(ruleFor(css, '.rootLeaf')).toBeDefined()
+    expect(ruleFor(css, '.rootPart')).toBeDefined()
+  })
+  it('当前文件那一行有底色标出', () => {
+    const body = ruleFor(lazyCss(), '.row[data-current]')
+    expect(body).toBeDefined()
+    expect(body).toMatch(/background:/)
+  })
+  it('键盘聚焦的行有可见焦点环', () => {
+    expect(ruleFor(lazyCss(), '.row:focus-visible')).toMatch(/outline:/)
   })
 })
