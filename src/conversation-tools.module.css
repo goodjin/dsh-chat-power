@@ -1,6 +1,16 @@
 .switcher,.chat { display:flex; flex:0 0 auto; flex-direction:column; min-height:0; min-width:0; overflow:hidden; }
 /* 工具标签激活时条带撑满（会话标签激活时缩回工具行+标签行高度）。 */
 .chat[data-chat-strip-live] { flex:1 1 0; }
+
+/* 工具标签激活时，藏掉宿主那两条「会话列宽」拖拽边。
+   宿主在会话正文两侧各渲染一条把手（`[data-width-handle]`），悬停才显形——
+   它们拖的是**对话内容列的宽度**，在文件 / 浏览器 / 终端这些界面里没有意义，
+   露在那里只会让人误以为能拖（2026-11-18 现场）。
+   把手是滚动层的兄弟、工具正文在滚动层里，所以用「滚动层里有激活态工具正文」
+   作条件，把同层的把手一起藏掉；回到对话标签时标记撤掉，边自然回来。 */
+[data-conversation-content]:has([data-conversation-scroll] [data-chat-strip-live]) > [data-width-handle] {
+  display: none;
+}
 .chat[hidden],.content[hidden],.body[hidden] { display:none; }
 .tools { display:flex; flex-direction:column; min-height:0; min-width:0; height:100%; }
 

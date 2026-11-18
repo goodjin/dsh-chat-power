@@ -23,8 +23,12 @@ vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => {
 
 import { ExpandEditor, BIG_CLASS, COMPOSER_SIZE_TAG, injectComposerSizeCss } from '../src/expand-editor.tsx'
 import { fallbackT } from '../src/locales.ts'
+import { notifySent } from '../src/send-signal.ts'
 
 ;(globalThis as { IS_REACT_ATT_ENVIRONMENT?: boolean }).IS_REACT_ATT_ENVIRONMENT = true
+
+/** 测试里的会话 id（浮钮从 DOM 上的会话标记取它，发送信号也按它投递）。 */
+const SESSION_ID = 's-expand-editor'
 
 let container: HTMLElement
 let content: HTMLElement
@@ -36,6 +40,7 @@ beforeEach(() => {
   // 宿主结构桩：会话内容区（带 phase）+ composer 卡片 + 输入框（Lexical 内容editable）。
   content = document.createElement('div')
   content.dataset.conversationContent = ''
+  content.dataset.conversationSession = SESSION_ID
   document.body.appendChild(content)
   card = document.createElement('div')
   card.dataset.composerCard = ''
@@ -101,13 +106,23 @@ describe('ExpandEditor 撑高 / 收起', () => {
     await expect(toggle()).resolves.toBeUndefined()
   })
 
-  it('请求发出（输入框被清空）即自动收起', async () => {
+  it('手动删光文字不收起（删字与发送是两件事）', async () => {
+    // 2026-11-18 现场：按删除键把字删完，输入框一空就把大编辑区收了，
+    // 正在写的稿子凭空消失。收起有向下的箭头按钮，用户想收自己点。
     await render()
     await toggle()
     expect(card.classList.contains(BIG_CLASS)).toBe(true)
-    // 模拟宿主发送后清空输入框：先有内容，再清空——清空这一下触发收起。
-    await act(async () => { input.textContent = '要发的内容' })
+    await act(async () => { input.textContent = '写了一半的稿子' })
     await act(async () => { input.textContent = '' })
+    expect(card.classList.contains(BIG_CLASS)).toBe(true)
+    expect(document.querySelector('[data-expand-toggle]')?.hasAttribute('data-big')).toBe(true)
+  })
+
+  it('真的发出去了才收起', async () => {
+    await render()
+    await toggle()
+    expect(card.classList.contains(BIG_CLASS)).toBe(true)
+    await act(async () => { notifySent(SESSION_ID) })
     expect(card.classList.contains(BIG_CLASS)).toBe(false)
     expect(document.querySelector('[data-expand-toggle]')?.hasAttribute('data-big')).toBe(false)
   })

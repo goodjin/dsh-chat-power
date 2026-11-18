@@ -22,6 +22,7 @@ import { readEntireWorkspaceText } from './workspace-text.ts'
 import { openComposerEdit } from './composer-edit-state.ts'
 import { saveWorkspaceText } from './workspace-save.ts'
 import { startSendWatch, USER_NODE_SELECTOR } from './send-watch.ts'
+import { notifySent } from './send-signal.ts'
 import { LOCAL_FILE_ACCEPT, LOCAL_FILE_MAX_BYTES, LocalFileComposerCard } from './local-file.tsx'
 import { createMarkdownTurnReaders } from './markdown-turn-sources.ts'
 import { installAnswerLinkInterception } from './answer-link-intercept.ts'
@@ -300,7 +301,12 @@ export function registerConversationTools(ctx: any) {
       const stopWatch = startSendWatch({
         root: () => content.querySelector('[data-conversation-scroll]'),
         isUserTurn: node => node.matches?.(USER_NODE_SELECTOR) === true || node.querySelector?.(USER_NODE_SELECTOR) !== null,
-        onSend: () => { toolsState.activateChat(id); checkedFiles.clear(id) },
+        onSend: () => {
+          toolsState.activateChat(id)
+          checkedFiles.clear(id)
+          // 大编辑区发完一轮让位给小框（输入框浮钮那边在等这个信号）。
+          notifySent(id)
+        },
       })
       return () => { teardown(); stopWatch() }
     }, [id, mounts])

@@ -22,6 +22,7 @@ import { createPortal } from 'react-dom'
 import type { ReactNode } from 'react'
 import { IconChevronDownOutlineRegular, IconChevronUpOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import { NAMESPACE, type RuntimeT } from './locales.ts'
+import { onSent } from './send-signal.ts'
 import css from './expand-editor.module.css'
 
 /** 展开大编辑区后，挂在宿主 composer 卡片上的标记类名（全局样式据此撑高）。 */
@@ -209,21 +210,23 @@ export function ExpandEditor(props: { readonly t: RuntimeT; readonly inHeader?: 
   // 装上回车拦截：仅在大编辑区状态改写回车，普通小框回车的宿主行为原样保留。
   useEffect(() => installEnterInterceptor(), [])
 
-  // 请求发出即收起：宿主 composer 发送后会清空输入框。观察到输入框由有内容变空
-  // （且当前仍是撑大态）就收起——大编辑区发完一轮自然让位给小框；hero 阶段本就靠
-  // 阶段切换收起，不落标记类，这里只处理用户点箭头撑大的那一种。
+  // 请求发出即收起：宿主 composer 发送完一轮后，大编辑区自然让位给小框。
+  //
+  // 判据是**真的发出去了**（聊天流里出现了新的用户消息），不是「输入框空了」：
+  // 手动删字也会让输入框空，那时收起等于把用户正在写的稿子凭空弄丢
+  // （2026-11-18 现场）。收起有向下的箭头按钮，用户想收自己点。
+  //
+  // hero 阶段本就靠阶段切换收起，不落标记类，这里只处理用户点箭头撑大的那一种。
   useEffect(() => {
-    const input = composerInputFromDom()
-    if (input === null) return
-    const observer = new MutationObserver(() => {
+    const sessionId = currentSessionIdFromDom()
+    if (sessionId === undefined) return
+    return onSent(sessionId, () => {
       const card = composerCardFromDom()
-      if (card !== null && card.classList.contains(BIG_CLASS) && (input.textContent ?? '') === '') {
+      if (card !== null && card.classList.contains(BIG_CLASS)) {
         card.classList.remove(BIG_CLASS)
         setBig(false)
       }
     })
-    observer.observe(input, { childList: true, characterData: true, subtree: true })
-    return () => observer.disconnect()
   }, [])
 
   const toggle = (): void => {
