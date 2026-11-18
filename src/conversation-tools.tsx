@@ -26,6 +26,7 @@ import { notifySent } from './send-signal.ts'
 import { LOCAL_FILE_ACCEPT, LOCAL_FILE_MAX_BYTES, LocalFileComposerCard } from './local-file.tsx'
 import { createMarkdownTurnReaders } from './markdown-turn-sources.ts'
 import { installAnswerLinkInterception } from './answer-link-intercept.ts'
+import { installChangedFilesInterception } from './changed-files-intercept.ts'
 import { DocumentActions } from './document-actions.tsx'
 import { sessionFileAddressOf } from './file-address.ts'
 import { fallbackT } from './locales.ts'
@@ -431,6 +432,12 @@ export function registerConversationTools(ctx: any) {
   // 文档卡片三种形态），范围是「回答内容」——宿主回答行是插件那个「每轮一框」
   // 的兄弟节点（框只承载标题），先前限定在框内等于这项功能从未生效。
   ctx.effect(() => installAnswerLinkInterception((sessionId, path) => { openAnswerFile(sessionId, path) }), 'chat-power: answer link open')
+  // 宿主每轮末尾那张「改动文件卡」（已编辑的文件）：点它原本开右侧栏的 review
+  // 对比，改成在会话区打开——会话区里已有等价的文件列表与编辑入口。
+  ctx.effect(() => installChangedFilesInterception({
+    open: (sessionId, path) => { openAnswerFile(sessionId, path) },
+    rootOf: sessionRootPath,
+  }), 'chat-power: changed files open in chat')
   ctx.effect(() => {
     const edit = (event: Event) => {
       const detail = (event as CustomEvent).detail
