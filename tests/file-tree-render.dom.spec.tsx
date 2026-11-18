@@ -88,6 +88,18 @@ describe('工作区文件树的渲染', () => {
     expect(icons.length).toBeGreaterThan(0)
   })
 
+  it('文件行只有一个图标（旧的通用轮廓要拿掉，别和新图标叠成两个）', async () => {
+    // 2026-11-18 现场：加了类型图标后旧的通用图标没删，一行画了两个。
+    const box = mount()
+    await flush()
+    const file = box.querySelector('[data-files-path="main.ts"] button')!
+    expect(file.querySelectorAll('[class*="icon"]').length).toBe(1)
+    // 目录行是「箭头 + 文件夹」两枚，文件行没有箭头。
+    const directory = box.querySelector('[data-files-path="src"] button')!
+    expect(directory.querySelectorAll('[class*="caret"]').length).toBe(1)
+    expect(directory.querySelectorAll('[class*="icon"]').length).toBe(1)
+  })
+
   it('根路径栏上有重新读取按钮', async () => {
     const box = mount({ rootPath: '/root', onRefresh: vi.fn() })
     await flush()

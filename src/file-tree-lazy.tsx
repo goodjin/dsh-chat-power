@@ -385,14 +385,10 @@ export function LazyFileTree(props: {
                   else props.onOpenFile?.(entryPath)
                 }}
               >
-                {isDirectory ? (
-                  // 树形标识：展开/收起箭头 + 文件夹图标，层级关系一眼可读。
+                {isDirectory && (
+                  // 树形标识：展开/收起箭头（目录才有）。
                   <span className={styles.caret} data-open={open || undefined} aria-hidden="true">
                     <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                  </span>
-                ) : (
-                  <span className={styles.icon} aria-hidden="true">
-                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M4 1.8h4.2L9.8 3.4H13c.6 0 1 .4 1 1v9c0 .6-.4 1-1 1H4c-.6 0-1-.4-1-1V2.8c0-.6.4-1 1-1Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
                   </span>
                 )}
                 {isDirectory ? (
