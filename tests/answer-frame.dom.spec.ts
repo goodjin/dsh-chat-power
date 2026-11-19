@@ -169,6 +169,27 @@ it('整框预算包含标题与内边距，最后一轮再为原生尾部操作�
   } finally { stop() }
 })
 
+it('视口太矮时不写固定高度：框按内容展开，正文看得见（web 版小窗口现场）', () => {
+  document.body.innerHTML = `<section data-conversation-session="s1"><main data-conversation-scroll>
+    <div data-chat-flow-kind="assistant-step" data-chat-turn="1" id="answer">正文</div>
+    <div data-chat-flow-kind="turn-tail" id="tail">原生操作栏</div>
+    <div data-composer-seat></div>
+  <div data-turn-tail="1"></div><div data-turn-tail="2"></div><div data-turn-tail="3"></div></main></section>`
+  const main = document.querySelector('main')!
+  // 视口只有 120px：按视口算出来是 96px，低于可用下限。
+  Object.defineProperty(main, 'clientHeight', { value: 120 })
+  const answer = document.getElementById('answer')!
+  answer.getBoundingClientRect = () => ({ bottom: 200, height: 500 }) as DOMRect
+  document.getElementById('tail')!.getBoundingClientRect = () => ({ bottom: 240, height: 32 }) as DOMRect
+  document.querySelector<HTMLElement>('[data-composer-seat]')!.getBoundingClientRect = () => ({ height: 40 }) as DOMRect
+  const stop = installAnswerFrame(document, () => {})
+  try {
+    // 不写固定高度 → CSS 里的 height 退回 auto，框按内容展开。
+    expect(answer.style.getPropertyValue('--chat-power-answer-height')).toBe('')
+    expect(getComputedStyle(answer).height).not.toBe('96px')
+  } finally { stop() }
+})
+
 it('流式时无框和标题，只有整轮结束才装饰；结束事件先到也会补查，切会话不串状态', async () => {
   const { vi } = await import('vitest')
   vi.useFakeTimers()
