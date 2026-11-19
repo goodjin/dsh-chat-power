@@ -77,9 +77,31 @@ ${FRAMED_SELECTOR}:has(> [data-chat-power-answer-header])::before { display: non
 [data-chat-power-answer-error] { font-weight: 400; font-size: 12px; }
 `
 
-/** 页内留 24px 呼吸空间；极小窗口保留标题及最小正文区。 */
-export function answerFrameHeight(page: number, composer: number, latest: boolean, tailHeight = 0): number {
-  return Math.max(80, Math.floor(page - 24 - (latest ? Math.max(0, composer) + Math.max(0, tailHeight) : 0)))
+/**
+ * 回答框的可用高度下限：低于它就不写固定高度。
+ *
+ * 视口太矮时（web 版的小窗口、输入框撑大后吃掉了大半屏），按视口算出来的高度
+ * 会变成负数或几十像素——框缩成一条，正文被压到看不见（2026-11-19 现场：
+ * web 版上历史轮次全成了小框，内容都读不到）。低于这个下限就干脆不写高度，
+ * 让框按内容自然展开，页面自己滚——内容总是看得见的。
+ */
+export const MIN_FRAME_HEIGHT = 240
+
+/**
+ * 回答框的高度。
+ *
+ * 页内留 24px 呼吸空间；最新一轮再扣掉输入框与原生尾巴（那两样占着屏）。
+ *
+ * @param page - 会话视口高度。
+ * @param composer - 输入框高度（只有最新一轮扣）。
+ * @param latest - 是不是最新一轮。
+ * @param tailHeight - 原生尾巴高度（只有最新一轮扣）。
+ * @returns 固定高度（像素）；视口太矮时 undefined——不写固定高度，按内容展开。
+ */
+export function answerFrameHeight(page: number, composer: number, latest: boolean, tailHeight = 0): number | undefined {
+  const height = Math.floor(page - 24 - (latest ? Math.max(0, composer) + Math.max(0, tailHeight) : 0))
+  if (height < MIN_FRAME_HEIGHT) return undefined
+  return height
 }
 
 /**
@@ -274,7 +296,14 @@ export function installAnswerFrame(doc?: Document, onEdit?: (sessionId: string, 
           if (rect.height > 0) tailHeight = Math.max(tailHeight, rect.bottom - bottom)
           sizes.add(tail)
         }
-        const height = `${answerFrameHeight(page, composer?.getBoundingClientRect().height ?? 0, latest, tailHeight)}px`
+        const computed = answerFrameHeight(page, composer?.getBoundingClientRect().height ?? 0, latest, tailHeight)
+        if (computed === undefined) {
+          // 视口太矮：不写固定高度，框按内容自然展开——正文要看得见，
+          // 不能被压成一条（2026-11-19 现场：web 版小窗口上历史轮次全成了小框）。
+          if (row.style.getPropertyValue(HEIGHT) !== '') row.style.removeProperty(HEIGHT)
+          continue
+        }
+        const height = `${computed}px`
         if (row.style.getPropertyValue(HEIGHT) !== height) row.style.setProperty(HEIGHT, height)
       }
     }
